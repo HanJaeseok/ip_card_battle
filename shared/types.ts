@@ -14,6 +14,7 @@ export interface TeamState {
   members: string[];
   scores: Record<Animal, number>;
   lastLevel: Record<Animal, number>;
+  playerIndex: number;  // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
 }
 
 export interface GameState {

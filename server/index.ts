@@ -1,0 +1,96 @@
+import { WebSocketServer } from 'ws';
+import { randomUUID } from 'crypto';
+import type { ClientMessage } from 'shared';
+import { RoomManager } from './roomManager';
+
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
+const wss = new WebSocketServer({ port: PORT });
+const roomManager = new RoomManager();
+
+console.log(`카드배틀 WebSocket 서버 시작 — ws://localhost:${PORT}`);
+
+wss.on('connection', (ws) => {
+  let currentRoomId: string | null = null;
+  let currentPlayerId: string | null = null;
+
+  ws.on('message', (raw) => {
+    let msg: ClientMessage;
+    try {
+      msg = JSON.parse(raw.toString()) as ClientMessage;
+    } catch {
+      return;
+    }
+
+    switch (msg.type) {
+      case 'createRoom': {
+        const { roomId, room } = roomManager.createRoom();
+        const playerId = randomUUID();
+        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team);
+        if (result !== 'ok') {
+          ws.send(JSON.stringify({ type: 'error', code: 'ROOM_FULL', message: '방을 만들 수 없습니다.' }));
+          return;
+        }
+        currentRoomId = roomId;
+        currentPlayerId = playerId;
+        ws.send(JSON.stringify({ type: 'roomCreated', roomId, playerId }));
+        break;
+      }
+
+      case 'joinRoom': {
+        const room = roomManager.getRoom(msg.roomId);
+        if (!room) {
+          ws.send(JSON.stringify({ type: 'error', code: 'ROOM_NOT_FOUND', message: `방 ${msg.roomId}을 찾을 수 없습니다.` }));
+          return;
+        }
+        const playerId = randomUUID();
+        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team);
+        if (result === 'game_started') {
+          ws.send(JSON.stringify({ type: 'error', code: 'GAME_ALREADY_STARTED', message: '이미 게임이 시작된 방입니다.' }));
+          return;
+        }
+        if (result === 'nickname_taken') {
+          ws.send(JSON.stringify({ type: 'error', code: 'NICKNAME_TAKEN', message: '이미 사용 중인 닉네임입니다.' }));
+          return;
+        }
+        currentRoomId = msg.roomId;
+        currentPlayerId = playerId;
+        ws.send(JSON.stringify({ type: 'roomJoined', roomId: msg.roomId, playerId }));
+        break;
+      }
+
+      case 'ready': {
+        if (!currentRoomId || !currentPlayerId) return;
+        roomManager.getRoom(currentRoomId)?.setReady(currentPlayerId);
+        break;
+      }
+
+      case 'openCard': {
+        if (!currentRoomId || !currentPlayerId) return;
+        roomManager.getRoom(currentRoomId)?.handleOpenCard(currentPlayerId, msg.r, msg.c);
+        break;
+      }
+
+      case 'reconnect': {
+        const room = roomManager.getRoom(msg.roomId);
+        if (!room) {
+          ws.send(JSON.stringify({ type: 'error', code: 'ROOM_NOT_FOUND', message: `방 ${msg.roomId}을 찾을 수 없습니다.` }));
+          return;
+        }
+        const ok = room.handleReconnect(ws, msg.playerId);
+        if (!ok) {
+          ws.send(JSON.stringify({ type: 'error', code: 'INVALID_RECONNECT', message: '재접속 정보가 유효하지 않습니다.' }));
+          return;
+        }
+        currentRoomId = msg.roomId;
+        currentPlayerId = msg.playerId;
+        break;
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    if (currentRoomId && currentPlayerId) {
+      roomManager.getRoom(currentRoomId)?.handleDisconnect(currentPlayerId, ws);
+    }
+  });
+});

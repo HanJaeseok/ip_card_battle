@@ -163,10 +163,10 @@ Card = { animal, num, open, collectedBy: null|'A'|'B' }
 
 ## 📦 Task 0. 프로젝트 셋업 ✅ 완료
 **목표**: 개발/배포 가능한 뼈대 마련
-1. ✅ 기술 스택 확정 — Next.js 15 + TypeScript + Tailwind CSS v4 + ShadcnUI (client), Node.js + ws (server)
+1. ✅ 기술 스택 확정 — Next.js 16 (Turbopack) + TypeScript + Tailwind CSS v4 (client), Node.js + ws (server)
 2. ✅ 저장소 초기화, 디렉토리 구조 설계 (`/client`, `/server`, `/shared`)
 3. ✅ 게임 상수 파일 작성: 보드 크기, 턴 상한(40), 확장 턴(20), **동물별 임계 단위(실용신양·상표토끼=10, 디자인어·특허랑이=20)**, **특허랑이 계수(1.5)**, **디자인어 캐치업 비율(0.5)/리드보너스 계수(0.3)**, 오픈 제한시간(30초)
-4. ⬜ 로컬 개발 서버 + 핫리로드 세팅
+4. ✅ 로컬 개발 서버 + 핫리로드 세팅 (ts-node + Next.js dev)
 
 ## 🧠 Task 1. 코어 게임 엔진 (서버, UI 없이 동작) ✅ 완료
 **목표**: 규칙 전체를 순수 로직으로 구현 — 렌더링과 완전 분리, 테스트 가능하게
@@ -194,19 +194,32 @@ Card = { animal, num, open, collectedBy: null|'A'|'B' }
    - 규칙 케이스 15개 통과: 상표토끼 1회성 발동, 특허랑이 min 0 및 20점 단위 판정, 실용신양 연쇄 cap, 홀수 잔류, 디자인어 캐치업/리드보너스 분기 정확성 등
    - 봇 대전 시뮬레이션 500게임 완주 (크래시·무한루프 없음, 15턴 고착률 ≈ 59% 목표 범위 내)
 
-## 🌐 Task 2. 멀티플레이 서버 (WebSocket) ⬜ 미구현
+## 🌐 Task 2. 멀티플레이 서버 (WebSocket) ✅ 완료
 **목표**: N:N 실시간 대전 + 치팅 방지 뷰 분리
 
-1. **Step 2-1. 방/로비**: 방 생성·참가·팀 배정, 준비 완료 → 게임 시작
-2. **Step 2-2. 뷰 직렬화(팀별)**
-   - 공통: 오픈된 카드, 점수, 턴, 타이머 남은 시간
-   - **미오픈 카드의 animal/num은 어떤 경우에도 클라이언트로 보내지 않음**
-   - (참고: 디자인어 효과가 점수 기반으로 변경되어, 기존 로드맵에 있던 "인어 우위 팀 전용 trembling 좌표 목록" 전송 로직은 더 이상 필요 없음 — 뷰 직렬화가 한 종류로 단순화됨)
-3. **Step 2-3. 30초 턴 타이머**
-   - 서버가 deadline 관리, 매 오픈마다 리셋
-   - 시간 초과 시 서버가 미오픈 카드 중 무작위 선택해 강제 오픈 → 결과 브로드캐스트 (클라 타이머는 표시용일 뿐)
-4. **Step 2-4. 팀 내 로테이션**: N:N에서 팀원끼리 오픈 순서 돌아가게 (activePlayerIndex)
-5. **Step 2-5. 재접속/이탈 처리**: 연결 끊긴 플레이어 차례는 30초 타임아웃 강제진행으로 자연 커버, 재접속 시 현재 뷰 재전송
+1. ✅ **Step 2-1. 방/로비** (`server/roomManager.ts`, `server/room.ts`)
+   - 4자리 대문자 방 코드(O·I 제외) 생성, 방 생성·참가·팀 배정
+   - 모든 플레이어 준비 완료 + 양팀 최소 1명 → 자동 게임 시작
+2. ✅ **Step 2-2. 뷰 직렬화** (`server/serializer.ts`, `shared/protocol.ts`)
+   - **미오픈 카드의 animal/num은 어떤 경우에도 전송하지 않음** — `ClientCard` 타입으로 강제
+   - `GameState.board(Map)` → `ClientBoardEntry[]` 배열 직렬화 (JSON 전송용)
+   - 디자인어 효과가 점수 기반으로 변경되어 팀별 뷰 분기 없음 — 단일 직렬화로 통일
+3. ✅ **Step 2-3. 30초 턴 타이머** (`server/room.ts`)
+   - 서버가 `turnDeadline = Date.now() + 30000` 타임스탬프 관리, 매 오픈마다 리셋
+   - 시간 초과 시 `processTimeout()` 호출 → 결과 브로드캐스트 (클라 타이머는 표시 전용)
+4. ✅ **Step 2-4. N:N 팀 내 로테이션** (`server/engine/turnManager.ts`)
+   - `TeamState`에 `playerIndex` 추가 → 팀별 독립 인덱스 관리
+   - 기존 공유 `activePlayerIndex` 방식의 2:2 버그 수정: `prevTeam.playerIndex` 증가 후 `nextTeam.playerIndex`로 activePlayerIndex 갱신
+   - 검증 결과: 2:2에서 `A1→B1→A2→B2→A1→...` 순환 정확
+5. ✅ **Step 2-5. 재접속/이탈 처리** (`server/room.ts`)
+   - 페이지 이동 시 구 WS가 늦게 닫히는 Race Condition 수정: `handleDisconnect(playerId, ws)` — 현재 등록된 WS와 다르면 무시
+   - 이탈 플레이어 차례는 30초 타임아웃 강제진행으로 자연 커버
+   - 재접속: localStorage에 `cardBattle_roomId` / `cardBattle_playerId` 저장 → 페이지 재방문 시 자동 reconnect
+6. ✅ **Step 2-6. 임시 클라이언트 UI** (`client/`)
+   - Next.js 16 App Router, `app/page.tsx`(로비) + `app/room/[roomId]/page.tsx`(게임)
+   - `hooks/useWebSocket.ts` — WebSocket 상태 관리 훅 (연결·재접속·메시지 디스패치)
+   - 로비: 방 생성/참가, 팀 선택, 준비 버튼, 대기실 플레이어 목록
+   - 게임: 10×10 카드 그리드, 팀별 점수판, 30초 카운트다운 타이머 바, 종료 화면
 
 ## 🎨 Task 3. 게임 화면 UI (확정 목업 기반) ⬜ 미구현
 **목표**: 업로드한 목업 + 추가 확정사항 반영
@@ -283,9 +296,92 @@ Card = { animal, num, open, collectedBy: null|'A'|'B' }
 | 마일스톤 | 포함 Task | 완료 기준 | 상태 |
 |---|---|---|---|
 | **M1. 규칙이 돌아간다** | Task 0, 1 | UI 없이 봇 대전이 40턴 완주, 테스트 통과 | ✅ 완료 |
-| **M2. 둘이서 논다** | Task 2 | 브라우저 2개로 1:1 실시간 대전 가능 (임시 UI) | ⬜ 미구현 |
+| **M2. 둘이서 논다** | Task 2 | 브라우저 2개로 N:N 실시간 대전 가능 (임시 UI) | ✅ 완료 |
 | **M3. 보기 좋다** | Task 3 | 확정 목업대로 화면 완성, 타이머·글로우·공격력 바 동작 | ⬜ 미구현 |
 | **M4. 재밌다** | Task 4 | 전 이벤트 연출 탑재 (디자인어 연출 등 미확정 항목은 별도 확정 후 추가) | ⬜ 미구현 |
 | **M5. 내보낸다** | Task 5, 6 | QA 통과, 초대 링크로 친구와 플레이 가능 | ⬜ 미구현 |
 
 > ⚠️ 우선순위 팁: Task 1(엔진)을 UI와 분리해 먼저 완성하는 것이 가장 중요. 규칙이 복잡해서(연쇄 오픈, lastLevel, 턴 종료 훅, 동물별 상이한 threshold) UI에 섞어 짜면 디버깅이 매우 어려워짐. M1에서 자동 대전 수백~1000판을 돌려 안정성과 밸런스 지표를 함께 확보한 뒤 화면 작업으로 넘어갈 것.
+
+---
+
+# PART 5. 개발 환경 & 실행 방법
+
+## 5-1. 디렉토리 구조
+
+```
+card_battle/
+├── shared/          # 타입·상수·WebSocket 프로토콜 (양쪽에서 공유)
+│   ├── types.ts     # GameState, Card, TeamState (playerIndex 포함) 등
+│   ├── constants.ts # THRESHOLDS, 계수, 턴 상한 등
+│   └── protocol.ts  # ClientMessage, ServerMessage, ClientGameState 등
+├── server/          # Node.js 게임 서버
+│   ├── index.ts     # WebSocket 서버 진입점 (포트 8080)
+│   ├── room.ts      # Room 클래스 (플레이어 관리·타이머·브로드캐스트)
+│   ├── roomManager.ts
+│   ├── serializer.ts  # 뷰 직렬화 (치팅 방지)
+│   └── engine/      # 게임 엔진 (Task 1, UI와 완전 분리)
+│       ├── gameEngine.ts   # processPlayerAction, processTimeout, initGame
+│       ├── board.ts
+│       ├── openCard.ts
+│       ├── turnManager.ts
+│       └── effects/  # sheep / rabbit / mermaid / tiger
+└── client/          # Next.js 16 앱 (임시 UI, Task 3에서 교체 예정)
+    ├── app/
+    │   ├── page.tsx              # 로비 (방 생성/참가/대기)
+    │   └── room/[roomId]/page.tsx  # 게임 화면
+    └── hooks/
+        └── useWebSocket.ts      # WebSocket 상태 관리 훅
+```
+
+## 5-2. 개발 서버 실행
+
+**터미널을 두 개 열어 각각 실행한다.**
+
+```bash
+# 터미널 1 — WebSocket 게임 서버 (포트 8080)
+cd server
+npx ts-node index.ts
+
+# 터미널 2 — Next.js 클라이언트 (포트 3000)
+cd client
+npm run dev
+```
+
+브라우저에서 `http://localhost:3000` 접속.
+
+## 5-3. 중단 방법
+
+두 터미널 모두 **`Ctrl+C`** 로 종료.
+
+> 포트가 이미 사용 중이라는 오류가 나면 PowerShell에서:
+> ```powershell
+> # 8080 포트 점유 프로세스 종료
+> Stop-Process -Id (Get-NetTCPConnection -LocalPort 8080).OwningProcess -Force
+> ```
+
+## 5-4. 테스트 실행
+
+```bash
+cd server
+
+npm test              # 전체 단위 테스트 (20개)
+npm run test:sim      # 봇 500게임 시뮬레이션 (시간 초과 방지 옵션 포함)
+```
+
+## 5-5. 주요 포트 & 환경 변수
+
+| 항목 | 기본값 | 변경 방법 |
+|---|---|---|
+| WebSocket 서버 포트 | `8080` | `PORT=9000 npx ts-node index.ts` |
+| Next.js 포트 | `3000` | `npm run dev -- -p 3001` |
+| 클라이언트가 바라보는 WS 주소 | `ws://localhost:8080` | `NEXT_PUBLIC_WS_URL` 환경 변수 |
+
+## 5-6. N:N 대전 테스트 방법
+
+1. 서버와 클라이언트 실행
+2. 브라우저 탭(또는 창) **N개** 열기
+3. 첫 번째 탭: **방 만들기** → 방 코드 확인 (예: `ABCD`)
+4. 나머지 탭: **방 참가하기** → 방 코드 입력, 각자 팀 선택
+5. 모든 참가자 **준비** 버튼 클릭 → 게임 자동 시작
+6. 차례인 플레이어의 탭에서 카드 클릭 → 전체 탭에 즉시 반영

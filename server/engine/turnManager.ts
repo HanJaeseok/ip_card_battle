@@ -54,12 +54,14 @@ export function advanceTurn(state: GameState, rng: RNG = Math.random): GameEvent
     }
   }
 
-  // 팀 교대 및 팀 내 플레이어 로테이션
+  // 방금 플레이한 팀의 playerIndex를 다음 번을 위해 증가 (N:N 로테이션)
+  const prevTeamState = state.teams[currentTeam];
+  prevTeamState.playerIndex =
+    (prevTeamState.playerIndex + 1) % prevTeamState.members.length;
+
+  // 팀 교대 후 다음 팀의 현재 playerIndex를 activePlayerIndex에 반영
   state.activeTeam = nextTeam;
-  const teamSize = state.teams[nextTeam].members.length;
-  if (teamSize > 1) {
-    state.activePlayerIndex = (state.activePlayerIndex + 1) % teamSize;
-  }
+  state.activePlayerIndex = state.teams[nextTeam].playerIndex;
 
   return events;
 }
@@ -74,6 +76,7 @@ export function initGame(
     members,
     scores: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
     lastLevel: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
+    playerIndex: 0,
   });
 
   return {
