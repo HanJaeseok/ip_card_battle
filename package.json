@@ -1,0 +1,5 @@
+{
+  "name": "card-battle",
+  "private": true,
+  "workspaces": ["client", "server", "shared"]
+}
