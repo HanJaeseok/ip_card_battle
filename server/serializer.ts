@@ -27,8 +27,16 @@ export function serializeState(
   }
 
   const teams: Record<'A' | 'B', ClientTeamState> = {
-    A: { members: state.teams.A.members, scores: { ...state.teams.A.scores } },
-    B: { members: state.teams.B.members, scores: { ...state.teams.B.scores } },
+    A: {
+      members: state.teams.A.members,
+      scores: { ...state.teams.A.scores },
+      lastLevel: { ...state.teams.A.lastLevel },
+    },
+    B: {
+      members: state.teams.B.members,
+      scores: { ...state.teams.B.scores },
+      lastLevel: { ...state.teams.B.lastLevel },
+    },
   };
 
   const activeTeam = state.teams[state.activeTeam];

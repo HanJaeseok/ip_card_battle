@@ -52,6 +52,7 @@ export interface ClientBoardEntry {
 export interface ClientTeamState {
   members: string[];
   scores: Record<Animal, number>;
+  lastLevel: Record<Animal, number>;
 }
 
 export interface ClientGameState {

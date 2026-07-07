@@ -29,11 +29,13 @@ export default function LobbyPage() {
 
   const handleCreateRoom = () => {
     if (!nickname.trim()) return;
+    localStorage.setItem('cardBattle_team', team);
     ws.createRoom(nickname.trim(), team);
   };
 
   const handleJoinRoom = () => {
     if (!nickname.trim() || !joinRoomId.trim()) return;
+    localStorage.setItem('cardBattle_team', team);
     ws.joinRoom(joinRoomId.trim().toUpperCase(), nickname.trim(), team);
   };
 
