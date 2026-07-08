@@ -3,16 +3,15 @@ import type { AnimationState } from '@/hooks/useAnimationQueue';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
 import { EffectLayer } from '@/components/effects/EffectLayer';
 import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
+import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { BoardPanel } from './BoardPanel';
 import { CommentaryBoard } from './CommentaryBoard';
 
-function shakeClass(level: number): string {
-  if (level === 0) return '';
-  if (level >= 8) return 'shake-strong';
-  if (level >= 5) return 'shake-medium';
-  return 'shake-small';
+// 실용신양 콤보 번호 → 진동 강도 스케일. 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다.
+function shakeScale(combo: number): number {
+  return Math.min(0.6 + (combo - 1) * 0.35, 3.2);
 }
 
 export function GameLayout({
@@ -28,9 +27,12 @@ export function GameLayout({
   error: string | null;
   animState: AnimationState;
 }) {
+  const isShaking = animState.screenShakeLevel > 0;
+
   return (
     <div
-      className={`min-h-screen bg-jungle-50 flex flex-col relative overflow-hidden ${shakeClass(animState.screenShakeLevel)}`}
+      className={`min-h-screen bg-jungle-50 flex flex-col relative overflow-hidden ${isShaking ? 'shake-combo' : ''}`}
+      style={isShaking ? ({ '--shake-scale': shakeScale(animState.screenShakeLevel) } as React.CSSProperties) : undefined}
     >
       {/* 모서리 잎사귀 장식 */}
       <LeafDecoration position="tl" />
@@ -63,7 +65,7 @@ export function GameLayout({
             expandBurst={animState.expandBurst}
             mermaidPopup={animState.mermaidPopup}
           />
-          <CommentaryBoard lines={animState.commentary} />
+          <CommentaryBoard lines={animState.commentary} gameState={gameState} />
         </div>
         <TeamPanel team="B" gameState={gameState} animState={animState} />
       </main>
@@ -76,6 +78,9 @@ export function GameLayout({
 
       {/* 상표토끼 보너스 — 카드 → 점수판 플라이트 (fixed, 화면 전역) */}
       <RabbitFlightLayer flights={animState.rabbitFlights} />
+
+      {/* 실용신양 추가 오픈 콤보 텍스트 (fixed, 화면 전역) */}
+      <SheepComboLayer combos={animState.sheepCombos} />
     </div>
   );
 }

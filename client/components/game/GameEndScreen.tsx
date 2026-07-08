@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
 import { ANIMALS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
+import { playFixedSound } from '@/lib/sounds';
 
 const FLAVOR_TEXT: Record<Animal, string> = {
   sheep: '실용신안의 실리주의에 당하셨군요!',
@@ -72,6 +73,10 @@ export function GameEndScreen({
     () => (winner && winner !== 'draw' ? generateConfetti(45, winner) : []),
     [winner],
   );
+
+  useEffect(() => {
+    playFixedSound('/sounds/result.wav');
+  }, []);
 
   const winnerEmoji = winner === 'draw' ? '🤝' : winner === 'A' ? '🟢' : '🔵';
   const winnerText = winner === 'draw' ? '무승부!' : `${winner}팀 승리!`;

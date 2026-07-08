@@ -201,37 +201,16 @@ body {
   .card-gold-flash { animation: none; box-shadow: 0 0 0 3px #fbbf24; }
 }
 
-/* ── 화면 흔들림 ─────────────────────────────────────────────────────────── */
-@keyframes shakeSmall {
+/* ── 화면 흔들림 (실용신양 콤보마다 발동, --shake-scale로 강도 연속 조절) ──────── */
+@keyframes shakeCombo {
   0%, 100% { transform: translate(0, 0); }
-  25%       { transform: translate(-2px, 1px); }
-  50%       { transform: translate(2px, -1px); }
-  75%       { transform: translate(-1px, 2px); }
+  25%       { transform: translate(calc(var(--shake-scale, 1) * -2px), calc(var(--shake-scale, 1) * 1px)); }
+  50%       { transform: translate(calc(var(--shake-scale, 1) * 2px), calc(var(--shake-scale, 1) * -1px)); }
+  75%       { transform: translate(calc(var(--shake-scale, 1) * -1px), calc(var(--shake-scale, 1) * 2px)); }
 }
-@keyframes shakeMedium {
-  0%, 100% { transform: translate(0, 0); }
-  15%       { transform: translate(-5px, 3px); }
-  30%       { transform: translate(5px, -4px); }
-  45%       { transform: translate(-4px, 4px); }
-  60%       { transform: translate(6px, -3px); }
-  80%       { transform: translate(-3px, 2px); }
-}
-@keyframes shakeStrong {
-  0%, 100% { transform: translate(0, 0); }
-  10%       { transform: translate(-9px, 5px); }
-  20%       { transform: translate(8px, -6px); }
-  30%       { transform: translate(-9px, 4px); }
-  40%       { transform: translate(9px, -5px); }
-  50%       { transform: translate(-7px, 6px); }
-  60%       { transform: translate(8px, -4px); }
-  70%       { transform: translate(-8px, 5px); }
-  85%       { transform: translate(5px, -3px); }
-}
-.shake-small  { animation: shakeSmall  0.25s ease-in-out; }
-.shake-medium { animation: shakeMedium 0.45s ease-in-out; }
-.shake-strong { animation: shakeStrong 0.65s ease-in-out; }
+.shake-combo { animation: shakeCombo 0.3s ease-in-out; }
 @media (prefers-reduced-motion: reduce) {
-  .shake-small, .shake-medium, .shake-strong { animation: none; }
+  .shake-combo { animation: none; }
 }
 
 /* ── 카드 들썩임 (sheep level≥8) ────────────────────────────────────────── */
@@ -579,6 +558,31 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .rabbit-flight-inner { display: none; }
+}
+
+/* ── 실용신양 추가 오픈 콤보 텍스트 ───────────────────────────────────────── */
+@keyframes sheepComboFloat {
+  0%   { opacity: 0; transform: translate(-50%, -50%) translateY(0); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-46px); }
+}
+.sheep-combo-text {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-block;
+  white-space: nowrap;
+  font-weight: 800;
+  background: linear-gradient(160deg, #ca8a04 0%, #c2410c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.6);
+  filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, 0.35));
+  animation: sheepComboFloat 1400ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheep-combo-text { display: none; }
 }
 
 /* ── 디자인어 효과 — 큰 인어 팝업 + 음표 ───────────────────────────────────── */

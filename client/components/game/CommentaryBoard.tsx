@@ -1,9 +1,17 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import type { ClientGameState } from 'shared';
 import type { CommentaryLine } from '@/hooks/useAnimationQueue';
+import { IpStatusBar } from './IpStatusBar';
 
-export function CommentaryBoard({ lines }: { lines: CommentaryLine[] }) {
+export function CommentaryBoard({
+  lines,
+  gameState,
+}: {
+  lines: CommentaryLine[];
+  gameState: ClientGameState;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // 새 줄이 추가되면 항상 최신 내용이 보이도록 맨 아래로 스크롤.
@@ -17,7 +25,10 @@ export function CommentaryBoard({ lines }: { lines: CommentaryLine[] }) {
 
   return (
     <div className="h-[21rem] shrink-0 bg-white rounded-2xl border border-jungle-200 px-4 py-3 flex flex-col">
-      <p className="text-sm text-jungle-400 font-semibold shrink-0 mb-1">해설</p>
+      <div className="flex items-center gap-3 shrink-0 mb-1">
+        <p className="text-sm text-jungle-400 font-semibold shrink-0">해설</p>
+        <IpStatusBar gameState={gameState} />
+      </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {lines.length === 0 ? (
           <p className="text-lg text-jungle-300">아직 소식이 없습니다.</p>
