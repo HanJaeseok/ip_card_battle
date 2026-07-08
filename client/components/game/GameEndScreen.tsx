@@ -1,9 +1,36 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { ClientGameState } from 'shared';
+import type { Animal, ClientGameState, Team } from 'shared';
 import { ANIMALS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
+
+const FLAVOR_TEXT: Record<Animal, string> = {
+  sheep: '실용신안의 실리주의에 당하셨군요!',
+  rabbit: '상표의 가치는 날로 강해지죠!',
+  mermaid: '디자인과 벤치마킹, 그 경계는 어디일까요?',
+  tiger: '가장 강력한 독점권을 행사하셨군요!',
+};
+
+/** 승리팀이 가장 크게 앞선 동물을 정규화 격차비율로 판정 (패배팀이 앞선 동물은 제외) */
+function pickFlavorAnimal(gameState: ClientGameState, winner: Team | 'draw' | null): Animal | null {
+  if (winner !== 'A' && winner !== 'B') return null;
+  const loser: Team = winner === 'A' ? 'B' : 'A';
+
+  let best: Animal | null = null;
+  let bestGap = 0;
+  for (const a of ANIMALS) {
+    const w = gameState.teams[winner].scores[a];
+    const l = gameState.teams[loser].scores[a];
+    if (w < l) continue;
+    const gap = (w - l) / (w + l || 1);
+    if (gap > bestGap) {
+      bestGap = gap;
+      best = a;
+    }
+  }
+  return best;
+}
 
 interface ConfettiPiece {
   id: number;
@@ -48,6 +75,7 @@ export function GameEndScreen({
 
   const winnerEmoji = winner === 'draw' ? '🤝' : winner === 'A' ? '🟢' : '🔵';
   const winnerText = winner === 'draw' ? '무승부!' : `${winner}팀 승리!`;
+  const flavorAnimal = useMemo(() => pickFlavorAnimal(gameState, winner), [gameState, winner]);
 
   return (
     <div className="min-h-screen bg-jungle-50 flex flex-col items-center justify-center gap-6 p-8 overflow-hidden relative">
@@ -71,6 +99,9 @@ export function GameEndScreen({
       <div className="winner-bounce-in flex flex-col items-center gap-3">
         <div style={{ fontSize: '5rem' }}>{winnerEmoji}</div>
         <h2 className="text-3xl font-bold text-jungle-900">{winnerText}</h2>
+        {flavorAnimal && (
+          <p className="text-sm text-jungle-500 -mt-1">{FLAVOR_TEXT[flavorAnimal]}</p>
+        )}
       </div>
 
       {/* 점수표 */}

@@ -611,6 +611,7 @@ body {
 .mermaid-popup.right { right: 12px; }
 .mermaid-popup-body {
   display: inline-block;
+  font-size: 6.5rem;
   animation: mermaidShiver 0.5s ease-in-out 0.35s 3;
 }
 @keyframes notePop {

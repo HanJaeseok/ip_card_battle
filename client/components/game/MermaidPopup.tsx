@@ -1,11 +1,11 @@
 import type { Team } from 'shared';
 
 const NOTES = [
-  { x: -50, y: -100, rot: -20, delay: 250 },
-  { x: 25, y: -135, rot: 15, delay: 420 },
-  { x: 70, y: -80, rot: 25, delay: 600 },
-  { x: -20, y: -145, rot: -10, delay: 780 },
-  { x: 50, y: -110, rot: 10, delay: 950 },
+  { x: -80, y: -160, rot: -20, delay: 250 },
+  { x: 40, y: -216, rot: 15, delay: 420 },
+  { x: 112, y: -128, rot: 25, delay: 600 },
+  { x: -32, y: -232, rot: -10, delay: 780 },
+  { x: 80, y: -176, rot: 10, delay: 950 },
 ];
 
 export function MermaidPopup({ team }: { team: Team }) {
@@ -18,7 +18,7 @@ export function MermaidPopup({ team }: { team: Team }) {
           className="mermaid-note"
           style={{
             left: '50%',
-            top: '35%',
+            top: '28%',
             '--note-x': `${n.x}px`,
             '--note-y': `${n.y}px`,
             '--note-rot': `${n.rot}deg`,

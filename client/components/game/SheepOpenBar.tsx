@@ -1,5 +1,6 @@
 export function SheepOpenBar({ count }: { count: number }) {
-  // 실용신양 연쇄로 지금까지 추가로 오픈된 누적 카드 수 (동작 확인용 라이브 카운터)
+  // 현재 실용신양 점수(floor(score/10)) 기준 실시간 값 — 매 턴 이만큼 항상 추가 오픈되고,
+  // 특허랑이에게 점수가 깎이면 이 수치도 즉시 함께 줄어든다.
   return (
     <div className="text-center py-1.5 px-3 rounded-full bg-lime-600 shadow-sm">
       <span className="text-sm font-bold text-white tracking-wide leading-tight">

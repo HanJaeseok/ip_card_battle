@@ -46,7 +46,6 @@ export interface AnimationState {
   expandQuake: boolean;
   expandBurst: number; // 0 = 없음, 그 외엔 먼지 파티클 seed
   commentary: CommentaryLine[];
-  sheepOpenCount: Record<Team, number>; // 실용신양 연쇄로 추가 오픈된 누적 카드 수
 }
 
 const EMPTY_SET = new Set<string>() as ReadonlySet<string>;
@@ -96,7 +95,6 @@ export function useAnimationQueue(
   const [expandQuake, setExpandQuake] = useState(false);
   const [expandBurst, setExpandBurst] = useState(0);
   const [commentary, setCommentary] = useState<CommentaryLine[]>([]);
-  const [sheepOpenCount, setSheepOpenCount] = useState<Record<Team, number>>({ A: 0, B: 0 });
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -171,7 +169,7 @@ export function useAnimationQueue(
         } else if (ev.type === 'sheepChain') {
           newLines.push({
             team: ev.team,
-            text: `${teamLabel(ev.team)} ${ANIMAL_INFO.sheep.emoji} 실용신양 연쇄! 카드 ${ev.count}장 추가 오픈!`,
+            text: `${teamLabel(ev.team)} 추가 카드 ${ev.count}장 오픈!`,
           });
         } else if (ev.type === 'rabbitBonus') {
           const r = range.get(`${i}:main`)!;
@@ -278,8 +276,6 @@ export function useAnimationQueue(
         chainStaggerIdx = 0;
         chainCount = ev.count;
         chainCursor = cursor; // chain starts at current cursor
-
-        setSheepOpenCount(prev => ({ ...prev, [ev.team]: prev[ev.team] + ev.count }));
 
         const level = ev.level;
         sched(() => {
@@ -426,6 +422,5 @@ export function useAnimationQueue(
     expandQuake,
     expandBurst,
     commentary,
-    sheepOpenCount,
   };
 }

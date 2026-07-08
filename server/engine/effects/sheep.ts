@@ -5,14 +5,17 @@ import type { RNG } from '../board';
 import { openCardInternal } from '../openCard';
 
 /**
- * 실용신양 효과 — 큐 기반 연쇄 오픈.
- * 재귀 대신 while 루프로 구현해 스택오버플로우를 방지한다.
+ * 실용신양 효과 — 상시효과. 임계값을 "새로" 넘었는지와 무관하게, 매 턴(플레이어가
+ * 카드를 열 때마다) 자기 팀의 현재 실용신양 점수 기준 레벨(n = floor(score/10))만큼
+ * 항상 추가로 카드를 연다. 점수가 오르면 다음 턴 추가 오픈 수도 늘고, 특허랑이에게
+ * 점수를 깎이면 다음 턴 추가 오픈 수도 즉시 줄어든다 — "질보다 양" 컨셉.
  *
- * 발동 기준: 자기 팀 sheep 점수가 10n 구간을 새로 넘을 때
- * 효과: 도달한 구간(n, 즉 현재 누적 레벨) 만큼 추가 오픈 — 점수가 쌓일수록
- *       한 번의 발동에 더 많은 카드가 열리는 "질보다 양" 컨셉. 연쇄 중 또
- *       새 구간을 넘으면 그 증가분도 그대로 합산된다.
- * 상한: SHEEP_SAFETY_CAP(350) 초과 시 강제 종료
+ * lastLevel.sheep은 더 이상 참조하지 않는다(과거의 "새로 넘은 구간만 발동" 게이트용
+ * 필드였으나, 이 효과는 이제 게이트 없이 항상 현재 레벨을 그대로 반영한다).
+ *
+ * 재귀 대신 while 루프로 구현해 스택오버플로우를 방지하고,
+ * 연쇄 중 레벨이 더 오르면(추가로 오픈한 카드가 실용신양 매치를 만들면) 그만큼
+ * 계속 이어서 연다. 상한: SHEEP_SAFETY_CAP(350) 초과 시 강제 종료.
  */
 export function applySheepEffect(state: GameState, rng: RNG): GameEvent[] {
   const team = state.activeTeam;
@@ -22,12 +25,9 @@ export function applySheepEffect(state: GameState, rng: RNG): GameEvent[] {
   const getLevel = () =>
     Math.floor(teamState.scores.sheep / THRESHOLDS.sheep);
 
-  let newLevel = getLevel();
-  const gained = newLevel - teamState.lastLevel.sheep;
-  if (gained <= 0) return events;
+  let pendingOpens = getLevel();
+  if (pendingOpens <= 0) return events;
 
-  teamState.lastLevel.sheep = newLevel;
-  let pendingOpens = newLevel;
   let totalOpened = 0;
 
   while (pendingOpens > 0 && totalOpened < SHEEP_SAFETY_CAP) {
@@ -42,20 +42,18 @@ export function applySheepEffect(state: GameState, rng: RNG): GameEvent[] {
     pendingOpens -= toOpen;
     totalOpened += toOpen;
 
-    events.push({ type: 'sheepChain', count: toOpen, level: newLevel, team });
+    events.push({ type: 'sheepChain', count: toOpen, level: getLevel(), team });
 
     const selected = shuffleArray(unopened, rng).slice(0, toOpen);
     for (const key of selected) {
+      const before = getLevel();
       const subEvents = openCardInternal(state, key, rng);
       events.push(...subEvents);
 
-      // 연쇄로 sheep 점수 오른 경우 pendingOpens에 증분 합산
-      const currLevel = getLevel();
-      const extra = currLevel - teamState.lastLevel.sheep;
-      if (extra > 0) {
-        pendingOpens += extra;
-        newLevel = currLevel;
-        teamState.lastLevel.sheep = currLevel;
+      // 연쇄 중 실용신양 매치로 레벨이 더 오르면 그 증가분만큼 추가로 큐에 쌓는다
+      const after = getLevel();
+      if (after > before) {
+        pendingOpens += after - before;
       }
     }
   }

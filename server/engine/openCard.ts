@@ -6,7 +6,8 @@ import type { RNG } from './board';
 
 /**
  * 카드 오픈 & 즉시 판정 — 플레이어 액션용.
- * 짝수 매칭 시 수집 후 sheep·tiger·mermaid 즉시 발동.
+ * 짝수 매칭 시 수집 후 tiger·mermaid 즉시 발동.
+ * 실용신양은 이 액션(턴)이 끝난 뒤 항상 1회, 현재 점수 기준으로 발동한다(상시효과).
  * 상표토끼는 턴 종료 훅 (turnManager에서 호출).
  */
 export function openCard(
@@ -23,27 +24,29 @@ export function openCard(
       card.openedBy = null;
     }
   }
-  return _openCard(state, `${r},${c}`, rng, true);
+
+  const events = _openCard(state, `${r},${c}`, rng);
+  // 실용신양 상시효과 — 이번에 어떤 카드를 열었든, 매치가 있었든 없었든
+  // 이 팀의 현재 실용신양 점수만큼 항상 추가로 카드를 연다.
+  events.push(...applySheepEffect(state, rng));
+  return events;
 }
 
 /**
- * 실용신양 연쇄 전용 내부 오픈.
- * sheep 재진입을 막기 위해 sheep 효과를 발동하지 않는다.
- * tiger·mermaid는 여전히 즉시 발동한다.
+ * 실용신양 연쇄 전용 내부 오픈. tiger·mermaid는 여전히 즉시 발동한다.
  */
 export function openCardInternal(
   state: GameState,
   key: string,
   rng: RNG,
 ): GameEvent[] {
-  return _openCard(state, key, rng, false);
+  return _openCard(state, key, rng);
 }
 
 function _openCard(
   state: GameState,
   key: string,
   rng: RNG,
-  triggerSheep: boolean,
 ): GameEvent[] {
   const card = state.board.get(key);
   if (!card || card.open || card.collectedBy !== null) return [];
@@ -78,9 +81,6 @@ function _openCard(
     });
 
     // 즉시 발동 이펙트
-    if (triggerSheep && card.animal === 'sheep') {
-      events.push(...applySheepEffect(state, rng));
-    }
     events.push(...applyTigerEffect(state));
     events.push(...applyMermaidEffect(state));
   }

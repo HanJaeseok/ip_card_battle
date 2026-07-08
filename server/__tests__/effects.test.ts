@@ -128,6 +128,27 @@ describe('특허랑이 — 20점 단위 & min 0', () => {
     expect(state.teams['B'].scores.sheep).toBe(94);
     expect(state.teams['B'].scores.rabbit).toBe(94);
   });
+
+  it('점수가 깎이면 lastLevel도 함께 낮춰서 재발동 가능해짐', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.turn = 1;
+    state.teams['A'].scores.tiger = 20; // gained=1, dmg=round(1*1*1.5)=2
+
+    state.teams['B'].scores.rabbit = 5; // 공격 후 5-2=3, level 0
+    state.teams['B'].lastLevel.rabbit = 2; // 과거 20점대에서 이미 보너스 받았던 상태
+
+    applyTigerEffect(state);
+    expect(state.teams['B'].scores.rabbit).toBe(3);
+    expect(state.teams['B'].lastLevel.rabbit).toBe(0); // 현재 점수 수준으로 clamp됨
+
+    // 이후 다시 25점까지 회복하면 보너스가 재발동해야 함
+    state.teams['B'].scores.rabbit = 25;
+    state.turn = 3;
+    state.activeTeam = 'B';
+    const events = applyRabbitEffect(state);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('rabbitBonus');
+  });
 });
 
 // ─── 디자인어 ─────────────────────────────────────────────────────────────────
@@ -196,7 +217,6 @@ describe('실용신양 — 연쇄 cap', () => {
     }
     // sheep 점수를 매우 높게 설정해 n이 크도록
     state.teams['A'].scores.sheep = 3500; // level=350
-    state.teams['A'].lastLevel.sheep = 0;
 
     const events = applySheepEffect(state, rng0);
     // sheepChain 이벤트의 count 합계가 350 이하여야 함
@@ -204,6 +224,36 @@ describe('실용신양 — 연쇄 cap', () => {
       .filter(e => e.type === 'sheepChain')
       .reduce((sum, e) => sum + (e as { type: 'sheepChain'; count: number }).count, 0);
     expect(totalOpened).toBeLessThanOrEqual(350);
+  });
+});
+
+describe('실용신양 — 상시효과 (lastLevel과 무관하게 현재 점수 기준)', () => {
+  it('lastLevel이 얼마든 간에 floor(score/10)만큼 항상 오픈', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.board.clear();
+    for (let i = 0; i < 10; i++) {
+      state.board.set(`${i},0`, {
+        animal: 'mermaid', // sheep이 아닌 카드로 채워도 무관하게 발동해야 함
+        num: 1,
+        open: false,
+        collectedBy: null,
+        openedBy: null,
+      });
+    }
+    state.teams['A'].scores.sheep = 25; // level=2
+    state.teams['A'].lastLevel.sheep = 10; // 과거 값이 남아 있어도 무시되어야 함
+
+    const events = applySheepEffect(state, rng0);
+    const totalOpened = events
+      .filter(e => e.type === 'sheepChain')
+      .reduce((sum, e) => sum + (e as { type: 'sheepChain'; count: number }).count, 0);
+    expect(totalOpened).toBe(2);
+  });
+
+  it('점수가 10 미만이면 발동하지 않음', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.sheep = 9;
+    expect(applySheepEffect(state, rng0)).toHaveLength(0);
   });
 });
 

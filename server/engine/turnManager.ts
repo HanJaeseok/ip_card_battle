@@ -44,14 +44,16 @@ export function advanceTurn(state: GameState, rng: RNG = Math.random): GameEvent
       state.expanded = true;
       events.push({ type: 'expand' });
     }
+  }
 
-    // 종료 판정
-    if (state.turn > MAX_TURN || allCardsOpened(state.board)) {
-      state.phase = 'ended';
-      state.winner = determineWinner(state);
-      events.push({ type: 'gameEnd', winner: state.winner });
-      return events;
-    }
+  // 종료 판정 — 실용신양 상시효과로 한 팀의 턴 안에서 보드 전체가 소진될 수 있으므로,
+  // 어느 팀이 방금 플레이했든 매번 확인한다 (B팀 턴 뒤로만 검사하면, A팀 턴 중 보드가
+  // 모두 열려도 게임이 끝나지 않고 다음 팀에게 열 카드가 없는 채로 넘어가 멈춰버린다).
+  if (state.turn > MAX_TURN || allCardsOpened(state.board)) {
+    state.phase = 'ended';
+    state.winner = determineWinner(state);
+    events.push({ type: 'gameEnd', winner: state.winner });
+    return events;
   }
 
   // 방금 플레이한 팀의 playerIndex를 다음 번을 위해 증가 (N:N 로테이션)

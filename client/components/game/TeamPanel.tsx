@@ -63,7 +63,6 @@ export function TeamPanel({
         tigerHitDmg={tigerHitDmg}
         mermaidEffectType={mermaidEffectType}
         scoreFlash={animState.scoreFlash}
-        sheepOpenCount={animState.sheepOpenCount[team]}
       />
     </div>
   );

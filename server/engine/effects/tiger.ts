@@ -23,6 +23,18 @@ export function applyTigerEffect(state: GameState): GameEvent[] {
   opState.scores.sheep = Math.max(0, opState.scores.sheep - dmg);
   opState.scores.rabbit = Math.max(0, opState.scores.rabbit - dmg);
 
+  // 점수가 깎였으니 lastLevel도 현재 점수 수준으로 함께 낮춘다.
+  // 그래야 나중에 이 임계값을 다시 넘었을 때 상표토끼 보너스가 재발동한다
+  // (lastLevel이 하락 없이 계속 높게 남아 있으면 재도달을 감지 못하는 버그가 있었음).
+  opState.lastLevel.sheep = Math.min(
+    opState.lastLevel.sheep,
+    Math.floor(opState.scores.sheep / THRESHOLDS.sheep),
+  );
+  opState.lastLevel.rabbit = Math.min(
+    opState.lastLevel.rabbit,
+    Math.floor(opState.scores.rabbit / THRESHOLDS.rabbit),
+  );
+
   events.push({ type: 'tigerAttack', team, dmg });
   return events;
 }
