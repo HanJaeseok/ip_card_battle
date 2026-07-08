@@ -41,7 +41,7 @@ export type ErrorCode =
 // ─── 클라이언트 게임 상태 (치팅 방지: 미오픈 카드 animal/num 제거) ────────────
 
 export type ClientCard =
-  | { open: true; animal: Animal; num: CardNum; collectedBy: Team | null }
+  | { open: true; animal: Animal; num: CardNum; collectedBy: Team | null; openedBy: Team | null }
   | { open: false; collectedBy: Team | null };
 
 export interface ClientBoardEntry {
@@ -73,7 +73,7 @@ export interface ClientGameState {
 export type ClientGameEvent =
   | { type: 'open'; key: string; card: Extract<ClientCard, { open: true }> }
   | { type: 'collect'; animal: Animal; team: Team; score: number; keys: string[] }
-  | { type: 'sheepChain'; count: number; level: number }
+  | { type: 'sheepChain'; count: number; level: number; team: Team }
   | { type: 'tigerAttack'; team: Team; dmg: number }
   | { type: 'rabbitBonus'; team: Team; bonus: number }
   | { type: 'mermaidCatchup'; team: Team; absorb: number }

@@ -6,11 +6,21 @@ export function CardGrid({
   expanded,
   isMyTurn,
   onCardClick,
+  suppressedKeys,
+  reactionMap,
+  joltAllFaceDown,
+  breathe,
+  collectGlowKeys,
 }: {
   board: ClientBoardEntry[];
   expanded: boolean;
   isMyTurn: boolean;
   onCardClick: (key: string) => void;
+  suppressedKeys: ReadonlySet<string>;
+  reactionMap: ReadonlyMap<string, number>;
+  joltAllFaceDown: boolean;
+  breathe: boolean;
+  collectGlowKeys: ReadonlyMap<string, string>;
 }) {
   const minRC = expanded ? -2 : 0;
   const maxRC = expanded ? 11 : 9;
@@ -20,7 +30,7 @@ export function CardGrid({
 
   return (
     <div
-      className="grid gap-1"
+      className={`relative grid gap-1 ${breathe ? 'board-breathe' : ''}`}
       style={{
         gridTemplateColumns: `repeat(${size}, minmax(0, 44px))`,
         gridTemplateRows: `repeat(${size}, minmax(0, 56px))`,
@@ -31,12 +41,23 @@ export function CardGrid({
           const r = minRC + ri;
           const c = minRC + ci;
           const key = `${r},${c}`;
+          const entry = boardMap.get(key) ?? null;
+          const isSuppressed = suppressedKeys.has(key);
+          const reactionNum = reactionMap.get(key) ?? null;
+          // jolt: only face-down (not suppressed == not yet flipped)
+          const isJolting = joltAllFaceDown && entry?.card.open === false && !isSuppressed;
+          const isExpandedCell = r < 0 || r > 9 || c < 0 || c > 9;
           return (
             <CardCell
               key={key}
-              entry={boardMap.get(key) ?? null}
+              entry={entry}
               cardKey={key}
               isMyTurn={isMyTurn}
+              isSuppressed={isSuppressed}
+              reactionNum={reactionNum}
+              isJolting={isJolting}
+              glowColor={collectGlowKeys.get(key) ?? null}
+              isExpandedCell={isExpandedCell}
               onClick={onCardClick}
             />
           );

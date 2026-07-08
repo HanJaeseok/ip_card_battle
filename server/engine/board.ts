@@ -28,6 +28,7 @@ function makeCards(animal: Animal, count: number, rng: RNG): Card[] {
     num: randomNum(rng),
     open: false,
     collectedBy: null,
+    openedBy: null,
   }));
 }
 

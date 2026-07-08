@@ -8,6 +8,7 @@ export interface Card {
   num: CardNum;
   open: boolean;
   collectedBy: Team | null;
+  openedBy: Team | null; // 오픈했지만 아직 짝을 못 찾은 카드의 테두리 색 표시용
 }
 
 export interface TeamState {
@@ -32,7 +33,7 @@ export interface GameState {
 export type GameEvent =
   | { type: 'open'; key: string; card: Card }
   | { type: 'collect'; animal: Animal; team: Team; score: number; keys: string[] }
-  | { type: 'sheepChain'; count: number; level: number }
+  | { type: 'sheepChain'; count: number; level: number; team: Team }
   | { type: 'tigerAttack'; team: Team; dmg: number }
   | { type: 'rabbitBonus'; team: Team; bonus: number }
   | { type: 'mermaidCatchup'; team: Team; absorb: number }

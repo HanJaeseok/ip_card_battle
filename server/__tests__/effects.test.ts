@@ -21,6 +21,7 @@ function makeState(cards: { key: string; card: Partial<Card> }[]): GameState {
       num: 1,
       open: false,
       collectedBy: null,
+      openedBy: null,
       ...card,
     });
   }
@@ -190,6 +191,7 @@ describe('실용신양 — 연쇄 cap', () => {
         num: 6,
         open: false,
         collectedBy: null,
+        openedBy: null,
       });
     }
     // sheep 점수를 매우 높게 설정해 n이 크도록

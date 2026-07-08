@@ -22,17 +22,11 @@ export function MermaidExpectedBar({
 
   return (
     <div
-      className={`w-full text-center py-1 px-2 rounded-md border mt-1 ${
-        isBehind
-          ? 'bg-blue-950/40 border-blue-600/50'
-          : 'bg-yellow-950/40 border-yellow-600/50'
+      className={`text-center py-1.5 px-3 rounded-full shadow-sm ${
+        isBehind ? 'bg-blue-600' : 'bg-amber-500'
       }`}
     >
-      <span
-        className={`text-xs font-semibold tracking-wide ${
-          isBehind ? 'text-blue-300' : 'text-yellow-300'
-        }`}
-      >
+      <span className="text-sm font-bold text-white tracking-wide leading-tight">
         {label} +{value}
       </span>
     </div>

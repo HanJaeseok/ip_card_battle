@@ -19,7 +19,13 @@ export function serializeState(
     if (card.open) {
       board.push({
         key,
-        card: { open: true, animal: card.animal, num: card.num, collectedBy: card.collectedBy },
+        card: {
+          open: true,
+          animal: card.animal,
+          num: card.num,
+          collectedBy: card.collectedBy,
+          openedBy: card.openedBy,
+        },
       });
     } else {
       board.push({ key, card: { open: false, collectedBy: card.collectedBy } });
@@ -71,6 +77,7 @@ export function serializeEvents(events: GameEvent[]): ClientGameEvent[] {
           animal: e.card.animal,
           num: e.card.num,
           collectedBy: e.card.collectedBy,
+          openedBy: e.card.openedBy,
         },
       };
     }

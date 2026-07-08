@@ -15,6 +15,14 @@ export function openCard(
   c: number,
   rng: RNG = Math.random,
 ): GameEvent[] {
+  // 이 팀이 새 액션을 시작하는 시점 — 지난 액션에서 오픈해 둔(짝을 못 찾은)
+  // 카드들의 하이라이트를 여기서 해제한다. 상대 턴 내내, 그리고 자기 턴이
+  // 돌아와도 다음 오픈을 하기 전까지는 유지되다가, 바로 이 시점에 사라진다.
+  for (const card of state.board.values()) {
+    if (card.openedBy === state.activeTeam && card.collectedBy === null) {
+      card.openedBy = null;
+    }
+  }
   return _openCard(state, `${r},${c}`, rng, true);
 }
 
@@ -41,6 +49,7 @@ function _openCard(
   if (!card || card.open || card.collectedBy !== null) return [];
 
   card.open = true;
+  card.openedBy = state.activeTeam;
   const events: GameEvent[] = [{ type: 'open', key, card }];
 
   // 보드 위 미획득 동일 animal 오픈 카드 집계

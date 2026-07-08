@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Team } from 'shared';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useAnimationQueue } from '@/hooks/useAnimationQueue';
 import { GameLayout } from '@/components/game/GameLayout';
 import { GameEndScreen } from '@/components/game/GameEndScreen';
 
@@ -11,8 +12,10 @@ const STORAGE_TEAM = 'cardBattle_team';
 
 export default function GamePage() {
   const router = useRouter();
-  const { gameState, openCard, error, connected } = useWebSocket();
+  const { gameState, lastEvents, openCard, error, connected } = useWebSocket();
   const [myTeam, setMyTeam] = useState<Team | null>(null);
+
+  const animState = useAnimationQueue(lastEvents, gameState);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_TEAM) as Team | null;
@@ -54,6 +57,7 @@ export default function GamePage() {
       myTeam={myTeam}
       onCardClick={handleCardClick}
       error={error}
+      animState={animState}
     />
   );
 }

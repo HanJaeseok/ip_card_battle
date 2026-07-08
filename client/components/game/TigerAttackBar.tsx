@@ -8,9 +8,9 @@ export function TigerAttackBar({
   const atk = Math.round((lastLevelTiger + 1) * turn * 1.5);
 
   return (
-    <div className="w-full text-center py-1 px-2 rounded-md bg-orange-950/40 border border-orange-700/50 mt-1">
-      <span className="text-xs font-semibold text-orange-300 tracking-wide">
-        ⚔ 현재 공격력 {atk}
+    <div className="text-center py-1.5 px-3 rounded-full bg-orange-600 shadow-sm">
+      <span className="text-sm font-bold text-white tracking-wide leading-tight">
+        ⚔ 공격력 {atk}
       </span>
     </div>
   );
