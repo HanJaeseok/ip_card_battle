@@ -41,6 +41,7 @@ export function GameBoard({
   newCardId,
   stackCards,
   displayedActiveTeam,
+  isSettling,
   expandFlash,
   mermaidPopup,
 }: {
@@ -58,12 +59,16 @@ export function GameBoard({
   newCardId: number | null;
   stackCards: Record<Animal, StackedCard[]>;
   displayedActiveTeam: Team;
+  isSettling: boolean;
   expandFlash: boolean;
   mermaidPopup: { team: Team } | null;
 }) {
-  // 장소 클릭 가능 여부는 실제 서버 상태(gameState.activeTeam)를 그대로 따라야 한다 —
-  // 정산 연출 중에는 이미 서버상 내 차례가 아니므로 클릭이 막혀 있는 게 맞다.
-  const canAct = myTeam !== null && gameState.activeTeam === myTeam;
+  // 장소 클릭 가능 여부는 "화면상" 턴(displayedActiveTeam)과 정산 연출이 완전히 끝났는지를
+  // 함께 따른다 — 서버는 스킬 선택/효과 반영이 끝나는 즉시 activeTeam을 넘기지만, 그 순간
+  // 곧바로 조작 가능해지면 아직 상대의 정산·효과 애니메이션이 재생 중인데도 내 턴처럼
+  // 장소가 호버·클릭되어 버려 플레이 감성을 해친다. 반드시 정산 연출(스킬 효과 또는
+  // "다음을 노리기" 캡션)까지 전부 끝난 뒤에만 조작을 허용한다.
+  const canAct = myTeam !== null && !isSettling && displayedActiveTeam === myTeam;
   // 테두리 펄스·동물 무드(happy/focus)는 정산 연출이 끝날 때까지 "내 차례"로 유지되는
   // 화면상 턴을 따른다.
   const isMyTurnDisplayed = myTeam !== null && displayedActiveTeam === myTeam;

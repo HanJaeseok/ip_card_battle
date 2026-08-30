@@ -83,6 +83,7 @@ export function GameLayout({
             newCardId={animState.newCardId}
             stackCards={animState.stackCards}
             displayedActiveTeam={animState.displayedActiveTeam}
+            isSettling={animState.isSettling}
             expandFlash={animState.expandFlash}
             mermaidPopup={animState.mermaidPopup}
           />
