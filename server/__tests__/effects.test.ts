@@ -73,7 +73,7 @@ describe('스킬 선택 — 실용신양', () => {
 });
 
 describe('스킬 선택 — 상표토끼', () => {
-  it('내 총점의 5%×레벨만큼 상표토끼 점수에 더해진다', () => {
+  it('내 총점의 5%×레벨만큼 상표토끼 점수에 더해지고, 사용 통계가 기록된다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.teams['A'].scores.rabbit = 20; // level=2
     state.teams['A'].scores.sheep = 30; // 총점 50
@@ -81,7 +81,9 @@ describe('스킬 선택 — 상표토끼', () => {
     const ev = applySkillChoice(state, 'A', 'rabbit');
     const expected = Math.round(50 * SKILL_PCT_PER_LEVEL * 2); // 5
     expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
-    expect(state.teams['A'].scores.rabbit).toBe(20 + expected);
+    // 레벨 초기화 후 효과로 얻은 값만 다시 쌓인다(기존 20점은 사라짐)
+    expect(state.teams['A'].scores.rabbit).toBe(expected);
+    expect(state.teams['A'].skillStats.rabbit).toEqual({ count: 1, totalLevel: 2 });
   });
 });
 
@@ -94,9 +96,20 @@ describe('스킬 선택 — 디자인어', () => {
     const ev = applySkillChoice(state, 'A', 'mermaid');
     const expected = Math.round(80 * SKILL_PCT_PER_LEVEL * 1); // 4
     expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
-    expect(state.teams['A'].scores.mermaid).toBe(20 + expected);
+    // 레벨 초기화 후 효과로 얻은 값만 다시 쌓인다
+    expect(state.teams['A'].scores.mermaid).toBe(expected);
     // 상대 점수는 건드리지 않는다(흡수가 아니라 그냥 획득)
     expect(state.teams['B'].scores.sheep).toBe(100);
+  });
+});
+
+describe('스킬 선택 — 레벨 초기화', () => {
+  it('레벨이 0인 동물을 고르면 아무 효과도 없고 초기화도 일어나지 않는다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    const ev = applySkillChoice(state, 'A', 'sheep');
+    expect(ev.type === 'skillApplied' && ev.level).toBe(0);
+    expect(state.teams['A'].scores.sheep).toBe(0);
+    expect(state.teams['A'].skillStats.sheep).toEqual({ count: 0, totalLevel: 0 });
   });
 });
 
@@ -196,6 +209,7 @@ describe('장소 클릭 후에는 스킬을 고를 때까지 턴이 넘어가지
 
   it('스킬을 고르면 pendingChoice가 풀리고 턴이 다음 팀으로 넘어간다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.sheep = 10; // level=1이어야 실제로 적용된다
     const { state: s1 } = processPlayerAction(state, 'house', rng0);
     const { state: s2, events } = processSkillChoice(s1, 'sheep');
     expect(s2.pendingChoice).toBeNull();

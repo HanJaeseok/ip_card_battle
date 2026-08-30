@@ -12,6 +12,8 @@ import type {
   Team,
 } from 'shared';
 
+type LobbyTeamNames = Record<Team, string | null>;
+
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8080';
 const STORAGE_ROOM_ID = 'cardBattle_roomId';
 const STORAGE_PLAYER_ID = 'cardBattle_playerId';
@@ -31,15 +33,17 @@ export interface UseWebSocketReturn {
   roomId: string | null;
   playerId: string | null;
   lobbyPlayers: LobbyPlayer[];
+  lobbyTeamNames: LobbyTeamNames;
   gameState: ClientGameState | null;
   lastEvents: ClientGameEvent[];
   error: string | null;
-  createRoom: (nickname: string, team: Team) => void;
-  joinRoom: (roomId: string, nickname: string, team: Team) => void;
-  createSoloRoom: (nickname: string) => void;
+  createRoom: (nickname: string, team: Team, teamName?: string) => void;
+  joinRoom: (roomId: string, nickname: string, team: Team, teamName?: string) => void;
+  createSoloRoom: (nickname: string, teamName?: string) => void;
   sendReady: () => void;
   drawCard: (place: Place) => void;
   chooseSkill: (animal: Animal) => void;
+  passSkill: () => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -48,6 +52,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
+  const [lobbyTeamNames, setLobbyTeamNames] = useState<LobbyTeamNames>({ A: null, B: null });
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
   const [lastEvents, setLastEvents] = useState<ClientGameEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +101,7 @@ export function useWebSocket(): UseWebSocketReturn {
 
         case 'lobbyState':
           setLobbyPlayers(msg.players);
+          setLobbyTeamNames(msg.teamNames);
           break;
 
         case 'gameStart':
@@ -124,19 +130,19 @@ export function useWebSocket(): UseWebSocketReturn {
     return () => ws.close();
   }, []);
 
-  const createRoom = useCallback((nickname: string, team: Team) => {
+  const createRoom = useCallback((nickname: string, team: Team, teamName?: string) => {
     setError(null);
-    send({ type: 'createRoom', nickname, team });
+    send({ type: 'createRoom', nickname, team, teamName });
   }, [send]);
 
-  const joinRoom = useCallback((rid: string, nickname: string, team: Team) => {
+  const joinRoom = useCallback((rid: string, nickname: string, team: Team, teamName?: string) => {
     setError(null);
-    send({ type: 'joinRoom', roomId: rid, nickname, team });
+    send({ type: 'joinRoom', roomId: rid, nickname, team, teamName });
   }, [send]);
 
-  const createSoloRoom = useCallback((nickname: string) => {
+  const createSoloRoom = useCallback((nickname: string, teamName?: string) => {
     setError(null);
-    send({ type: 'createSoloRoom', nickname });
+    send({ type: 'createSoloRoom', nickname, teamName });
   }, [send]);
 
   const sendReady = useCallback(() => send({ type: 'ready' }), [send]);
@@ -149,9 +155,11 @@ export function useWebSocket(): UseWebSocketReturn {
     send({ type: 'chooseSkill', animal });
   }, [send]);
 
+  const passSkill = useCallback(() => send({ type: 'passSkill' }), [send]);
+
   return {
     connected, roomId, playerId,
-    lobbyPlayers, gameState, lastEvents, error,
-    createRoom, joinRoom, createSoloRoom, sendReady, drawCard, chooseSkill,
+    lobbyPlayers, lobbyTeamNames, gameState, lastEvents, error,
+    createRoom, joinRoom, createSoloRoom, sendReady, drawCard, chooseSkill, passSkill,
   };
 }

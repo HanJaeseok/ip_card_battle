@@ -70,6 +70,12 @@ export function initGame(
     scores: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
     pendingExtraDraws: 0,
     playerIndex: 0,
+    skillStats: {
+      sheep: { count: 0, totalLevel: 0 },
+      rabbit: { count: 0, totalLevel: 0 },
+      mermaid: { count: 0, totalLevel: 0 },
+      tiger: { count: 0, totalLevel: 0 },
+    },
   });
 
   return {

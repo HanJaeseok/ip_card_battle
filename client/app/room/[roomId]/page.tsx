@@ -14,7 +14,7 @@ const GAME_BGM_VOLUME = 0.5; // 게임 효과음이 함께 들려야 하므로 B
 
 export default function GamePage() {
   const router = useRouter();
-  const { gameState, lastEvents, drawCard, chooseSkill, error, connected } = useWebSocket();
+  const { gameState, lastEvents, drawCard, chooseSkill, passSkill, error, connected } = useWebSocket();
   const [myTeam, setMyTeam] = useState<Team | null>(null);
 
   const animState = useAnimationQueue(lastEvents, gameState);
@@ -50,6 +50,10 @@ export default function GamePage() {
     [chooseSkill],
   );
 
+  const handlePassSkill = useCallback(() => {
+    passSkill();
+  }, [passSkill]);
+
   if (!gameState) {
     return (
       <div className="min-h-screen bg-jungle-50 flex flex-col items-center justify-center gap-3">
@@ -68,7 +72,7 @@ export default function GamePage() {
   }
 
   if (gameState.phase === 'ended') {
-    return <GameEndScreen gameState={gameState} onBack={() => router.push('/')} />;
+    return <GameEndScreen gameState={gameState} myTeam={myTeam} onBack={() => router.push('/')} />;
   }
 
   return (
@@ -77,6 +81,7 @@ export default function GamePage() {
       myTeam={myTeam}
       onPlaceClick={handlePlaceClick}
       onChooseSkill={handleChooseSkill}
+      onPassSkill={handlePassSkill}
       error={error}
       animState={animState}
     />

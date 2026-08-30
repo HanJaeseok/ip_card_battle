@@ -42,6 +42,23 @@ export interface SheepLoaded {
   count: number; // 이번 액션에서 소모되는 예약된 추가 뽑기 수
 }
 
+export interface SheepProgress {
+  team: Team;
+  current: number; // 지금까지 소모한 예약 뽑기 수
+  total: number;   // 이번에 소모해야 할 전체 예약 뽑기 수
+}
+
+export interface RabbitFlight {
+  id: number;
+  team: Team;
+  count: number; // 날아가는 토끼 아이콘 개수(획득 점수 자릿수)
+}
+
+export interface RabbitPressure {
+  sourceTeam: Team; // 토끼가 불어난 팀
+  targetTeam: Team; // 압박을 느껴야 할 상대 팀
+}
+
 export interface CaptionItem {
   id: number;
   text: string;
@@ -98,6 +115,13 @@ export interface AnimationState {
   sheepCombos: SheepCombo[];
   mainCombo: MainCombo | null;
   sheepLoaded: SheepLoaded | null;
+  sheepProgress: SheepProgress | null; // 예약된 추가 뽑기가 지금 몇 번째까지 소모됐는지
+  rabbitFlights: RabbitFlight[];
+  rabbitPressure: RabbitPressure | null;
+  tigerSlash: { onTeam: Team } | null;
+  tigerRecoil: { attackerTeam: Team } | null;
+  tigerImpact: boolean;
+  mermaidPopup: { team: Team } | null;
   scoreFlash: ReadonlyMap<string, number>; // "team:animal" → flash id (for CSS re-trigger)
   expandFlash: boolean;
   commentary: CommentaryLine[];
@@ -133,6 +157,11 @@ const BOMB_FALL_DUR = 800; // .stack-card-bomb-fall CSS 지속시간과 일치�
 const SHAKE_CHECK_DUR = 550; // .stack-card-shake-* CSS 지속시간과 일치해야 함
 const SHEEP_LOADED_DUR = 1100;
 const EMOTICON_DUR = 2000;
+const TIGER_RECOIL_DUR = 500;
+const TIGER_HIT_DUR = 900;
+const MERMAID_POPUP_DUR = 2000;
+const RABBIT_FLIGHT_DUR = 900;
+const RABBIT_PRESSURE_DUR = 700;
 
 let floatIdCounter = 0;
 
@@ -146,6 +175,13 @@ export function useAnimationQueue(
   const [sheepCombos, setSheepCombos] = useState<SheepCombo[]>([]);
   const [mainCombo, setMainCombo] = useState<MainCombo | null>(null);
   const [sheepLoaded, setSheepLoaded] = useState<SheepLoaded | null>(null);
+  const [sheepProgress, setSheepProgress] = useState<SheepProgress | null>(null);
+  const [rabbitFlights, setRabbitFlights] = useState<RabbitFlight[]>([]);
+  const [rabbitPressure, setRabbitPressure] = useState<RabbitPressure | null>(null);
+  const [tigerSlash, setTigerSlash] = useState<{ onTeam: Team } | null>(null);
+  const [tigerRecoil, setTigerRecoil] = useState<{ attackerTeam: Team } | null>(null);
+  const [tigerImpact, setTigerImpact] = useState(false);
+  const [mermaidPopup, setMermaidPopup] = useState<{ team: Team } | null>(null);
   const [scoreFlash, setScoreFlash] = useState<ReadonlyMap<string, number>>(EMPTY_SCORE_MAP);
   const [expandFlash, setExpandFlash] = useState(false);
   const [commentary, setCommentary] = useState<CommentaryLine[]>([]);
@@ -276,6 +312,13 @@ export function useAnimationQueue(
     setFloatingTexts([]);
     setSheepCombos([]);
     setMainCombo(null);
+    setSheepProgress(null);
+    setRabbitFlights([]);
+    setRabbitPressure(null);
+    setTigerSlash(null);
+    setTigerRecoil(null);
+    setTigerImpact(false);
+    setMermaidPopup(null);
     setScoreFlash(EMPTY_SCORE_MAP);
     setExpandFlash(false);
     setCaptions([]);
@@ -407,10 +450,17 @@ export function useAnimationQueue(
           if (ev.oppScoreDelta > 0) parts.push(`상대 점수 -${ev.oppScoreDelta}`);
           if (ev.extraDrawsQueued > 0) parts.push(`다음 턴 추가 뽑기 ${ev.extraDrawsQueued}회 예약`);
           newLines.push({ team: ev.team, text: parts.join(' ') });
+        } else if (ev.type === 'skillPassed') {
+          newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 아무것도 하지 않고 턴을 넘겼습니다.` });
         } else if (ev.type === 'expand') {
           newLines.push({ team: null, text: '더 신나게!! 도토리 폭탄이 등장합니다.' });
         } else if (ev.type === 'timeoutChoice') {
-          newLines.push({ team: null, text: `시간 초과로 서버가 대신 ${ANIMAL_INFO[ev.animal].name} 스킬을 선택했습니다.` });
+          newLines.push({
+            team: null,
+            text: ev.animal
+              ? `시간 초과로 서버가 대신 ${ANIMAL_INFO[ev.animal].name} 스킬을 선택했습니다.`
+              : '시간 초과로 아무 스킬도 선택되지 않아 턴이 넘어갔습니다.',
+          });
         }
       });
 
@@ -430,6 +480,7 @@ export function useAnimationQueue(
     let bonusRollTeam: Team | null = null;
     let bonusRollRemaining = 0;
     let bonusRollIdx = 0;
+    let bonusRollTotal = 0;
     let comboCounter = 0;
     let lastDrawEndCursor = 0;
 
@@ -476,6 +527,9 @@ export function useAnimationQueue(
         if (inRoll) {
           const combo = ++comboCounter;
           const comboId = ++floatIdCounter;
+          const progressTeam = bonusRollTeam!;
+          const progressCurrent = bonusRollIdx;
+          const progressTotal = bonusRollTotal;
           sched(() => {
             setSheepCombos(prev => [...prev, { id: comboId, place, combo }]);
             sched(() => setSheepCombos(prev => prev.filter(c => c.id !== comboId)), SHEEP_COMBO_DUR);
@@ -483,6 +537,9 @@ export function useAnimationQueue(
             // 콤보마다 진동 — 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다
             setScreenShakeLevel(combo);
             sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
+
+            // 이번 턴에 예약된 추가 뽑기가 몇 번째까지 진행됐는지 계속 갱신해 보여준다.
+            setSheepProgress({ team: progressTeam, current: progressCurrent, total: progressTotal });
           }, revealAt);
 
           if (bonusRollRemaining === 0) {
@@ -529,6 +586,11 @@ export function useAnimationQueue(
         addPlaceFocus(place, revealAt);
         addCaption(`🌰 ${ANIMAL_INFO[animal].short} 카드 전부 폭발!`, 'pair', revealAt, { stackAnimal: animal });
 
+        const bombInRoll = inRoll;
+        const bombProgressTeam = bonusRollTeam;
+        const bombProgressCurrent = bonusRollIdx;
+        const bombProgressTotal = bonusRollTotal;
+
         sched(() => {
           // 도토리 폭죽과 카드가 흔들리며 떨어지는 연출을 동시에 보여준 다음에만 사라지게 한다.
           setBombBursts(prev => [...prev, { id: burstId, animal }]);
@@ -536,6 +598,10 @@ export function useAnimationQueue(
           playRandomSound('bomb', 1, 1, 'tiger'); // bomb 전용 효과음이 없으면 특허랑이 사운드로 대체
           setScreenShakeLevel(prevLvl => Math.max(prevLvl, 2));
           sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
+
+          if (bombInRoll && bombProgressTeam) {
+            setSheepProgress({ team: bombProgressTeam, current: bombProgressCurrent, total: bombProgressTotal });
+          }
 
           // 폭탄이 터지면 양 팀 모두에게 해당 동물의 "cry" 표정을 보여준다.
           const gs = gameStateRef.current;
@@ -569,6 +635,7 @@ export function useAnimationQueue(
         bonusRollTeam = ev.team;
         bonusRollRemaining = ev.count;
         bonusRollIdx = 0;
+        bonusRollTotal = ev.count;
 
         if (ev.count >= 5) {
           const level = ev.count;
@@ -667,9 +734,12 @@ export function useAnimationQueue(
       }
     }
 
-    // ── Pass 1.6: 스킬 발동(skillApplied) — 정산과는 별개 액션(선택 응답)에서 온다 ──
+    // ── Pass 1.6: 스킬 발동(skillApplied)/패스(skillPassed) — 정산과는 별개
+    // 액션(선택 응답)에서 온다. 동물마다 원래 있었던 전용 연출을 그대로 재생한다.
     {
       const skillEv = lastEvents.find((e): e is Extract<ClientGameEvent, { type: 'skillApplied' }> => e.type === 'skillApplied');
+      const passEv = lastEvents.find((e): e is Extract<ClientGameEvent, { type: 'skillPassed' }> => e.type === 'skillPassed');
+
       if (skillEv) {
         const { team, animal, myScoreDelta, oppScoreDelta } = skillEv;
         const opp: Team = team === 'A' ? 'B' : 'A';
@@ -678,16 +748,14 @@ export function useAnimationQueue(
         addCaption(`${ANIMAL_INFO[animal].short} 스킬 발동!`, 'effect', at, { team });
 
         sched(() => {
-          playRandomSound(animal === 'tiger' ? 'tiger' : animal === 'mermaid' ? 'mermaid' : animal === 'rabbit' ? 'rabbit' : 'card');
-
           const gs = gameStateRef.current;
           if (gs) {
             addEmoticon(team, gs.teams[team].playerIndex, emoticonFile(animal, 'happy'), 0, at);
           }
 
-          if (myScoreDelta > 0) {
+          const flashScore = (flashTeam: Team, flashAnimal: Animal) => {
             const flashId = ++floatIdCounter;
-            const flashKey = `${team}:${animal}`;
+            const flashKey = `${flashTeam}:${flashAnimal}`;
             setScoreFlash(prev => new Map([...prev, [flashKey, flashId]]));
             sched(() => {
               setScoreFlash(prev => {
@@ -696,14 +764,56 @@ export function useAnimationQueue(
                 return next;
               });
             }, SCORE_FLASH_DUR);
-            addFloat(`+${myScoreDelta}`, team, 'bonus');
-          }
-          if (oppScoreDelta > 0) {
-            addFloat(`-${oppScoreDelta}`, opp, 'penalty');
+          };
+
+          if (animal === 'rabbit') {
+            // 상표토끼 — 카드에서 점수판으로 날아가는 토끼 연출 복구
+            playRandomSound('rabbit');
+            if (myScoreDelta > 0) {
+              flashScore(team, 'rabbit');
+              const digits = String(myScoreDelta).length;
+              const flightId = ++floatIdCounter;
+              setRabbitFlights(prev => [...prev, { id: flightId, team, count: digits }]);
+              sched(() => setRabbitFlights(prev => prev.filter(f => f.id !== flightId)), RABBIT_FLIGHT_DUR);
+              addFloat(`+${myScoreDelta}`, team, 'bonus');
+
+              setRabbitPressure({ sourceTeam: team, targetTeam: opp });
+              sched(() => setRabbitPressure(null), RABBIT_PRESSURE_DUR);
+            }
+          } else if (animal === 'mermaid') {
+            // 디자인어 — 큰 인어 팝업 복구
+            playRandomSound('mermaid');
+            setMermaidPopup({ team });
+            sched(() => setMermaidPopup(null), MERMAID_POPUP_DUR);
+            if (myScoreDelta > 0) {
+              flashScore(team, 'mermaid');
+              addFloat(`+${myScoreDelta}`, team, 'bonus');
+            }
+          } else if (animal === 'tiger') {
+            // 특허랑이 — 공격자 반동 + 피격자 슬래시/비네트 복구
+            setTigerRecoil({ attackerTeam: team });
+            sched(() => setTigerRecoil(null), TIGER_RECOIL_DUR);
+            sched(() => {
+              setTigerSlash({ onTeam: opp });
+              setTigerImpact(true);
+              playRandomSound('tiger');
+              sched(() => setTigerSlash(null), TIGER_HIT_DUR);
+              sched(() => setTigerImpact(false), 600);
+            }, TIGER_RECOIL_DUR);
+            if (oppScoreDelta > 0) addFloat(`-${oppScoreDelta}`, opp, 'penalty');
+          } else {
+            // 실용신양 — 즉시 점수 변화는 없으므로 담백하게 카드 사운드만
+            playRandomSound('card');
           }
         }, at);
 
-        cursor = at + EFFECT_DUR;
+        cursor = animal === 'tiger'
+          ? at + TIGER_RECOIL_DUR + TIGER_HIT_DUR + 80
+          : at + EFFECT_DUR;
+      } else if (passEv) {
+        const at = cursor;
+        addCaption('아무것도 하지 않음', 'effect', at, { team: passEv.team });
+        cursor = at + 700;
       }
     }
 
@@ -775,6 +885,13 @@ export function useAnimationQueue(
     sheepCombos,
     mainCombo,
     sheepLoaded,
+    sheepProgress,
+    rabbitFlights,
+    rabbitPressure,
+    tigerSlash,
+    tigerRecoil,
+    tigerImpact,
+    mermaidPopup,
     scoreFlash,
     expandFlash,
     commentary,

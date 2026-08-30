@@ -18,6 +18,7 @@ export default function LobbyPage() {
 
   const [nickname, setNickname] = useState('');
   const [team, setTeam] = useState<Team>('A');
+  const [teamName, setTeamName] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [mode, setMode] = useState<'home' | 'create' | 'join' | 'solo' | 'waiting'>('home');
   const [isReady, setIsReady] = useState(false);
@@ -38,7 +39,7 @@ export default function LobbyPage() {
   const handleCreateRoom = () => {
     if (!nickname.trim()) return;
     sessionStorage.setItem('cardBattle_team', team);
-    ws.createRoom(nickname.trim(), team);
+    ws.createRoom(nickname.trim(), team, teamName.trim() || undefined);
   };
 
   const handleJoinRoom = () => {
@@ -50,7 +51,7 @@ export default function LobbyPage() {
   const handleStartSolo = () => {
     if (!nickname.trim()) return;
     sessionStorage.setItem('cardBattle_team', 'A');
-    ws.createSoloRoom(nickname.trim());
+    ws.createSoloRoom(nickname.trim(), teamName.trim() || undefined);
   };
 
   const handleReady = () => {
@@ -128,6 +129,17 @@ export default function LobbyPage() {
             />
           </Field>
 
+          <Field label="우리 팀 이름 (선택, 비워두면 무작위 배정)">
+            <input
+              type="text"
+              value={teamName}
+              onChange={e => setTeamName(e.target.value)}
+              placeholder="예: 특허"
+              maxLength={12}
+              className="input-base"
+            />
+          </Field>
+
           <button
             onClick={handleStartSolo}
             disabled={!ws.connected || !nickname.trim()}
@@ -182,11 +194,24 @@ export default function LobbyPage() {
                     team === t ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {t === 'A' ? '🟢 A팀' : '🔵 B팀'}
+                  {t === 'A' ? '🟢 팀 1' : '🔵 팀 2'}
                 </button>
               ))}
             </div>
           </Field>
+
+          {mode === 'create' && (
+            <Field label="우리 팀 이름 (선택, 비워두면 무작위 배정)">
+              <input
+                type="text"
+                value={teamName}
+                onChange={e => setTeamName(e.target.value)}
+                placeholder="예: 상표"
+                maxLength={12}
+                className="input-base"
+              />
+            </Field>
+          )}
 
           <button
             onClick={mode === 'create' ? handleCreateRoom : handleJoinRoom}
@@ -206,6 +231,7 @@ export default function LobbyPage() {
         <WaitingRoom
           roomId={ws.roomId}
           players={ws.lobbyPlayers}
+          teamNames={ws.lobbyTeamNames}
           isReady={isReady}
           onReady={handleReady}
         />
@@ -236,10 +262,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function WaitingRoom({
-  roomId, players, isReady, onReady,
+  roomId, players, teamNames, isReady, onReady,
 }: {
   roomId: string;
   players: LobbyPlayer[];
+  teamNames: Record<Team, string | null>;
   isReady: boolean;
   onReady: () => void;
 }) {
@@ -256,8 +283,8 @@ function WaitingRoom({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <TeamColumn label="🟢 A팀" players={teamA} />
-        <TeamColumn label="🔵 B팀" players={teamB} />
+        <TeamColumn label={`🟢 ${teamNames.A ?? '팀 1 (미정)'}`} players={teamA} />
+        <TeamColumn label={`🔵 ${teamNames.B ?? '팀 2 (미정)'}`} players={teamB} />
       </div>
 
       {canStart ? (

@@ -25,7 +25,7 @@ wss.on('connection', (ws) => {
       case 'createRoom': {
         const { roomId, room } = roomManager.createRoom();
         const playerId = randomUUID();
-        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team);
+        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team, msg.teamName);
         if (result !== 'ok') {
           ws.send(JSON.stringify({ type: 'error', code: 'ROOM_FULL', message: '방을 만들 수 없습니다.' }));
           return;
@@ -39,7 +39,7 @@ wss.on('connection', (ws) => {
       case 'createSoloRoom': {
         const { roomId, room } = roomManager.createRoom();
         const playerId = randomUUID();
-        room.addSoloPlayer(ws, playerId, msg.nickname);
+        room.addSoloPlayer(ws, playerId, msg.nickname, msg.teamName);
         currentRoomId = roomId;
         currentPlayerId = playerId;
         ws.send(JSON.stringify({ type: 'roomCreated', roomId, playerId }));
@@ -53,7 +53,7 @@ wss.on('connection', (ws) => {
           return;
         }
         const playerId = randomUUID();
-        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team);
+        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team, msg.teamName);
         if (result === 'game_started') {
           ws.send(JSON.stringify({ type: 'error', code: 'GAME_ALREADY_STARTED', message: '이미 게임이 시작된 방입니다.' }));
           return;
@@ -83,6 +83,12 @@ wss.on('connection', (ws) => {
       case 'chooseSkill': {
         if (!currentRoomId || !currentPlayerId) return;
         roomManager.getRoom(currentRoomId)?.handleChooseSkill(currentPlayerId, msg.animal);
+        break;
+      }
+
+      case 'passSkill': {
+        if (!currentRoomId || !currentPlayerId) return;
+        roomManager.getRoom(currentRoomId)?.handlePassSkill(currentPlayerId);
         break;
       }
 

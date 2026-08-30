@@ -1,5 +1,6 @@
 import { initGame } from '../engine/turnManager';
-import { processPlayerAction, processSkillChoice } from '../engine/gameEngine';
+import { processPlayerAction, processSkillChoice, processPass } from '../engine/gameEngine';
+import { randomEligibleSkill } from '../engine/skills';
 import { PLACES } from 'shared';
 import type { GameState } from 'shared';
 import { ANIMALS, MAX_TURN } from 'shared';
@@ -60,10 +61,13 @@ function runGame(seed: number): {
     const place = PLACES[Math.floor(rng() * PLACES.length)];
     processPlayerAction(state, place, rng);
 
-    // 뽑기+정산이 끝나면 스킬 하나를 골라야 턴이 넘어간다 — 봇은 무작위로 고른다.
+    // 뽑기+정산이 끝나면 스킬 하나를 골라야 턴이 넘어간다 — 봇은 레벨이 있는 것 중
+    // 무작위로 고르고, 고를 게 없으면 패스한다.
     if (state.pendingChoice !== null) {
-      const animal = ANIMALS[Math.floor(rng() * ANIMALS.length)];
-      processSkillChoice(state, animal);
+      const team = state.pendingChoice;
+      const animal = randomEligibleSkill(state, team, rng);
+      if (animal === null) processPass(state);
+      else processSkillChoice(state, animal);
     }
   }
 

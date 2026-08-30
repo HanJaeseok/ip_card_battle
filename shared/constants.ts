@@ -23,3 +23,11 @@ export function bombChanceForTurn(turn: number): number {
 }
 
 export const ANIMALS = ['sheep', 'rabbit', 'mermaid', 'tiger'] as const;
+
+// 방을 만들 때 팀 이름을 정하지 않으면 이 중 서로 겹치지 않게 무작위로 배정된다.
+export const TEAM_NAME_POOL = [
+  '상표', '디자인', '실용신안', '특허', '영업비밀', '저작권', '무단도용', '불법복제',
+] as const;
+
+// 실용신양 스킬로 예약된 추가 뽑기 1회당 턴 제한시간 연장(초) — 30초 + 10×n
+export const SHEEP_EXTRA_TIME_PER_DRAW_SEC = 10;

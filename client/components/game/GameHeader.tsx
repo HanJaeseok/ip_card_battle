@@ -13,7 +13,7 @@ export function GameHeader({
   displayedActivePlayerIndex: number;
   isSettling: boolean;
 }) {
-  const teamLabel = displayedActiveTeam === 'A' ? '🟢 A팀' : '🔵 B팀';
+  const teamLabel = `${displayedActiveTeam === 'A' ? '🟢' : '🔵'} ${gameState.teamNames[displayedActiveTeam]}`;
   const nickname = gameState.teams[displayedActiveTeam].members[displayedActivePlayerIndex] ?? '';
   const bombPct = gameState.expanded ? Math.round(bombChanceForTurn(gameState.turn) * 100) : null;
 

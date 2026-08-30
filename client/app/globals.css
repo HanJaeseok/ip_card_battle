@@ -960,6 +960,13 @@ body {
 .skill-choice-panel:focus-visible {
   filter: brightness(1);
 }
+.skill-choice-disabled {
+  filter: brightness(0.18) grayscale(70%);
+}
+.skill-choice-disabled:hover,
+.skill-choice-disabled:focus-visible {
+  filter: brightness(0.18) grayscale(70%);
+}
 .skill-choice-dim {
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.1) 100%);
   pointer-events: none;

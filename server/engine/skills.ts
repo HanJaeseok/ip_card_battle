@@ -10,6 +10,11 @@ export function totalScore(state: GameState, team: Team): number {
   return ANIMALS.reduce((sum, a) => sum + state.teams[team].scores[a], 0);
 }
 
+/** 레벨이 1 이상이라 지금 고를 수 있는 동물 목록. */
+export function eligibleAnimals(state: GameState, team: Team): Animal[] {
+  return ANIMALS.filter(a => levelOf(state, team, a) > 0);
+}
+
 /** 상대 총점을 동물별 비중대로 차감한다 — 개별 동물 점수가 음수가 되지 않도록 안전하게 분배. */
 function distributeDeduct(state: GameState, team: Team, amount: number): void {
   const scores = state.teams[team].scores;
@@ -30,11 +35,14 @@ function distributeDeduct(state: GameState, team: Team, amount: number): void {
 }
 
 /**
- * 턴을 마친 팀이 4가지 스킬 중 하나를 고르면 호출된다. 각 동물의 "레벨"을 배율로 사용한다.
- * - 🐑 실용신양: 다음 내 턴에 (레벨)회 추가로 뽑는다 — 즉시 점수 변화는 없다.
- * - 🐰 상표토끼: 내 총점의 `5% × 레벨` 만큼 상표토끼 점수에 더한다.
+ * 턴을 마친 팀이 4가지 스킬 중 하나를 고르면 호출된다. 각 동물의 "레벨"(초기화 직전 값)을
+ * 배율로 사용하며, 스킬을 고른 동물의 점수(경험치)는 발동 직후 항상 0으로 초기화된다.
+ * - 🐑 실용신양: 다음 내 턴에 (레벨)회 추가로 뽑는다.
+ * - 🐰 상표토끼: 내 총점의 `5% × 레벨` 만큼 상표토끼 점수에 더한다(초기화 후 다시 채워짐).
  * - 🧜‍♀️ 디자인어: 상대와의 총점 차이의 `5% × 레벨` 만큼 디자인어 점수에 더한다.
  * - 🐯 특허랑이: 상대 총점의 `5% × 레벨` 만큼 상대 점수를 깎는다.
+ *
+ * 레벨이 0인 동물을 골랐다면(정상적인 클라이언트라면 UI에서 막힘) 아무 일도 일어나지 않는다.
  */
 export function applySkillChoice(state: GameState, team: Team, animal: Animal): GameEvent {
   const opponent: Team = team === 'A' ? 'B' : 'A';
@@ -44,28 +52,41 @@ export function applySkillChoice(state: GameState, team: Team, animal: Animal): 
   let oppScoreDelta = 0;
   let extraDrawsQueued = 0;
 
-  if (animal === 'sheep') {
-    extraDrawsQueued = level;
-    state.teams[team].pendingExtraDraws = level;
-  } else if (animal === 'rabbit') {
-    const gain = Math.round(totalScore(state, team) * SKILL_PCT_PER_LEVEL * level);
-    state.teams[team].scores.rabbit += gain;
-    myScoreDelta = gain;
-  } else if (animal === 'mermaid') {
-    const diff = Math.abs(totalScore(state, team) - totalScore(state, opponent));
-    const gain = Math.round(diff * SKILL_PCT_PER_LEVEL * level);
-    state.teams[team].scores.mermaid += gain;
-    myScoreDelta = gain;
-  } else if (animal === 'tiger') {
-    const loss = Math.round(totalScore(state, opponent) * SKILL_PCT_PER_LEVEL * level);
-    distributeDeduct(state, opponent, loss);
-    oppScoreDelta = loss;
+  if (level > 0) {
+    if (animal === 'sheep') {
+      extraDrawsQueued = level;
+      state.teams[team].pendingExtraDraws = level;
+    } else if (animal === 'rabbit') {
+      myScoreDelta = Math.round(totalScore(state, team) * SKILL_PCT_PER_LEVEL * level);
+    } else if (animal === 'mermaid') {
+      const diff = Math.abs(totalScore(state, team) - totalScore(state, opponent));
+      myScoreDelta = Math.round(diff * SKILL_PCT_PER_LEVEL * level);
+    } else if (animal === 'tiger') {
+      const loss = Math.round(totalScore(state, opponent) * SKILL_PCT_PER_LEVEL * level);
+      distributeDeduct(state, opponent, loss);
+      oppScoreDelta = loss;
+    }
+
+    // 레벨 초기화 — 스킬을 고른 동물의 에너지를 전부 소모한다. 효과로 얻은 점수(있다면)는
+    // 방금 초기화된 그 버킷에 다시 쌓인다.
+    state.teams[team].scores[animal] = myScoreDelta;
+
+    const stat = state.teams[team].skillStats[animal];
+    stat.count += 1;
+    stat.totalLevel += level;
   }
 
-  return { type: 'skillApplied', team, animal, myScoreDelta, oppScoreDelta, extraDrawsQueued };
+  return { type: 'skillApplied', team, animal, level, myScoreDelta, oppScoreDelta, extraDrawsQueued };
 }
 
-/** 제한시간 내에 고르지 않으면 서버가 대신 무작위로 하나를 골라준다. */
-export function randomSkillAnimal(rng: () => number = Math.random): Animal {
-  return ANIMALS[Math.floor(rng() * ANIMALS.length)];
+/** 아무 스킬도 쓰지 않고 턴을 넘긴다. */
+export function applyPass(team: Team): GameEvent {
+  return { type: 'skillPassed', team };
+}
+
+/** 제한시간 내에 고르지 않으면 서버가 대신 무작위로 하나를 골라준다(고를 수 있는 게 없으면 null=패스). */
+export function randomEligibleSkill(state: GameState, team: Team, rng: () => number = Math.random): Animal | null {
+  const options = eligibleAnimals(state, team);
+  if (options.length === 0) return null;
+  return options[Math.floor(rng() * options.length)];
 }

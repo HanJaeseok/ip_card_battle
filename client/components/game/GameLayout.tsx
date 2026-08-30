@@ -6,9 +6,11 @@ import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
 import { MainComboBanner } from '@/components/effects/MainComboBanner';
 import { SheepLoadedBanner } from '@/components/effects/SheepLoadedBanner';
 import { PlayerEmoticonLayer } from '@/components/effects/PlayerEmoticonLayer';
+import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { GameBoard } from './GameBoard';
+import { SheepProgressBar } from './SheepProgressBar';
 import { CommentaryBoard } from './CommentaryBoard';
 import { SkillChoiceModal } from './SkillChoiceModal';
 
@@ -22,6 +24,7 @@ export function GameLayout({
   myTeam,
   onPlaceClick,
   onChooseSkill,
+  onPassSkill,
   error,
   animState,
 }: {
@@ -29,6 +32,7 @@ export function GameLayout({
   myTeam: Team | null;
   onPlaceClick: (place: Place) => void;
   onChooseSkill: (animal: Animal) => void;
+  onPassSkill: () => void;
   error: string | null;
   animState: AnimationState;
 }) {
@@ -80,6 +84,7 @@ export function GameLayout({
             stackCards={animState.stackCards}
             displayedActiveTeam={animState.displayedActiveTeam}
             expandFlash={animState.expandFlash}
+            mermaidPopup={animState.mermaidPopup}
           />
           <CommentaryBoard lines={animState.commentary} />
         </div>
@@ -104,9 +109,18 @@ export function GameLayout({
       {/* 플레이어 프로필 옆 반응 이모티콘 (fixed, 화면 전역) */}
       <PlayerEmoticonLayer items={animState.emoticons} />
 
+      {/* 실용신양 추가 뽑기 진행도 */}
+      <SheepProgressBar progress={animState.sheepProgress} />
+
+      {/* 상표토끼 스킬 발동 — 토끼 스택에서 팀 점수판으로 날아가는 토끼들 */}
+      <RabbitFlightLayer flights={animState.rabbitFlights} />
+
+      {/* 특허랑이 스킬 발동 — 화면 전체가 크게 흔들리는 타격 비네트 */}
+      {animState.tigerImpact && <div className="tiger-vignette" />}
+
       {/* 턴 종료 — 4가지 스킬 중 하나를 고르는 모달 */}
       {showSkillModal && myTeam !== null && (
-        <SkillChoiceModal gameState={gameState} team={myTeam} onChoose={onChooseSkill} />
+        <SkillChoiceModal gameState={gameState} team={myTeam} onChoose={onChooseSkill} onPass={onPassSkill} />
       )}
     </div>
   );

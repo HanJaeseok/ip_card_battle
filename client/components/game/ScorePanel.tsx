@@ -1,28 +1,37 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { Animal, Team } from 'shared';
+import type { Animal, ClientGameState, Team } from 'shared';
 import { ANIMALS, THRESHOLDS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
+import { previewSkill } from '@/lib/skills';
+import { SKILL_TITLE, describeSkill } from '@/lib/skillInfo';
 
 // ── 동물별 표 — 아이콘 | 점수, 그 아래 경험치 바 + 레벨 ─────────────────────
+// 마우스를 올리면 해당 동물 스킬의 설명과, 지금 고른다면 얻을 기댓값을 미리 보여준다.
 function AnimalTable({
   animal,
   score,
   isFlashing,
   isPopping,
+  gameState,
+  team,
 }: {
   animal: Animal;
   score: number;
   isFlashing: boolean;
   isPopping: boolean;
+  gameState: ClientGameState;
+  team: Team;
 }) {
   const threshold = THRESHOLDS[animal];
   const level = Math.floor(score / threshold);
   const progressPct = ((score % threshold) / threshold) * 100;
+  const preview = previewSkill(gameState, team, animal);
+  const hasEffect = preview.myScoreDelta > 0 || preview.oppScoreDelta > 0 || preview.extraDraws > 0;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div className="relative group border border-gray-200 rounded-lg overflow-hidden bg-white">
       <div className="flex items-stretch">
         <div className="flex items-center justify-center px-3 py-2 flex-1 min-w-0">
           <span className="text-3xl leading-none">{ANIMAL_INFO[animal].emoji}</span>
@@ -45,19 +54,34 @@ function AnimalTable({
         </div>
         <p className="text-[0.65rem] text-jungle-500 text-right mt-0.5 font-bold">Lv. {level}</p>
       </div>
+
+      {/* 호버 툴팁 — 스킬 설명 + 지금 고르면 얻을 기댓값 */}
+      <div className="skill-tooltip absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-30 pointer-events-none">
+        <div className="bg-jungle-950 text-white text-xs rounded-lg px-3 py-2 shadow-xl text-center">
+          <p className="font-bold mb-1">{SKILL_TITLE[animal]} (Lv. {level})</p>
+          <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level)}</p>
+          <p className={`mt-1 font-bold ${hasEffect ? 'text-amber-300' : 'text-gray-400'}`}>
+            {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
+            {preview.myScoreDelta > 0 && `내 점수 +${preview.myScoreDelta}점`}
+            {preview.oppScoreDelta > 0 && `상대 점수 -${preview.oppScoreDelta}점`}
+            {!hasEffect && '아직 레벨 0 (효과 없음)'}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
 export function ScorePanel({
   team,
-  scores,
+  gameState,
   scoreFlash,
 }: {
   team: Team;
-  scores: Record<Animal, number>;
+  gameState: ClientGameState;
   scoreFlash: ReadonlyMap<string, number>;
 }) {
+  const scores = gameState.teams[team].scores;
   const myTotal = ANIMALS.reduce((s, a) => s + scores[a], 0);
 
   // 점수 팝 — flashKey 변경 시 re-trigger
@@ -94,6 +118,8 @@ export function ScorePanel({
           score={scores[a]}
           isFlashing={scoreFlash.has(`${team}:${a}`)}
           isPopping={popKeys.has(a)}
+          gameState={gameState}
+          team={team}
         />
       ))}
 

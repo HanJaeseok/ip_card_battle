@@ -9,6 +9,7 @@ import { CardFocusLayer } from '@/components/effects/CardFocusLayer';
 import { DrawSlotLayer } from '@/components/effects/DrawSlotLayer';
 import { WoolBallLayer } from '@/components/effects/WoolBallLayer';
 import { BombBurstLayer } from '@/components/effects/BombBurstLayer';
+import { MermaidPopup } from './MermaidPopup';
 import type {
   BombBurstItem,
   CaptionItem,
@@ -41,6 +42,7 @@ export function GameBoard({
   stackCards,
   displayedActiveTeam,
   expandFlash,
+  mermaidPopup,
 }: {
   gameState: ClientGameState;
   myTeam: Team | null;
@@ -57,6 +59,7 @@ export function GameBoard({
   stackCards: Record<Animal, StackedCard[]>;
   displayedActiveTeam: Team;
   expandFlash: boolean;
+  mermaidPopup: { team: Team } | null;
 }) {
   // 장소 클릭 가능 여부는 실제 서버 상태(gameState.activeTeam)를 그대로 따라야 한다 —
   // 정산 연출 중에는 이미 서버상 내 차례가 아니므로 클릭이 막혀 있는 게 맞다.
@@ -99,6 +102,7 @@ export function GameBoard({
       </div>
 
       {expandFlash && <div className="expand-flash" />}
+      {mermaidPopup && <MermaidPopup team={mermaidPopup.team} />}
 
       <CardCaptionLayer captions={captions} myTeam={myTeam} />
       <CardFocusLayer items={placeFocusBursts} />

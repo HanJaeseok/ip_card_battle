@@ -31,13 +31,25 @@ export function TeamPanel({
   const isMyTurn = myTeam !== null && animState.displayedActiveTeam === myTeam;
   const turnBgClass = myTeam === null ? 'bg-white' : isMyTurn ? 'bg-lime-100' : 'bg-rose-100';
 
-  const label = team === 'A' ? '🟢 A팀' : '🔵 B팀';
+  const teamEmoji = team === 'A' ? '🟢' : '🔵';
+  const label = `${teamEmoji} ${gameState.teamNames[team]}`;
+  const isMine = myTeam === team;
+
+  // 타이거 스킬 연출 — 발동한 쪽은 반동(recoil), 맞는 쪽은 충격(hit shake)
+  const recoilClass = animState.tigerRecoil?.attackerTeam === team ? (team === 'A' ? 'panel-recoil-a' : 'panel-recoil-b') : '';
+  const hitShakeClass = animState.tigerSlash?.onTeam === team ? 'panel-hit-shake' : '';
+  // 상표토끼 스킬 연출 — 날아온 토끼가 부딪히는 압박 효과
+  const rabbitPressureClass = animState.rabbitPressure?.targetTeam === team ? 'panel-rabbit-pressure' : '';
 
   return (
     <div
-      className={`w-56 shrink-0 ${turnBgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} transition-colors transition-shadow`}
+      data-rabbit-target={team}
+      className={`w-56 shrink-0 ${turnBgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} ${recoilClass} ${hitShakeClass} ${rabbitPressureClass} transition-colors transition-shadow`}
     >
-      <div className={`text-base font-bold ${teamColor}`}>{label}</div>
+      <div className={`text-base font-bold ${teamColor} flex items-center gap-1.5`}>
+        {label}
+        {isMine && <span className="text-rose-500">우리팀♥</span>}
+      </div>
 
       <PlayerList
         team={team}
@@ -50,7 +62,7 @@ export function TeamPanel({
 
       <ScorePanel
         team={team}
-        scores={teamState.scores}
+        gameState={gameState}
         scoreFlash={animState.scoreFlash}
       />
     </div>

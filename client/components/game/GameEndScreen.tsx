@@ -59,9 +59,11 @@ function generateConfetti(count: number, teamColor: string): ConfettiPiece[] {
 
 export function GameEndScreen({
   gameState,
+  myTeam,
   onBack,
 }: {
   gameState: ClientGameState;
+  myTeam: Team | null;
   onBack: () => void;
 }) {
   const { winner } = gameState;
@@ -74,7 +76,8 @@ export function GameEndScreen({
   );
 
   const winnerEmoji = winner === 'draw' ? '🤝' : winner === 'A' ? '🟢' : '🔵';
-  const winnerText = winner === 'draw' ? '무승부!' : `${winner}팀 승리!`;
+  const winnerText =
+    winner === 'draw' ? '무승부!' : myTeam !== null && winner === myTeam ? '우리팀 승리!' : '우리팀 패배!';
   const flavorAnimal = useMemo(() => pickFlavorAnimal(gameState, winner), [gameState, winner]);
 
   return (
@@ -97,18 +100,7 @@ export function GameEndScreen({
 
       {/* 승리 텍스트 */}
       <div className="winner-bounce-in flex flex-col items-center gap-3">
-        {flavorAnimal && (winner === 'A' || winner === 'B') ? (
-          <img
-            src={`/skills/${flavorAnimal}_skill.png`}
-            alt={ANIMAL_INFO[flavorAnimal].name}
-            className="w-[40vw] h-[40vw] max-w-[440px] max-h-[440px] min-w-[200px] min-h-[200px] rounded-full object-cover shadow-xl"
-            style={{
-              border: `5px solid ${winner === 'A' ? '#22c55e' : '#3b82f6'}`,
-            }}
-          />
-        ) : (
-          <div style={{ fontSize: '5rem' }}>{winnerEmoji}</div>
-        )}
+        <div style={{ fontSize: '5rem' }}>{winnerEmoji}</div>
         <h2 className="text-3xl font-bold text-jungle-900">{winnerText}</h2>
         {flavorAnimal && (
           <p className="text-sm text-jungle-500 -mt-1">{FLAVOR_TEXT[flavorAnimal]}</p>
@@ -124,12 +116,12 @@ export function GameEndScreen({
           <span
             className={`text-team-a ${winner === 'A' ? 'underline decoration-2' : 'opacity-60'}`}
           >
-            🟢 A팀: {scoreA}점
+            🟢 {gameState.teamNames.A}: {scoreA}점
           </span>
           <span
             className={`text-team-b ${winner === 'B' ? 'underline decoration-2' : 'opacity-60'}`}
           >
-            🔵 B팀: {scoreB}점
+            🔵 {gameState.teamNames.B}: {scoreB}점
           </span>
         </div>
 
@@ -159,6 +151,36 @@ export function GameEndScreen({
                 >
                   {gameState.teams.B.scores[a]}
                 </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 스킬 사용 통계 — 동물별로 몇 번, 총 몇 레벨어치를 발동했는지 */}
+      <div
+        className="bg-white rounded-2xl shadow-lg border border-jungle-200 p-6 w-full max-w-md"
+        style={{ animation: 'bounceIn 0.7s cubic-bezier(0.36,0.07,0.19,0.97) 300ms both' }}
+      >
+        <p className="text-center text-sm font-bold text-jungle-500 mb-4">스킬 사용 통계</p>
+        <div className="grid grid-cols-2 gap-4">
+          {(['A', 'B'] as const).map(t => (
+            <div key={t}>
+              <p className={`text-xs font-bold mb-2 ${t === 'A' ? 'text-team-a' : 'text-team-b'}`}>
+                {t === 'A' ? '🟢' : '🔵'} {gameState.teamNames[t]}
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {ANIMALS.map(a => {
+                  const stat = gameState.teams[t].skillStats[a];
+                  return (
+                    <div key={a} className="flex items-center justify-between text-xs text-jungle-700">
+                      <span>{ANIMAL_INFO[a].emoji} {ANIMAL_INFO[a].name}</span>
+                      <span className="tabular-nums font-mono">
+                        {stat.count}회 (합 Lv.{stat.totalLevel})
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
