@@ -923,6 +923,17 @@ body {
 .place-tile-disabled {
   filter: brightness(0.4) grayscale(30%);
 }
+@keyframes placeTilePress {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.93); }
+  100% { transform: scale(1); }
+}
+.place-tile-pressed {
+  animation: placeTilePress 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .place-tile-pressed { animation: none; }
+}
 
 /* ── 턴 종료 스킬 선택 모달 ─────────────────────────────────────────────── */
 .skill-choice-panel {

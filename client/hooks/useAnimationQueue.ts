@@ -141,6 +141,9 @@ export interface AnimationState {
   isSettling: boolean; // 이번 액션의 정산 연출이 아직 재생 중인지
 }
 
+// 수동으로 "다음 기회를 노리기"를 골랐을 때 화면에 뜨는 문구 — 매번 무작위로 하나 고른다.
+const PASS_CAPTIONS = ['다음 기회를 노려봅니다.', '큰그림 그리는 중..', '(레벨 올려서 한 번에 몰아칠 예정)'];
+
 const EMPTY_SCORE_MAP = new Map<string, number>() as ReadonlyMap<string, number>;
 const EMPTY_ID_SET = new Set<number>() as ReadonlySet<number>;
 
@@ -451,7 +454,7 @@ export function useAnimationQueue(
           if (ev.extraDrawsQueued > 0) parts.push(`다음 턴 추가 뽑기 ${ev.extraDrawsQueued}회 예약`);
           newLines.push({ team: ev.team, text: parts.join(' ') });
         } else if (ev.type === 'skillPassed' && !ev.auto) {
-          newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 아무것도 하지 않고 턴을 넘겼습니다.` });
+          newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 다음 기회를 노리기로 했습니다 (레벨을 더 모으는 중).` });
         } else if (ev.type === 'expand') {
           newLines.push({ team: null, text: '더 신나게!! 도토리 폭탄이 등장합니다.' });
         } else if (ev.type === 'timeoutChoice') {
@@ -515,9 +518,9 @@ export function useAnimationQueue(
 
         addPlaceFocus(place, slotAt);
 
-        // 슬롯이 뜨는 순간 바로 card_1/card_2 사운드를 재생한다(스핀이 끝날 때까지 기다리지 않음).
+        // 슬롯이 뜨고 0.3초 뒤에 card_1/card_2 사운드를 재생한다(스핀 종료까지는 기다리지 않음).
         const pitch = inRoll ? Math.min(1.35, 1 + (bonusRollIdx - 1) * 0.035) : 1;
-        sched(() => playRandomSound('card', pitch), slotAt);
+        sched(() => playRandomSound('card', pitch), slotAt + 300);
 
         sched(() => {
           setNewCardId(card.id);
@@ -813,7 +816,8 @@ export function useAnimationQueue(
           : at + EFFECT_DUR;
       } else if (passEv && !passEv.auto) {
         const at = cursor;
-        addCaption('아무것도 하지 않음', 'effect', at, { team: passEv.team });
+        const text = PASS_CAPTIONS[Math.floor(Math.random() * PASS_CAPTIONS.length)];
+        addCaption(text, 'effect', at, { team: passEv.team });
         cursor = at + 700;
       }
     }
