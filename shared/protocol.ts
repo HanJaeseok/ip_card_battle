@@ -1,4 +1,4 @@
-import type { GameEvent, GameState, Place, Team } from './types';
+import type { Animal, GameEvent, GameState, Place, Team } from './types';
 
 // ─── 클라이언트 → 서버 ───────────────────────────────────────────────────────
 
@@ -8,6 +8,7 @@ export type ClientMessage =
   | { type: 'createSoloRoom'; nickname: string } // 싱글 모드 — 컴퓨터(랜덤 클릭)와 즉시 대전
   | { type: 'ready' }
   | { type: 'drawCard'; place: Place }
+  | { type: 'chooseSkill'; animal: Animal } // 턴 종료 시 4가지 스킬 중 하나 선택
   | { type: 'reconnect'; roomId: string; playerId: string };
 
 // ─── 서버 → 클라이언트 ──────────────────────────────────────────────────────
@@ -37,7 +38,8 @@ export type ErrorCode =
   | 'CARD_NOT_AVAILABLE'
   | 'GAME_NOT_STARTED'
   | 'GAME_ALREADY_STARTED'
-  | 'INVALID_RECONNECT';
+  | 'INVALID_RECONNECT'
+  | 'NO_PENDING_CHOICE';
 
 // ─── 클라이언트 게임 상태 ─────────────────────────────────────────────────────
 // 카드가 뽑히는 즉시 공개되므로(숨겨진 카드 상태가 없음) 서버 GameState를 그대로

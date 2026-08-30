@@ -27,17 +27,18 @@ export function serializeState(
       tiger: [...state.stacks.tiger],
     },
     expanded: state.expanded,
+    pendingChoice: state.pendingChoice,
     teams: {
       A: {
         members: state.teams.A.members,
         scores: { ...state.teams.A.scores },
-        lastLevel: { ...state.teams.A.lastLevel },
+        pendingExtraDraws: state.teams.A.pendingExtraDraws,
         playerIndex: state.teams.A.playerIndex,
       },
       B: {
         members: state.teams.B.members,
         scores: { ...state.teams.B.scores },
-        lastLevel: { ...state.teams.B.lastLevel },
+        pendingExtraDraws: state.teams.B.pendingExtraDraws,
         playerIndex: state.teams.B.playerIndex,
       },
     },

@@ -1,19 +1,13 @@
-import { bombChanceForTurn, PLACE_ANIMALS, ANIMALS } from 'shared';
+import { bombChanceForTurn, PLACE_ANIMALS, ANIMALS, SHEEP_SAFETY_CAP } from 'shared';
 import type { GameEvent, GameState, Place } from 'shared';
-import { applySheepEffect } from './effects/sheep';
-import { applyTigerEffect } from './effects/tiger';
-import { applyMermaidEffect } from './effects/mermaid';
-import { drawCardAt } from './places';
+import { drawCardAt, randomPlace } from './places';
 import type { RNG } from './places';
 
 /**
- * 장소 클릭 처리 — 엔진의 단일 진입점.
- * 1) 클릭한 장소에서 카드 1장을 뽑는다(EXPAND_TURN 이후엔 BOMB_CHANCE 확률로 폭탄).
- * 2) 실용신양 상시효과 — 이 액션을 시작하는 시점의 실용신양 점수 기준으로
- *    floor(score/10)번 무작위 장소에서 추가로 뽑는다(정산 전이라 점수가 아직
- *    안 올랐으므로, 이 값은 액션 도중 다시 늘지 않는다 — 재귀 불필요).
- * 3) 이번 액션에서 뽑은 카드가 전부 모인 뒤, 동물별로 미획득 스택이 짝수 개면
- *    한꺼번에 수집하고 특허랑이·디자인어 즉시효과를 발동한다.
+ * 장소 클릭 처리.
+ * 1) 실용신양 스킬로 예약해둔 추가 뽑기가 있으면 먼저 전부 소모한다.
+ * 2) 클릭한 장소에서 카드 1장을 뽑는다(EXPAND_TURN 이후엔 도토리 폭탄 확률 판정).
+ * 3) 이번 액션에서 뽑은 카드가 전부 모인 뒤, 동물별로 미획득 스택이 짝수 개면 한꺼번에 수집한다.
  */
 export function drawCard(
   state: GameState,
@@ -22,16 +16,25 @@ export function drawCard(
 ): GameEvent[] {
   const events: GameEvent[] = [];
 
+  events.push(...consumePendingExtraDraws(state, rng));
   events.push(..._drawOne(state, place, rng));
-  events.push(...applySheepEffect(state, rng));
   events.push(...settleStacks(state));
 
   return events;
 }
 
-/** 실용신양 효과 전용 — 정산 없이 카드 1장만 뽑아 스택에 쌓는다(폭탄 판정 포함). */
-export function drawCardInternal(state: GameState, place: Place, rng: RNG): GameEvent[] {
-  return _drawOne(state, place, rng);
+function consumePendingExtraDraws(state: GameState, rng: RNG): GameEvent[] {
+  const team = state.activeTeam;
+  const teamState = state.teams[team];
+  const count = Math.min(teamState.pendingExtraDraws, SHEEP_SAFETY_CAP);
+  teamState.pendingExtraDraws = 0;
+  if (count <= 0) return [];
+
+  const events: GameEvent[] = [{ type: 'bonusDraws', team, count }];
+  for (let i = 0; i < count; i++) {
+    events.push(..._drawOne(state, randomPlace(rng), rng));
+  }
+  return events;
 }
 
 function _drawOne(state: GameState, place: Place, rng: RNG): GameEvent[] {
@@ -70,9 +73,6 @@ function settleStacks(state: GameState): GameEvent[] {
       score: scoreGain,
       cardIds: uncollected.map(c => c.id),
     });
-
-    if (animal === 'tiger') events.push(...applyTigerEffect(state));
-    if (animal === 'mermaid') events.push(...applyMermaidEffect(state));
   }
 
   return events;

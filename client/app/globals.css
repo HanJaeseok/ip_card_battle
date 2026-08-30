@@ -947,6 +947,32 @@ body {
   filter: brightness(0.4) grayscale(30%);
 }
 
+/* ── 턴 종료 스킬 선택 모달 ─────────────────────────────────────────────── */
+.skill-choice-panel {
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.55);
+  transition: filter 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.skill-choice-panel:hover,
+.skill-choice-panel:focus-visible {
+  filter: brightness(1);
+}
+.skill-choice-dim {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.1) 100%);
+  pointer-events: none;
+}
+.skill-outline-text {
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 3px 8px rgba(0, 0, 0, 0.8);
+}
+
 /* ── 중앙 동물 스택 — 카드 한 장 ──────────────────────────────────────────── */
 .stack-card {
   position: relative;

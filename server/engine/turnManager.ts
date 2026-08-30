@@ -1,7 +1,6 @@
 import { EXPAND_TURN, MAX_TURN, ANIMALS } from 'shared';
 import type { GameEvent, GameState, Team } from 'shared';
 import { initStacks } from './places';
-import { applyRabbitEffect } from './effects/rabbit';
 import type { RNG } from './places';
 
 function determineWinner(state: GameState): Team | 'draw' {
@@ -15,21 +14,16 @@ function determineWinner(state: GameState): Team | 'draw' {
 }
 
 /**
- * 턴 종료 처리.
- * 호출 시점: 현재 activeTeam 플레이어가 장소를 클릭한 직후.
+ * 턴 종료 처리 — 스킬 선택까지 모두 끝난 뒤에만 호출된다.
  *
  * 순서:
- * 1. 상표토끼 턴 종료 훅
- * 2. 팀 교대 (A→B, B→A)
- * 3. B→A 교대 시 턴 카운터 증가
- * 4. EXPAND_TURN 도달 시 "더 신나지는" 시점 진입 (1회) — 이때부터 폭탄 등장
- * 5. MAX_TURN 초과 시 게임 종료
+ * 1. 팀 교대 (A→B, B→A)
+ * 2. B→A 교대 시 턴 카운터 증가
+ * 3. EXPAND_TURN 도달 시 "더 신나지는" 시점 진입 (1회) — 이때부터 폭탄 등장
+ * 4. MAX_TURN 초과 시 게임 종료
  */
-export function advanceTurn(state: GameState, rng: RNG = Math.random): GameEvent[] {
+export function advanceTurn(state: GameState): GameEvent[] {
   const events: GameEvent[] = [];
-
-  // 상표토끼 턴 종료 훅
-  events.push(...applyRabbitEffect(state));
 
   const currentTeam = state.activeTeam;
   const nextTeam: Team = currentTeam === 'A' ? 'B' : 'A';
@@ -38,7 +32,7 @@ export function advanceTurn(state: GameState, rng: RNG = Math.random): GameEvent
   if (currentTeam === 'B') {
     state.turn++;
 
-    // EXPAND_TURN 종료 시점부터 폭탄이 등장한다 (카드 재고 개념은 없음 — 뽑기는 항상 무한)
+    // EXPAND_TURN 종료 시점부터 폭탄이 등장한다
     if (state.turn === EXPAND_TURN + 1 && !state.expanded) {
       state.expanded = true;
       events.push({ type: 'expand' });
@@ -74,7 +68,7 @@ export function initGame(
   const makeTeam = (members: string[]) => ({
     members,
     scores: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
-    lastLevel: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
+    pendingExtraDraws: 0,
     playerIndex: 0,
   });
 
@@ -85,6 +79,7 @@ export function initGame(
     activePlayerIndex: 0,
     stacks: initStacks(),
     expanded: false,
+    pendingChoice: null,
     teams: {
       A: makeTeam(teamAMembers),
       B: makeTeam(teamBMembers),

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
+  Animal,
   ClientGameEvent,
   ClientGameState,
   ClientMessage,
@@ -38,6 +39,7 @@ export interface UseWebSocketReturn {
   createSoloRoom: (nickname: string) => void;
   sendReady: () => void;
   drawCard: (place: Place) => void;
+  chooseSkill: (animal: Animal) => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -143,9 +145,13 @@ export function useWebSocket(): UseWebSocketReturn {
     send({ type: 'drawCard', place });
   }, [send]);
 
+  const chooseSkill = useCallback((animal: Animal) => {
+    send({ type: 'chooseSkill', animal });
+  }, [send]);
+
   return {
     connected, roomId, playerId,
     lobbyPlayers, gameState, lastEvents, error,
-    createRoom, joinRoom, createSoloRoom, sendReady, drawCard,
+    createRoom, joinRoom, createSoloRoom, sendReady, drawCard, chooseSkill,
   };
 }

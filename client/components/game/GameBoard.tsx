@@ -4,7 +4,6 @@ import type { Animal, ClientGameState, Place, StackedCard, Team } from 'shared';
 import { PLACES } from 'shared';
 import { PlaceTile } from './PlaceTile';
 import { AnimalStackArea } from './AnimalStackArea';
-import { MermaidPopup } from './MermaidPopup';
 import { CardCaptionLayer } from '@/components/effects/CardCaptionLayer';
 import { CardFocusLayer } from '@/components/effects/CardFocusLayer';
 import { DrawSlotLayer } from '@/components/effects/DrawSlotLayer';
@@ -41,7 +40,6 @@ export function GameBoard({
   newCardId,
   stackCards,
   displayedActiveTeam,
-  mermaidPopup,
   expandFlash,
 }: {
   gameState: ClientGameState;
@@ -58,7 +56,6 @@ export function GameBoard({
   newCardId: number | null;
   stackCards: Record<Animal, StackedCard[]>;
   displayedActiveTeam: Team;
-  mermaidPopup: { team: Team } | null;
   expandFlash: boolean;
 }) {
   // 장소 클릭 가능 여부는 실제 서버 상태(gameState.activeTeam)를 그대로 따라야 한다 —
@@ -101,7 +98,6 @@ export function GameBoard({
         />
       </div>
 
-      {mermaidPopup && <MermaidPopup team={mermaidPopup.team} />}
       {expandFlash && <div className="expand-flash" />}
 
       <CardCaptionLayer captions={captions} myTeam={myTeam} />

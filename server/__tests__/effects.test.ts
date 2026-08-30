@@ -1,12 +1,10 @@
 import { initGame } from '../engine/turnManager';
 import { drawCard } from '../engine/drawCard';
 import { advanceTurn } from '../engine/turnManager';
-import { applyRabbitEffect } from '../engine/effects/rabbit';
-import { applyTigerEffect } from '../engine/effects/tiger';
-import { applyMermaidEffect } from '../engine/effects/mermaid';
-import { applySheepEffect } from '../engine/effects/sheep';
+import { processPlayerAction, processSkillChoice } from '../engine/gameEngine';
+import { applySkillChoice, levelOf } from '../engine/skills';
 import type { Animal, CardNum, StackedCard } from 'shared';
-import { MAX_TURN, SHEEP_SAFETY_CAP } from 'shared';
+import { MAX_TURN, SHEEP_SAFETY_CAP, SKILL_PCT_PER_LEVEL } from 'shared';
 
 // 결정론적 RNG (항상 0 반환 — Math.floor(rng()*n)은 항상 0번째 원소를 고른다)
 const rng0 = () => 0;
@@ -18,7 +16,7 @@ function stackedCard(animal: Animal, num: CardNum): StackedCard {
   return { id: ++cardIdSeed, animal, num, collectedBy: null };
 }
 
-// ─── 홀수 잔류 ───────────────────────────────────────────────────────────────
+// ─── 홀수 잔류 / 짝수 즉시 수집 ────────────────────────────────────────────────
 describe('홀수 잔류', () => {
   it('3장 스택 시 아무것도 수집하지 않음', () => {
     const state = initGame(['A1'], ['B1'], rng0);
@@ -41,193 +39,132 @@ describe('홀수 잔류', () => {
   });
 });
 
-// ─── 상표토끼 ─────────────────────────────────────────────────────────────────
-describe('상표토끼 — 1회성 발동', () => {
-  it('10점 도달 시 1회만 보너스, lastLevel 갱신으로 재발동 없음', () => {
+// ─── 레벨 계산 ───────────────────────────────────────────────────────────────
+describe('레벨 = floor(점수 / 임계값)', () => {
+  it('양·토끼는 10점 단위, 인어·호랑이는 20점 단위', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 5;
-    state.teams['A'].scores.rabbit = 10;
-    state.teams['A'].lastLevel.rabbit = 0;
+    state.teams['A'].scores.sheep = 25;
+    state.teams['A'].scores.rabbit = 9;
+    state.teams['A'].scores.mermaid = 41;
+    state.teams['A'].scores.tiger = 20;
 
-    const events = applyRabbitEffect(state);
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('rabbitBonus');
-
-    const bonus = (events[0] as { type: 'rabbitBonus'; team: string; bonus: number }).bonus;
-    // gained=1, turn=5 → bonus=5
-    expect(bonus).toBe(5);
-    expect(state.teams['A'].scores.rabbit).toBe(15);
-    expect(state.teams['A'].lastLevel.rabbit).toBe(1);
-
-    // 재호출 시 발동 없음
-    const events2 = applyRabbitEffect(state);
-    expect(events2).toHaveLength(0);
-  });
-
-  it('보너스 추가 후 lastLevel 갱신 (순서 검증)', () => {
-    // rabbit 점수 19, 보너스로 20점이 되면 재발동하면 안 됨
-    const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 1;
-    state.teams['A'].scores.rabbit = 10;
-    state.teams['A'].lastLevel.rabbit = 0;
-
-    applyRabbitEffect(state); // bonus=1, 총 11점, lastLevel=1
-    expect(state.teams['A'].lastLevel.rabbit).toBe(1);
-    // 한 번 더 호출해도 발동 없음
-    expect(applyRabbitEffect(state)).toHaveLength(0);
+    expect(levelOf(state, 'A', 'sheep')).toBe(2);
+    expect(levelOf(state, 'A', 'rabbit')).toBe(0);
+    expect(levelOf(state, 'A', 'mermaid')).toBe(2);
+    expect(levelOf(state, 'A', 'tiger')).toBe(1);
   });
 });
 
-// ─── 특허랑이 ─────────────────────────────────────────────────────────────────
-describe('특허랑이 — 20점 단위 & min 0', () => {
-  it('19점에서 미발동, 20점에서 발동', () => {
+// ─── 스킬 선택 효과 ───────────────────────────────────────────────────────────
+describe('스킬 선택 — 실용신양', () => {
+  it('레벨만큼 다음 내 턴에 추가 뽑기를 예약하고, 즉시 점수 변화는 없다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 1;
+    state.teams['A'].scores.sheep = 35; // level=3
 
-    state.teams['A'].scores.tiger = 19;
-    expect(applyTigerEffect(state)).toHaveLength(0);
-
-    state.teams['A'].scores.tiger = 20;
-    const events = applyTigerEffect(state);
-    expect(events[0].type).toBe('tigerAttack');
+    const ev = applySkillChoice(state, 'A', 'sheep');
+    expect(ev.type).toBe('skillApplied');
+    if (ev.type === 'skillApplied') {
+      expect(ev.extraDrawsQueued).toBe(3);
+      expect(ev.myScoreDelta).toBe(0);
+      expect(ev.oppScoreDelta).toBe(0);
+    }
+    expect(state.teams['A'].pendingExtraDraws).toBe(3);
   });
+});
 
-  it('상대 점수가 dmg보다 작아도 음수 미발생', () => {
+describe('스킬 선택 — 상표토끼', () => {
+  it('내 총점의 5%×레벨만큼 상표토끼 점수에 더해진다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 10;
-    state.teams['A'].scores.tiger = 20;
-    state.teams['B'].scores.sheep = 2;
-    state.teams['B'].scores.rabbit = 1;
+    state.teams['A'].scores.rabbit = 20; // level=2
+    state.teams['A'].scores.sheep = 30; // 총점 50
 
-    applyTigerEffect(state);
+    const ev = applySkillChoice(state, 'A', 'rabbit');
+    const expected = Math.round(50 * SKILL_PCT_PER_LEVEL * 2); // 5
+    expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
+    expect(state.teams['A'].scores.rabbit).toBe(20 + expected);
+  });
+});
+
+describe('스킬 선택 — 디자인어', () => {
+  it('상대와의 총점 차이의 5%×레벨만큼 획득 (뒤처져 있어도 앞서 있어도 동일 공식)', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.mermaid = 20; // level=1, A 총점=20
+    state.teams['B'].scores.sheep = 100; // B 총점=100, 총점 차이 80
+
+    const ev = applySkillChoice(state, 'A', 'mermaid');
+    const expected = Math.round(80 * SKILL_PCT_PER_LEVEL * 1); // 4
+    expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
+    expect(state.teams['A'].scores.mermaid).toBe(20 + expected);
+    // 상대 점수는 건드리지 않는다(흡수가 아니라 그냥 획득)
+    expect(state.teams['B'].scores.sheep).toBe(100);
+  });
+});
+
+describe('스킬 선택 — 특허랑이', () => {
+  it('상대 총점의 5%×레벨만큼 상대 점수를 깎는다 (음수 방지)', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.tiger = 40; // level=2
+    state.teams['B'].scores.sheep = 10;
+    state.teams['B'].scores.rabbit = 10; // 총점 20
+
+    const ev = applySkillChoice(state, 'A', 'tiger');
+    const expectedLoss = Math.round(20 * SKILL_PCT_PER_LEVEL * 2); // 2
+    expect(ev.type === 'skillApplied' && ev.oppScoreDelta).toBe(expectedLoss);
+
+    const remaining = state.teams['B'].scores.sheep + state.teams['B'].scores.rabbit;
+    expect(remaining).toBe(20 - expectedLoss);
     expect(state.teams['B'].scores.sheep).toBeGreaterThanOrEqual(0);
     expect(state.teams['B'].scores.rabbit).toBeGreaterThanOrEqual(0);
   });
 
-  it('dmg = round(gained × turn × 1.5)', () => {
+  it('레벨이 0이면(아직 임계값 미달) 아무 효과도 없다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 4; // round(1 × 4 × 1.5) = 6
-    state.teams['A'].scores.tiger = 20;
-    state.teams['B'].scores.sheep = 100;
-    state.teams['B'].scores.rabbit = 100;
+    state.teams['B'].scores.sheep = 50;
 
-    applyTigerEffect(state);
-    expect(state.teams['B'].scores.sheep).toBe(94);
-    expect(state.teams['B'].scores.rabbit).toBe(94);
-  });
-
-  it('점수가 깎이면 lastLevel도 함께 낮춰서 재발동 가능해짐', () => {
-    const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 1;
-    state.teams['A'].scores.tiger = 20; // gained=1, dmg=round(1*1*1.5)=2
-
-    state.teams['B'].scores.rabbit = 5; // 공격 후 5-2=3, level 0
-    state.teams['B'].lastLevel.rabbit = 2; // 과거 20점대에서 이미 보너스 받았던 상태
-
-    applyTigerEffect(state);
-    expect(state.teams['B'].scores.rabbit).toBe(3);
-    expect(state.teams['B'].lastLevel.rabbit).toBe(0); // 현재 점수 수준으로 clamp됨
-
-    // 이후 다시 25점까지 회복하면 보너스가 재발동해야 함
-    state.teams['B'].scores.rabbit = 25;
-    state.turn = 3;
-    state.activeTeam = 'B';
-    const events = applyRabbitEffect(state);
-    expect(events).toHaveLength(1);
-    expect(events[0].type).toBe('rabbitBonus');
+    const ev = applySkillChoice(state, 'A', 'tiger');
+    expect(ev.type === 'skillApplied' && ev.oppScoreDelta).toBe(0);
+    expect(state.teams['B'].scores.sheep).toBe(50);
   });
 });
 
-// ─── 디자인어 ─────────────────────────────────────────────────────────────────
-describe('디자인어 — 캐치업/리드 분기', () => {
-  it('뒤처진 팀 → 격차 50% 흡수', () => {
+// ─── 실용신양 예약 뽑기 소모 ───────────────────────────────────────────────────
+describe('실용신양 — 예약된 추가 뽑기 소모', () => {
+  it('pendingExtraDraws만큼 이번 액션에서 추가로 뽑고 0으로 초기화된다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 1;
-    // A팀이 뒤처짐: A총점=20, B총점=60, gap=40, absorb=20
-    state.teams['A'].scores.mermaid = 20;
-    state.teams['B'].scores.mermaid = 60;
-    state.teams['A'].lastLevel.mermaid = 0;
+    state.teams['A'].pendingExtraDraws = 3;
 
-    const before = state.teams['B'].scores.mermaid;
-    applyMermaidEffect(state);
-    const absorb = before - state.teams['B'].scores.mermaid;
-    expect(absorb).toBe(20); // gap(40) × 0.5
-    expect(state.teams['A'].scores.mermaid).toBe(40); // 20 + 20
+    const events = drawCard(state, 'house', rng0);
+    const bonus = events.find(e => e.type === 'bonusDraws');
+    expect(bonus && bonus.type === 'bonusDraws' ? bonus.count : 0).toBe(3);
+
+    const drawCount = events.filter(e => e.type === 'draw').length;
+    expect(drawCount).toBe(4); // 예약 3장 + 이번 클릭 1장
+    expect(state.teams['A'].pendingExtraDraws).toBe(0);
   });
 
-  it('앞선 팀 → 소량 보너스만', () => {
+  it(`SHEEP_SAFETY_CAP(${SHEEP_SAFETY_CAP})을 넘는 예약은 그 값에서 잘린다`, () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 3; // bonus = round(1 × 3 × 0.3) = 1
-    state.teams['A'].scores.mermaid = 20;
-    state.teams['B'].scores.mermaid = 0;
-    state.teams['A'].lastLevel.mermaid = 0;
+    state.teams['A'].pendingExtraDraws = SHEEP_SAFETY_CAP + 500;
 
-    const bBefore = state.teams['B'].scores.mermaid;
-    applyMermaidEffect(state);
-    expect(state.teams['B'].scores.mermaid).toBe(bBefore); // 상대 점수 변화 없음
-    expect(state.teams['A'].scores.mermaid).toBeGreaterThan(20);
-  });
-
-  it('흡수량이 상대 총점 초과 시 클램핑', () => {
-    const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 1;
-    // A=20, B=5 → 뒤처짐, gap=15 * 상대 실제 보유량 5에서 클램핑
-    state.teams['A'].scores.mermaid = 0;
-    state.teams['B'].scores.mermaid = 5;
-    state.teams['A'].scores.sheep = 20;
-    state.teams['A'].lastLevel.mermaid = 0;
-
-    applyMermaidEffect(state);
-    // 상대 총점 이하로만 차감
-    for (const animal of ['sheep', 'rabbit', 'mermaid', 'tiger'] as const) {
-      expect(state.teams['B'].scores[animal]).toBeGreaterThanOrEqual(0);
-    }
+    const events = drawCard(state, 'house', rng0);
+    const bonus = events.find(e => e.type === 'bonusDraws');
+    expect(bonus && bonus.type === 'bonusDraws' ? bonus.count : 0).toBe(SHEEP_SAFETY_CAP);
   });
 });
 
-// ─── 실용신양 뽑기 상한 ────────────────────────────────────────────────────────
-describe('실용신양 — 뽑기 상한', () => {
-  it(`SHEEP_SAFETY_CAP(${SHEEP_SAFETY_CAP}) 이상 뽑기 시도 시 그 값에서 중단`, () => {
-    const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].scores.sheep = 3500; // level=350
-
-    const events = applySheepEffect(state, rng0);
-    const rollCount = events.find(e => e.type === 'sheepRoll');
-    expect(rollCount && rollCount.type === 'sheepRoll' ? rollCount.count : 0).toBeLessThanOrEqual(SHEEP_SAFETY_CAP);
-  });
-});
-
-describe('실용신양 — 상시효과 (lastLevel과 무관하게 현재 점수 기준)', () => {
-  it('lastLevel이 얼마든 간에 floor(score/10)만큼 항상 뽑음', () => {
-    const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].scores.sheep = 25; // level=2
-    state.teams['A'].lastLevel.sheep = 10; // 과거 값이 남아 있어도 무시되어야 함
-
-    const events = applySheepEffect(state, rng0);
-    const roll = events.find(e => e.type === 'sheepRoll');
-    expect(roll && roll.type === 'sheepRoll' ? roll.count : 0).toBe(2);
-  });
-
-  it('점수가 10 미만이면 발동하지 않음', () => {
-    const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].scores.sheep = 9;
-    expect(applySheepEffect(state, rng0)).toHaveLength(0);
-  });
-});
-
-// ─── turnManager ─────────────────────────────────────────────────────────────
+// ─── 턴 진행 ─────────────────────────────────────────────────────────────────
 describe('턴 진행', () => {
   it('B팀 플레이 후 턴 카운터 증가', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.activeTeam = 'B';
-    advanceTurn(state, rng0);
+    advanceTurn(state);
     expect(state.turn).toBe(2);
   });
 
   it('A팀 플레이 후 턴 카운터 유지', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.activeTeam = 'A';
-    advanceTurn(state, rng0);
+    advanceTurn(state);
     expect(state.turn).toBe(1);
   });
 
@@ -235,9 +172,35 @@ describe('턴 진행', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.turn = MAX_TURN;
     state.activeTeam = 'B';
-    const events = advanceTurn(state, rng0);
+    const events = advanceTurn(state);
     expect(state.phase).toBe('ended');
     expect(events.some(e => e.type === 'gameEnd')).toBe(true);
+  });
+});
+
+// ─── 카드 선택 ↔ 스킬 선택 대기 상태 ───────────────────────────────────────────
+describe('장소 클릭 후에는 스킬을 고를 때까지 턴이 넘어가지 않는다', () => {
+  it('processPlayerAction 직후 pendingChoice가 세팅되고 activeTeam은 그대로다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    const { state: s1 } = processPlayerAction(state, 'house', rng0);
+    expect(s1.pendingChoice).toBe('A');
+    expect(s1.activeTeam).toBe('A');
+  });
+
+  it('pendingChoice가 있는 동안 추가 장소 클릭은 무시된다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    const { state: s1 } = processPlayerAction(state, 'house', rng0);
+    const { events } = processPlayerAction(s1, 'house', rng0);
+    expect(events).toHaveLength(0);
+  });
+
+  it('스킬을 고르면 pendingChoice가 풀리고 턴이 다음 팀으로 넘어간다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    const { state: s1 } = processPlayerAction(state, 'house', rng0);
+    const { state: s2, events } = processSkillChoice(s1, 'sheep');
+    expect(s2.pendingChoice).toBeNull();
+    expect(s2.activeTeam).toBe('B');
+    expect(events.some(e => e.type === 'skillApplied')).toBe(true);
   });
 });
 
@@ -246,7 +209,6 @@ describe('폭탄 — EXPAND_TURN 이후에만 등장', () => {
   it('expanded=false면 폭탄이 절대 발생하지 않음', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.expanded = false;
-    // 0.01은 BOMB_CHANCE(0.3)보다 작지만, expanded가 false면 애초에 확률 판정을 안 한다.
     const events = drawCard(state, 'house', () => 0.01);
     expect(events.some(e => e.type === 'bomb')).toBe(false);
   });
@@ -259,7 +221,7 @@ describe('폭탄 — EXPAND_TURN 이후에만 등장', () => {
     alreadyCollected.collectedBy = 'A';
     state.stacks.rabbit.push(alreadyCollected);
 
-    // 0.01 < BOMB_CHANCE(0.3) → 폭탄. house=[rabbit, sheep] 중 인덱스 0=rabbit이 타깃.
+    // 0.01 < BOMB_BASE_CHANCE(0.1) → 폭탄. house=[rabbit, sheep] 중 인덱스 0=rabbit이 타깃.
     const events = drawCard(state, 'house', () => 0.01);
     const bombEv = events.find((e): e is Extract<typeof events[number], { type: 'bomb' }> => e.type === 'bomb');
     expect(bombEv).toBeDefined();

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-const PREFIXES = ['sheep', 'mermaid', 'tiger', 'rabbit', 'card'] as const;
+const PREFIXES = ['sheep', 'mermaid', 'tiger', 'rabbit', 'card', 'bomb'] as const;
 type Prefix = (typeof PREFIXES)[number];
 
 export async function GET() {
@@ -13,6 +13,7 @@ export async function GET() {
     tiger: [],
     rabbit: [],
     card: [],
+    bomb: [],
   };
 
   let files: string[] = [];
@@ -24,7 +25,8 @@ export async function GET() {
   }
 
   for (const file of files) {
-    const prefix = PREFIXES.find(p => file.startsWith(`${p}_`));
+    // "sheep_1.mp3" 같은 접두사+언더스코어 규칙과, "bomb.wav" 같은 단일 파일도 허용한다.
+    const prefix = PREFIXES.find(p => file.startsWith(`${p}_`) || file.startsWith(`${p}.`));
     if (prefix) manifest[prefix].push(`/sounds/${file}`);
   }
 

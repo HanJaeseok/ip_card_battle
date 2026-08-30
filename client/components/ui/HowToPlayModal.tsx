@@ -18,30 +18,21 @@ function MiniPlace({ place }: { place: Place }) {
   );
 }
 
-// 실제 게임의 예측 게이지 바(SheepOpenBar 등)와 동일한 룩을 그대로 재사용 —
-// "현재 카드 획득 +N" 위에 "발동 시 어떻게 되는지"를 큼직하게 보여준다.
-function MiniGaugeBar({
-  color,
-  fillPct,
-  boardGain,
-  text,
-}: {
-  color: string;
-  fillPct: number;
-  boardGain: number;
-  text: string;
-}) {
+// 동물 점수판의 실제 모습(점수 + 경험치 바 + 레벨)을 축소 재연
+function MiniLevelBar({ emoji, score, threshold }: { emoji: string; score: number; threshold: number }) {
+  const level = Math.floor(score / threshold);
+  const pct = ((score % threshold) / threshold) * 100;
   return (
-    <div className={`rounded-full shadow-sm overflow-hidden relative ${color}`}>
-      <div
-        className="absolute inset-y-0 left-0 bg-black/30"
-        style={{ width: `${fillPct}%` }}
-      />
-      <div className="relative text-center py-1 px-3">
-        <p className="text-[0.65rem] text-white/80 leading-none mb-0.5">
-          현재 카드 획득 +{boardGain}
-        </p>
-        <p className="text-sm font-bold text-white leading-tight">{text}</p>
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden w-28">
+      <div className="flex items-center justify-between px-2 py-1">
+        <span className="text-lg leading-none">{emoji}</span>
+        <span className="text-sm font-extrabold text-jungle-900">{score}</span>
+      </div>
+      <div className="px-2 pb-1">
+        <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-jungle-500" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="text-[0.6rem] text-jungle-500 text-right font-bold">Lv. {level}</p>
       </div>
     </div>
   );
@@ -166,55 +157,43 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
             중앙 스택에 같은 동물 카드가 <b>짝수 장</b> 쌓이면 그 자리에서 전부 획득하고,
             숫자를 모두 합한 만큼 점수를 얻습니다(왼쪽의 큰 숫자가 지금 획득 시 받을 점수예요).
             단, 정산은 이번 차례에 뽑을 카드를 <b>모두 뽑은 뒤</b>에 한 번에 이루어집니다 —
-            실용신양 효과로 여러 장이 연달아 나와도, 그 카드들이 전부 나온 다음에야 어느
-            동물이 짝을 이뤘는지 확인합니다. 정산은 항상 <b>양 → 상표토끼 → 특허랑이 → 디자인어</b>
-            순서로, 하나씩 텀을 두고 보여줍니다.
+            예약된 실용신양 추가 뽑기로 여러 장이 연달아 나와도, 그 카드들이 전부 나온
+            다음에야 어느 동물이 짝을 이뤘는지 확인합니다. 정산은 항상 <b>양 → 상표토끼 → 특허랑이 → 디자인어</b>
+            순서로, 하나씩 흔들어 확인한 뒤 팀 쪽으로 날아갑니다.
           </Section>
 
-          {/* 실용신양 */}
+          {/* 경험치와 레벨 */}
           <Section
-            emoji="🐑"
-            title="실용신양 — 점수가 쌓일수록 카드가 저절로 더 나와요"
-            visual={<MiniGaugeBar color="bg-lime-600" fillPct={70} boardGain={3} text="🐑 점수 획득시 +2마리 추가 뽑기" />}
+            emoji="📈"
+            title="획득한 숫자만큼 경험치가 쌓이고, 레벨이 올라요"
+            visual={
+              <>
+                <MiniLevelBar emoji="🐑" score={25} threshold={10} />
+                <MiniLevelBar emoji="🐰" score={7} threshold={10} />
+                <MiniLevelBar emoji="🧜‍♀️" score={41} threshold={20} />
+                <MiniLevelBar emoji="🐯" score={20} threshold={20} />
+              </>
+            }
           >
-            상시로 켜져 있는 효과예요. <b>내 실용신양 점수를 10으로 나눈 몫</b>만큼, 내가
-            장소를 클릭할 때마다 양털뭉치가 무작위 장소로 굴러가 카드를 추가로 뽑아옵니다.
-            발동하는 순간 화면에 <b>"실용신양의 N번째 힘!"</b>이라는 큰 배너가 뜨니 눈여겨보세요.
-            점수가 오르면 다음 차례에 더 많이 뽑히고, 특허랑이에게 점수를 뺏기면 그만큼
-            바로 줄어듭니다.
+            동물 카드로 짝을 맞춰 획득하면, 그 숫자의 합만큼 해당 동물의 점수(=경험치)가
+            오릅니다. <b>실용신양·상표토끼는 10점마다, 디자인어·특허랑이는 20점마다</b> 레벨이
+            1씩 오르고, 프로필 아래 "Lv. N"으로 표시됩니다. 이 레벨이 턴을 마칠 때 고르는
+            스킬의 위력을 결정합니다.
           </Section>
 
-          {/* 상표토끼 */}
-          <Section
-            emoji="🐰"
-            title="상표토끼 — 꾸준히 모으면 보너스"
-            visual={<MiniGaugeBar color="bg-pink-500" fillPct={40} boardGain={4} text="🎯 점수 획득시 +8" />}
-          >
-            내 차례가 끝날 때 상표토끼 점수가 <b>10점 단위 구간을 새로 넘으면</b>, (넘은
-            구간 수 × 현재 턴 수)만큼 보너스를 추가로 받습니다. 턴이 늦을수록 한 번에
-            받는 보너스가 커집니다.
-          </Section>
-
-          {/* 디자인어 */}
-          <Section
-            emoji="🧜‍♀️"
-            title="디자인어 — 뒤처지면 역전, 앞서면 가속"
-            visual={<MiniGaugeBar color="bg-blue-600" fillPct={60} boardGain={6} text="🔵 점수 획득시 흡수 +15" />}
-          >
-            디자인어 점수가 <b>20점 단위 구간을 새로 넘을 때</b> 발동합니다. 전체
-            총점이 상대보다 뒤처져 있다면 격차의 50%를 상대에게서 흡수해 오고,
-            앞서고 있다면 대신 소량의 보너스를 받습니다.
-          </Section>
-
-          {/* 특허랑이 */}
-          <Section
-            emoji="🐯"
-            title="특허랑이 — 상대 점수를 강탈"
-            visual={<MiniGaugeBar color="bg-orange-600" fillPct={90} boardGain={5} text="⚔ 점수 획득시 공격력 12" />}
-          >
-            특허랑이 점수가 <b>20점 단위 구간을 새로 넘을 때</b>, 상대 팀의 실용신양과
-            상표토끼 점수를 깎아 빼앗아 옵니다(0 밑으로는 내려가지 않아요). 게이지가
-            꽉 찰수록 곧 터진다는 뜻이니 상대 화면을 주시하세요!
+          {/* 턴 종료 스킬 선택 */}
+          <Section emoji="✨" title="내 턴이 끝나면, 스킬 하나를 고르세요">
+            카드를 뽑고 정산까지 끝나면 화면에 커다란 선택 모달이 뜹니다. 네 동물 중
+            <b> 딱 하나</b>를 골라야 비로소 턴이 상대에게 넘어갑니다. 고른 동물은 화면에
+            웃는(happy) 이모티콘으로 표시돼요. 효과는 그 동물의 <b>레벨</b>에 비례합니다.
+            <br /><br />
+            <b>🐑 실용신양</b> — 놀라운 기술로 다음 턴에 카드를 (레벨)회 더 뽑습니다.<br />
+            <b>🐰 상표토끼</b> — 영향력을 확장합니다. 현재 내 점수 +5×(레벨)%<br />
+            <b>🧜‍♀️ 디자인어</b> — 상대를 벤치마킹합니다. 상대와의 점수 차이의 5×(레벨)%만큼 획득합니다.<br />
+            <b>🐯 특허랑이</b> — 독점권을 발동합니다. 상대의 점수 5×(레벨)%만큼 감소시킵니다.<br /><br />
+            각 선택지 아래에는 "내 점수 +nnnn점"처럼 실제로 계산된 값이 미리 표시되니,
+            그걸 보고 가장 유리한 스킬을 고르면 됩니다. 레벨이 0인 동물은 골라도 효과가
+            없어요.
           </Section>
 
           {/* 도토리 폭탄 */}

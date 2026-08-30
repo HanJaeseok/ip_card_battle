@@ -1,8 +1,7 @@
-import type { ClientGameState, Place, Team } from 'shared';
+import type { Animal, ClientGameState, Place, Team } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
 import { EffectLayer } from '@/components/effects/EffectLayer';
-import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
 import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
 import { MainComboBanner } from '@/components/effects/MainComboBanner';
 import { SheepLoadedBanner } from '@/components/effects/SheepLoadedBanner';
@@ -11,6 +10,7 @@ import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { GameBoard } from './GameBoard';
 import { CommentaryBoard } from './CommentaryBoard';
+import { SkillChoiceModal } from './SkillChoiceModal';
 
 // 실용신양 콤보 번호 → 진동 강도 스케일. 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다.
 function shakeScale(combo: number): number {
@@ -21,16 +21,20 @@ export function GameLayout({
   gameState,
   myTeam,
   onPlaceClick,
+  onChooseSkill,
   error,
   animState,
 }: {
   gameState: ClientGameState;
   myTeam: Team | null;
   onPlaceClick: (place: Place) => void;
+  onChooseSkill: (animal: Animal) => void;
   error: string | null;
   animState: AnimationState;
 }) {
   const isShaking = animState.screenShakeLevel > 0;
+  // 정산 연출이 다 끝난 뒤, 내 팀이 스킬을 고를 차례일 때만 모달을 띄운다.
+  const showSkillModal = !animState.isSettling && myTeam !== null && gameState.pendingChoice === myTeam;
 
   return (
     <div
@@ -75,7 +79,6 @@ export function GameLayout({
             newCardId={animState.newCardId}
             stackCards={animState.stackCards}
             displayedActiveTeam={animState.displayedActiveTeam}
-            mermaidPopup={animState.mermaidPopup}
             expandFlash={animState.expandFlash}
           />
           <CommentaryBoard lines={animState.commentary} />
@@ -89,23 +92,22 @@ export function GameLayout({
         floatingTexts={animState.floatingTexts}
       />
 
-      {/* 상표토끼 보너스 — 카드 → 점수판 플라이트 (fixed, 화면 전역) */}
-      <RabbitFlightLayer flights={animState.rabbitFlights} />
-
-      {/* 실용신양 발동 예고 — "실용신양의 N번째 힘!" */}
+      {/* 실용신양 발동 예고 — "예약된 카드 N장 뽑기!" */}
       <SheepLoadedBanner loaded={animState.sheepLoaded} />
 
-      {/* 실용신양 추가 오픈 콤보 텍스트 (fixed, 화면 전역) */}
+      {/* 예약된 추가 뽑기 콤보 텍스트 (fixed, 화면 전역) */}
       <SheepComboLayer combos={animState.sheepCombos} />
 
-      {/* 실용신양 연쇄 종료 — 최종 콤보 수 배너 */}
+      {/* 예약된 추가 뽑기 종료 — 최종 콤보 수 배너 */}
       <MainComboBanner combo={animState.mainCombo} />
-
-      {/* 특허랑이 강탈 순간 — 화면 전체 비네트 */}
-      {animState.tigerImpact && <div className="tiger-vignette" />}
 
       {/* 플레이어 프로필 옆 반응 이모티콘 (fixed, 화면 전역) */}
       <PlayerEmoticonLayer items={animState.emoticons} />
+
+      {/* 턴 종료 — 4가지 스킬 중 하나를 고르는 모달 */}
+      {showSkillModal && myTeam !== null && (
+        <SkillChoiceModal gameState={gameState} team={myTeam} onChoose={onChooseSkill} />
+      )}
     </div>
   );
 }

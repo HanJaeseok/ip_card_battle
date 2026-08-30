@@ -25,9 +25,9 @@ export interface StackedCard {
 
 export interface TeamState {
   members: string[];
-  scores: Record<Animal, number>;
-  lastLevel: Record<Animal, number>;
-  playerIndex: number;  // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
+  scores: Record<Animal, number>;      // 동물별 누적 점수 = 경험치 (레벨 = floor(score/threshold))
+  pendingExtraDraws: number;           // 실용신양 스킬로 예약된, 다음 내 턴에 추가로 뽑을 카드 수
+  playerIndex: number;                 // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
 }
 
 export interface GameState {
@@ -37,6 +37,7 @@ export interface GameState {
   activePlayerIndex: number;
   stacks: Record<Animal, StackedCard[]>;      // 동물별 중앙 카드 스택 (수집된 카드도 기록으로 남음)
   expanded: boolean;                          // EXPAND_TURN 이후 여부 — 이때부터 폭탄이 등장한다
+  pendingChoice: Team | null;                 // 턴을 마친 팀이 4가지 스킬 중 하나를 고르길 기다리는 중
   teams: Record<Team, TeamState>;
   winner: Team | 'draw' | null;
 }
@@ -46,11 +47,16 @@ export type GameEvent =
   | { type: 'draw'; place: Place; card: StackedCard }
   | { type: 'bomb'; place: Place; animal: Animal; clearedCards: StackedCard[] } // 해당 동물 미획득 스택을 전부 날려버림(도토리 폭탄)
   | { type: 'collect'; animal: Animal; team: Team; score: number; cardIds: number[] }
-  | { type: 'sheepRoll'; count: number; team: Team }
-  | { type: 'tigerAttack'; team: Team; dmg: number }
-  | { type: 'rabbitBonus'; team: Team; bonus: number }
-  | { type: 'mermaidCatchup'; team: Team; absorb: number }
-  | { type: 'mermaidBonus'; team: Team; bonus: number }
+  | { type: 'bonusDraws'; team: Team; count: number } // 실용신양 스킬로 예약해둔 추가 뽑기를 이번 턴에 소모
+  | {
+      type: 'skillApplied';
+      team: Team;
+      animal: Animal;
+      myScoreDelta: number;   // 내 점수(해당 동물 버킷)에 더해진 값
+      oppScoreDelta: number;  // 상대 총점에서 깎인 값(양수로 표기, 실제로는 감소)
+      extraDrawsQueued: number; // 실용신양을 골랐을 때, 다음 내 턴에 예약된 추가 뽑기 수
+    }
   | { type: 'expand' }
   | { type: 'gameEnd'; winner: Team | 'draw' }
-  | { type: 'timeout'; place: Place };
+  | { type: 'timeout'; place: Place }
+  | { type: 'timeoutChoice'; animal: Animal }; // 스킬 선택 제한시간 초과로 서버가 대신 무작위 선택

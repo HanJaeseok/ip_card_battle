@@ -1,40 +1,64 @@
-import type { GameEvent, GameState, Place } from 'shared';
+import type { Animal, GameEvent, GameState, Place } from 'shared';
 import { drawCard } from './drawCard';
 import { advanceTurn, initGame } from './turnManager';
+import { applySkillChoice, randomSkillAnimal } from './skills';
 import { randomPlace } from './places';
 import type { RNG } from './places';
 
 export { initGame } from './turnManager';
 
 /**
- * 플레이어 액션 처리 — 엔진의 단일 진입점.
- * 장소 클릭 → 뽑기(+실용신양 연쇄) → 정산 → 턴 종료를 원자적으로 처리한다.
- *
- * @returns 변경된 state와 이벤트 배열 (클라이언트 연출 및 로깅용)
+ * 장소 클릭 처리 — 엔진의 진입점 ①.
+ * 뽑기+정산까지 끝나면 곧바로 턴을 넘기지 않고, 그 팀이 스킬을 고를 때까지 대기한다.
  */
 export function processPlayerAction(
   state: GameState,
   place: Place,
   rng: RNG = Math.random,
 ): { state: GameState; events: GameEvent[] } {
-  if (state.phase !== 'playing') return { state, events: [] };
+  if (state.phase !== 'playing' || state.pendingChoice !== null) return { state, events: [] };
 
   const events: GameEvent[] = [];
-
   events.push(...drawCard(state, place, rng));
-  events.push(...advanceTurn(state, rng));
+
+  if (state.phase === 'playing') {
+    state.pendingChoice = state.activeTeam;
+  }
 
   return { state, events };
 }
 
 /**
- * 30초 타임아웃 강제진행 — 무작위 장소 1곳을 클릭한 것으로 처리(뽑기는 항상 무한).
+ * 스킬 선택 처리 — 엔진의 진입점 ②.
+ * 선택이 끝나야 비로소 턴이 다음 팀으로 넘어간다.
  */
+export function processSkillChoice(
+  state: GameState,
+  animal: Animal,
+): { state: GameState; events: GameEvent[] } {
+  if (state.phase !== 'playing' || state.pendingChoice === null) return { state, events: [] };
+
+  const team = state.pendingChoice;
+  const events: GameEvent[] = [];
+  events.push(applySkillChoice(state, team, animal));
+  state.pendingChoice = null;
+  events.push(...advanceTurn(state));
+
+  return { state, events };
+}
+
+/** 30초 제한시간 초과 — 카드 선택 대기 중이면 무작위 장소를, 스킬 선택 대기 중이면 무작위 스킬을 대신 골라준다. */
 export function processTimeout(
   state: GameState,
   rng: RNG = Math.random,
 ): { state: GameState; events: GameEvent[] } {
   if (state.phase !== 'playing') return { state, events: [] };
+
+  if (state.pendingChoice !== null) {
+    const animal = randomSkillAnimal(rng);
+    const result = processSkillChoice(state, animal);
+    return { state: result.state, events: [{ type: 'timeoutChoice', animal }, ...result.events] };
+  }
 
   return processPlayerAction(state, randomPlace(rng), rng);
 }

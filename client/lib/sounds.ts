@@ -2,11 +2,11 @@
 
 import { getSfxVolume } from './audioSettings';
 
-type SoundAnimal = 'sheep' | 'mermaid' | 'tiger' | 'rabbit' | 'card';
+type SoundAnimal = 'sheep' | 'mermaid' | 'tiger' | 'rabbit' | 'card' | 'bomb';
 
 type Manifest = Record<SoundAnimal, string[]>;
 
-const EMPTY_MANIFEST: Manifest = { sheep: [], mermaid: [], tiger: [], rabbit: [], card: [] };
+const EMPTY_MANIFEST: Manifest = { sheep: [], mermaid: [], tiger: [], rabbit: [], card: [], bomb: [] };
 
 let manifest: Manifest = EMPTY_MANIFEST;
 const audioCache = new Map<string, HTMLAudioElement>();
@@ -42,9 +42,12 @@ function playSrc(src: string, rate = 1, volume = 1) {
   audio.play().catch(() => {});
 }
 
-export function playRandomSound(animal: SoundAnimal, rate = 1, volume = 1) {
+export function playRandomSound(animal: SoundAnimal, rate = 1, volume = 1, fallback?: SoundAnimal) {
   const files = manifest[animal];
-  if (!files || files.length === 0) return;
+  if (!files || files.length === 0) {
+    if (fallback) playRandomSound(fallback, rate, volume);
+    return;
+  }
   const src = files[Math.floor(Math.random() * files.length)];
   playSrc(src, rate, volume);
 }

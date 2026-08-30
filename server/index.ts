@@ -80,6 +80,12 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'chooseSkill': {
+        if (!currentRoomId || !currentPlayerId) return;
+        roomManager.getRoom(currentRoomId)?.handleChooseSkill(currentPlayerId, msg.animal);
+        break;
+      }
+
       case 'reconnect': {
         const room = roomManager.getRoom(msg.roomId);
         if (!room) {

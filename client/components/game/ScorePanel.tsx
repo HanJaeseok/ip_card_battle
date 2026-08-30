@@ -2,77 +2,49 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Animal, Team } from 'shared';
-import { ANIMALS } from 'shared';
+import { ANIMALS, THRESHOLDS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
-import { TigerAttackBar } from './TigerAttackBar';
-import { MermaidExpectedBar } from './MermaidExpectedBar';
-import { SheepOpenBar } from './SheepOpenBar';
-import { RabbitBonusBar } from './RabbitBonusBar';
 
-// ── 동물별 표 (아이콘 | 얇은 구분선 | 점수) — 가로로 넓게, 세로로 나열 ──────
+// ── 동물별 표 — 아이콘 | 점수, 그 아래 경험치 바 + 레벨 ─────────────────────
 function AnimalTable({
   animal,
   score,
   isFlashing,
   isPopping,
-  hitDmg,
-  targetAttr,
 }: {
   animal: Animal;
   score: number;
   isFlashing: boolean;
   isPopping: boolean;
-  hitDmg?: number;
-  targetAttr?: string;
 }) {
-  // 특허랑이에게 강탈당하는 순간 — 숫자가 즉시 바뀌지 않고 눈에 보이게 빠르게 깎여 내려간다.
-  const [displayScore, setDisplayScore] = useState(score);
-  const tweeningHitRef = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    if (hitDmg !== undefined && tweeningHitRef.current === undefined) {
-      tweeningHitRef.current = hitDmg;
-      const start = score + hitDmg;
-      const end = score;
-      const startTime = performance.now();
-      const dur = 500;
-      let raf: number;
-      const tick = (now: number) => {
-        const t = Math.min(1, (now - startTime) / dur);
-        setDisplayScore(Math.round(start + (end - start) * t));
-        if (t < 1) raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-      return () => cancelAnimationFrame(raf);
-    }
-    if (hitDmg === undefined) {
-      tweeningHitRef.current = undefined;
-      setDisplayScore(score);
-    }
-  }, [hitDmg, score]);
-
-  const isTweening = hitDmg !== undefined && displayScore !== score;
+  const threshold = THRESHOLDS[animal];
+  const level = Math.floor(score / threshold);
+  const progressPct = ((score % threshold) / threshold) * 100;
 
   return (
-    <div
-      data-rabbit-target={targetAttr}
-      className={`relative border border-gray-200 rounded-lg overflow-hidden bg-white flex items-stretch ${hitDmg !== undefined ? 'table-hit' : ''}`}
-    >
-      <div className="flex items-center justify-center px-3 py-2 flex-1 min-w-0">
-        <span className="text-3xl leading-none">{ANIMAL_INFO[animal].emoji}</span>
+    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <div className="flex items-stretch">
+        <div className="flex items-center justify-center px-3 py-2 flex-1 min-w-0">
+          <span className="text-3xl leading-none">{ANIMAL_INFO[animal].emoji}</span>
+        </div>
+        <div className="border-l border-gray-200 px-3 py-2 flex items-center justify-center min-w-[4.5rem]">
+          <p
+            className={`text-2xl font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
+            style={isFlashing ? { color: '#22c55e' } : undefined}
+          >
+            {score}
+          </p>
+        </div>
       </div>
-      <div className="border-l border-gray-200 px-3 py-2 flex items-center justify-center min-w-[4.5rem]">
-        <p
-          className={`text-2xl font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
-          style={isFlashing ? { color: '#22c55e' } : isTweening ? { color: '#dc2626' } : undefined}
-        >
-          {isTweening ? displayScore : score}
-        </p>
+      <div className="px-2 pb-1.5 pt-1">
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-jungle-500 transition-[width] duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <p className="text-[0.65rem] text-jungle-500 text-right mt-0.5 font-bold">Lv. {level}</p>
       </div>
-
-      {hitDmg !== undefined && (
-        <span className="table-hit-float">-{hitDmg}</span>
-      )}
     </div>
   );
 }
@@ -80,30 +52,13 @@ function AnimalTable({
 export function ScorePanel({
   team,
   scores,
-  lastLevel,
-  opponentScores,
-  turn,
-  tigerSlashActive,
-  tigerHitDmg,
-  mermaidEffectType,
   scoreFlash,
-  sheepReserveCount,
-  boardTotals,
 }: {
   team: Team;
   scores: Record<Animal, number>;
-  lastLevel: Record<Animal, number>;
-  opponentScores: Record<Animal, number>;
-  turn: number;
-  tigerSlashActive: boolean;
-  tigerHitDmg: number | null;
-  mermaidEffectType: 'catchup' | 'bonus' | null;
   scoreFlash: ReadonlyMap<string, number>;
-  sheepReserveCount: number;
-  boardTotals: Record<Animal, number>;
 }) {
   const myTotal = ANIMALS.reduce((s, a) => s + scores[a], 0);
-  const opTotal = ANIMALS.reduce((s, a) => s + opponentScores[a], 0);
 
   // 점수 팝 — flashKey 변경 시 re-trigger
   const [popKeys, setPopKeys] = useState<Set<Animal>>(new Set());
@@ -130,66 +85,19 @@ export function ScorePanel({
     return () => clearTimeout(timer);
   }, [scoreFlash, team]);
 
-  const showMermaid = mermaidEffectType !== null;
-
-  const table = (a: Animal, opts?: { targetAttr?: string }) => {
-    const flashKey = `${team}:${a}`;
-    const hitDmg = tigerHitDmg !== null && (a === 'sheep' || a === 'rabbit') ? tigerHitDmg : undefined;
-    return (
-      <AnimalTable
-        animal={a}
-        score={scores[a]}
-        isFlashing={scoreFlash.has(flashKey)}
-        isPopping={popKeys.has(a)}
-        hitDmg={hitDmg}
-        targetAttr={opts?.targetAttr}
-      />
-    );
-  };
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        {table('sheep')}
-        <SheepOpenBar sheepScore={scores.sheep} boardTotal={boardTotals.sheep} reserveCount={sheepReserveCount} />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {table('rabbit', { targetAttr: team })}
-        <RabbitBonusBar
-          rabbitScore={scores.rabbit}
-          lastLevelRabbit={lastLevel.rabbit}
-          turn={turn}
-          boardTotal={boardTotals.rabbit}
+    <div className="flex flex-col gap-2.5">
+      {ANIMALS.map(a => (
+        <AnimalTable
+          key={a}
+          animal={a}
+          score={scores[a]}
+          isFlashing={scoreFlash.has(`${team}:${a}`)}
+          isPopping={popKeys.has(a)}
         />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {table('mermaid')}
-        <MermaidExpectedBar
-          mermaidScore={scores.mermaid}
-          lastLevelMermaid={lastLevel.mermaid}
-          myTotal={myTotal}
-          opTotal={opTotal}
-          turn={turn}
-          boardTotal={boardTotals.mermaid}
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {table('tiger')}
-        <TigerAttackBar
-          tigerScore={scores.tiger}
-          lastLevelTiger={lastLevel.tiger}
-          turn={turn}
-          boardTotal={boardTotals.tiger}
-        />
-      </div>
+      ))}
 
-      <div className="bg-jungle-50 border border-jungle-200 rounded-lg px-3 py-2 text-center mt-1 relative overflow-hidden">
-        {/* 특허랑이 공격 슬래시 오버레이 */}
-        {tigerSlashActive && <div className="tiger-slash-overlay" />}
-
-        {/* 디자인어 파동 오버레이 */}
-        {showMermaid && <div className="mermaid-wave-overlay" />}
-
+      <div className="bg-jungle-50 border border-jungle-200 rounded-lg px-3 py-2 text-center mt-1">
         <p className="text-xs text-jungle-500">합계</p>
         <p className="text-2xl font-bold text-jungle-800 tabular-nums">{myTotal}</p>
       </div>

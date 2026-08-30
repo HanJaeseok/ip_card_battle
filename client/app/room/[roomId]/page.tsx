@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Place, Team } from 'shared';
+import type { Animal, Place, Team } from 'shared';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAnimationQueue } from '@/hooks/useAnimationQueue';
 import { GameLayout } from '@/components/game/GameLayout';
@@ -14,7 +14,7 @@ const GAME_BGM_VOLUME = 0.5; // 게임 효과음이 함께 들려야 하므로 B
 
 export default function GamePage() {
   const router = useRouter();
-  const { gameState, lastEvents, drawCard, error, connected } = useWebSocket();
+  const { gameState, lastEvents, drawCard, chooseSkill, error, connected } = useWebSocket();
   const [myTeam, setMyTeam] = useState<Team | null>(null);
 
   const animState = useAnimationQueue(lastEvents, gameState);
@@ -43,6 +43,13 @@ export default function GamePage() {
     [drawCard],
   );
 
+  const handleChooseSkill = useCallback(
+    (animal: Animal) => {
+      chooseSkill(animal);
+    },
+    [chooseSkill],
+  );
+
   if (!gameState) {
     return (
       <div className="min-h-screen bg-jungle-50 flex flex-col items-center justify-center gap-3">
@@ -69,6 +76,7 @@ export default function GamePage() {
       gameState={gameState}
       myTeam={myTeam}
       onPlaceClick={handlePlaceClick}
+      onChooseSkill={handleChooseSkill}
       error={error}
       animState={animState}
     />
