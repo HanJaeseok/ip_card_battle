@@ -89,6 +89,12 @@ export function SkillChoiceModal({
             </div>
           </button>
         </div>
+
+        <p className="text-center text-[0.7rem] text-jungle-400 px-4 py-2 leading-relaxed">
+          💡 지금 바로 쓰면 안전하게 조금씩, 묵혀뒀다 한번에 쓰면 더 크게 — 레벨과 점수가
+          자랄수록 효과도 함께 커지니 저울질해서 골라보세요. 상대 총점이 높을수록 특허랑이가,
+          내 총점이 높을수록 상표토끼가 강해집니다.
+        </p>
       </div>
     </div>
   );
