@@ -25,6 +25,34 @@ function AnimalTable({
   hitDmg?: number;
   targetAttr?: string;
 }) {
+  // 특허랑이에게 강탈당하는 순간 — 숫자가 즉시 바뀌지 않고 눈에 보이게 빠르게 깎여 내려간다.
+  const [displayScore, setDisplayScore] = useState(score);
+  const tweeningHitRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (hitDmg !== undefined && tweeningHitRef.current === undefined) {
+      tweeningHitRef.current = hitDmg;
+      const start = score + hitDmg;
+      const end = score;
+      const startTime = performance.now();
+      const dur = 500;
+      let raf: number;
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - startTime) / dur);
+        setDisplayScore(Math.round(start + (end - start) * t));
+        if (t < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(raf);
+    }
+    if (hitDmg === undefined) {
+      tweeningHitRef.current = undefined;
+      setDisplayScore(score);
+    }
+  }, [hitDmg, score]);
+
+  const isTweening = hitDmg !== undefined && displayScore !== score;
+
   return (
     <div
       data-rabbit-target={targetAttr}
@@ -36,9 +64,9 @@ function AnimalTable({
       <div className="border-l border-gray-200 px-3 py-2 flex items-center justify-center min-w-[4.5rem]">
         <p
           className={`text-2xl font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
-          style={isFlashing ? { color: '#22c55e' } : undefined}
+          style={isFlashing ? { color: '#22c55e' } : isTweening ? { color: '#dc2626' } : undefined}
         >
-          {score}
+          {isTweening ? displayScore : score}
         </p>
       </div>
 
@@ -123,7 +151,7 @@ export function ScorePanel({
       </div>
       <div className="flex flex-col gap-1.5">
         {table('rabbit', { targetAttr: team })}
-        <RabbitBonusBar turn={turn} />
+        <RabbitBonusBar rabbitScore={scores.rabbit} turn={turn} />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('mermaid')}
@@ -131,7 +159,7 @@ export function ScorePanel({
       </div>
       <div className="flex flex-col gap-1.5">
         {table('tiger')}
-        <TigerAttackBar lastLevelTiger={lastLevel.tiger} turn={turn} />
+        <TigerAttackBar tigerScore={scores.tiger} lastLevelTiger={lastLevel.tiger} turn={turn} />
       </div>
 
       <div className="bg-jungle-50 border border-jungle-200 rounded-lg px-3 py-2 text-center mt-1 relative overflow-hidden">

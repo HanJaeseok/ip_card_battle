@@ -30,17 +30,18 @@ if (typeof window !== 'undefined') {
   loadManifest();
 }
 
-function playSrc(src: string) {
+function playSrc(src: string, rate = 1) {
   const base = audioCache.get(src);
   const audio = base ? (base.cloneNode(true) as HTMLAudioElement) : new Audio(src);
+  audio.playbackRate = rate;
   audio.play().catch(() => {});
 }
 
-export function playRandomSound(animal: SoundAnimal) {
+export function playRandomSound(animal: SoundAnimal, rate = 1) {
   const files = manifest[animal];
   if (!files || files.length === 0) return;
   const src = files[Math.floor(Math.random() * files.length)];
-  playSrc(src);
+  playSrc(src, rate);
 }
 
 export function playRandomSoundSequence(animal: SoundAnimal, count: number, intervalMs = 150) {

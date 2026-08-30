@@ -38,10 +38,11 @@ export function TeamPanel({
   const isAttacker = animState.tigerRecoil?.attackerTeam === team;
   const recoilClass = isAttacker ? (team === 'A' ? 'panel-recoil-a' : 'panel-recoil-b') : '';
   const hitShakeClass = tigerSlashActive ? 'panel-hit-shake' : '';
+  const rabbitPressureClass = animState.rabbitPressure?.targetTeam === team ? 'panel-rabbit-pressure' : '';
 
   return (
     <div
-      className={`w-56 shrink-0 bg-white rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} transition-shadow ${recoilClass} ${hitShakeClass}`}
+      className={`w-56 shrink-0 bg-white rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} transition-shadow ${recoilClass} ${hitShakeClass} ${rabbitPressureClass}`}
     >
       <div className={`text-base font-bold ${teamColor}`}>{label}</div>
 

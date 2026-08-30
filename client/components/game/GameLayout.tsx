@@ -4,6 +4,7 @@ import { LeafDecoration } from '@/components/ui/LeafDecoration';
 import { EffectLayer } from '@/components/effects/EffectLayer';
 import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
 import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
+import { MainComboBanner } from '@/components/effects/MainComboBanner';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { BoardPanel } from './BoardPanel';
@@ -57,6 +58,7 @@ export function GameLayout({
             myTeam={myTeam}
             onCardClick={onCardClick}
             suppressedKeys={animState.suppressedKeys}
+            recentlyOpenedKeys={animState.recentlyOpenedKeys}
             reactionMap={animState.reactionMap}
             joltAllFaceDown={animState.joltAllFaceDown}
             boardBreathe={animState.boardBreathe}
@@ -81,6 +83,12 @@ export function GameLayout({
 
       {/* 실용신양 추가 오픈 콤보 텍스트 (fixed, 화면 전역) */}
       <SheepComboLayer combos={animState.sheepCombos} />
+
+      {/* 실용신양 연쇄 종료 — 최종 콤보 수 배너 */}
+      <MainComboBanner combo={animState.mainCombo} />
+
+      {/* 특허랑이 강탈 순간 — 화면 전체 비네트 */}
+      {animState.tigerImpact && <div className="tiger-vignette" />}
     </div>
   );
 }

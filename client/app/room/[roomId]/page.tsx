@@ -7,8 +7,10 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAnimationQueue } from '@/hooks/useAnimationQueue';
 import { GameLayout } from '@/components/game/GameLayout';
 import { GameEndScreen } from '@/components/game/GameEndScreen';
+import { playBgm } from '@/lib/bgm';
 
 const STORAGE_TEAM = 'cardBattle_team';
+const GAME_BGM_VOLUME = 0.5; // 게임 효과음이 함께 들려야 하므로 BGM은 절반 볼륨으로
 
 export default function GamePage() {
   const router = useRouter();
@@ -18,9 +20,21 @@ export default function GamePage() {
   const animState = useAnimationQueue(lastEvents, gameState);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_TEAM) as Team | null;
+    const saved = sessionStorage.getItem(STORAGE_TEAM) as Team | null;
     if (saved === 'A' || saved === 'B') setMyTeam(saved);
   }, []);
+
+  // 게임 진행 상황에 따른 BGM 전환: 진행 중(game1) → 보드 확장(game2) → 종료(opening)
+  useEffect(() => {
+    if (!gameState) return;
+    if (gameState.phase === 'ended') {
+      playBgm('/sounds/bgm_opening.mp3', 1);
+    } else if (gameState.expanded) {
+      playBgm('/sounds/bgm_game2.mp3', GAME_BGM_VOLUME);
+    } else {
+      playBgm('/sounds/bgm_game1.mp3', GAME_BGM_VOLUME);
+    }
+  }, [gameState?.phase, gameState?.expanded]);
 
   const handleCardClick = useCallback(
     (key: string) => {

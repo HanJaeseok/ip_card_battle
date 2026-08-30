@@ -41,6 +41,7 @@ export function BoardPanel({
   myTeam,
   onCardClick,
   suppressedKeys,
+  recentlyOpenedKeys,
   reactionMap,
   joltAllFaceDown,
   boardBreathe,
@@ -53,6 +54,7 @@ export function BoardPanel({
   myTeam: Team | null;
   onCardClick: (key: string) => void;
   suppressedKeys: ReadonlySet<string>;
+  recentlyOpenedKeys: ReadonlySet<string>;
   reactionMap: ReadonlyMap<string, number>;
   joltAllFaceDown: boolean;
   boardBreathe: boolean;
@@ -179,6 +181,7 @@ export function BoardPanel({
           isMyTurn={isMyTurn}
           onCardClick={handleCardClick}
           suppressedKeys={suppressedKeys}
+          recentlyOpenedKeys={recentlyOpenedKeys}
           reactionMap={reactionMap}
           joltAllFaceDown={joltAllFaceDown}
           breathe={boardBreathe}

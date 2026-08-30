@@ -35,17 +35,31 @@ export interface SheepCombo {
   combo: number; // 1부터 시작하는 콤보 번호
 }
 
+export interface MainCombo {
+  id: number;
+  combo: number; // 이번 연쇄의 최종 콤보 수
+}
+
+export interface RabbitPressure {
+  sourceTeam: Team; // 토끼가 불어난 팀
+  targetTeam: Team; // 압박을 느껴야 할 상대 팀
+}
+
 export interface AnimationState {
   suppressedKeys: ReadonlySet<string>;
+  recentlyOpenedKeys: ReadonlySet<string>; // 이번 액션에서 새로 뒤집힌 카드 — 이전 턴 정보는 노출하지 않는다
   reactionMap: ReadonlyMap<string, number>; // cardKey → num
   joltAllFaceDown: boolean;
   screenShakeLevel: number; // 0 = none, 그 외엔 실용신양 콤보 번호(진동 강도 스케일 산출용)
   leafParticleCount: number;
   floatingTexts: FloatingTextItem[];
   rabbitFlights: RabbitFlight[];
+  rabbitPressure: RabbitPressure | null;
   sheepCombos: SheepCombo[];
+  mainCombo: MainCombo | null;
   tigerSlash: { onTeam: Team; dmg: number } | null;
   tigerRecoil: { attackerTeam: Team } | null;
+  tigerImpact: boolean;
   mermaidEffect: { team: Team; type: 'catchup' | 'bonus' } | null;
   mermaidPopup: { team: Team } | null;
   boardBreathe: boolean;
@@ -62,10 +76,16 @@ const EMPTY_SCORE_MAP = new Map<string, number>() as ReadonlyMap<string, number>
 const EMPTY_GLOW_MAP = new Map<string, string>() as ReadonlyMap<string, string>;
 
 const FLIP_HALF = 125;     // ms — flip-out half
-const FLIP_FULL = 250;     // ms — flip완료
+const FLIP_IN_DUR = 180;   // ms — flip-in + 펀치 바운스
+const FLIP_FULL = FLIP_HALF + FLIP_IN_DUR; // ms — flip 전체 완료 시점
 const REACTION_DUR = 700;  // ms — wink/gold reaction
-const CHAIN_STAGGER = 500; // ms — per card in sheep chain ("우당탕탕" 연쇄 간격)
+const CHAIN_STAGGER_START = 480; // ms — 연쇄 첫 카드 간격 ("닥!")
+const CHAIN_STAGGER_MIN = 150;   // ms — 연쇄가 가속되며 도달하는 최소 간격 ("따다다닥!")
+const CHAIN_STAGGER_DECAY = 0.82; // 카드 순번마다 간격에 곱해지는 감쇠율
 const CHAIN_MAX_VIS = 15;  // max cards with stagger; rest are instant
+// i번째(0-based) 카드가 열린 뒤 다음 카드까지의 간격 — 갈수록 몰아치도록 지수 감쇠시킨다.
+const sheepStaggerGap = (i: number) =>
+  Math.max(CHAIN_STAGGER_MIN, CHAIN_STAGGER_START * Math.pow(CHAIN_STAGGER_DECAY, i));
 const SCORE_FLASH_DUR = 500;
 const EFFECT_DUR = 1400;
 const PAIR_GLOW_DUR = 500; // 페어 매칭 글로우 지속 시간
@@ -76,6 +96,8 @@ const MERMAID_POPUP_DUR = 2000;
 const RABBIT_FLIGHT_DUR = 900;
 const SHEEP_COMBO_DUR = 1400;
 const SHAKE_PULSE_DUR = 300; // ms — 콤보 1회당 진동 지속시간
+const MAIN_COMBO_DUR = 1300; // ms — 화면 중앙 메인 콤보 카운터 지속시간
+const RABBIT_PRESSURE_DUR = 700; // ms — 상대 팀 압박 경고 지속시간
 
 const PAIR_COLORS = [
   '#f87171', '#fb923c', '#facc15', '#4ade80',
@@ -89,15 +111,19 @@ export function useAnimationQueue(
   gameState: ClientGameState | null,
 ): AnimationState {
   const [suppressedKeys, setSuppressedKeys] = useState<ReadonlySet<string>>(EMPTY_SET);
+  const [recentlyOpenedKeys, setRecentlyOpenedKeys] = useState<ReadonlySet<string>>(EMPTY_SET);
   const [reactionMap, setReactionMap] = useState<ReadonlyMap<string, number>>(EMPTY_MAP_STR);
   const [joltAllFaceDown, setJoltAllFaceDown] = useState(false);
   const [screenShakeLevel, setScreenShakeLevel] = useState(0);
   const [leafParticleCount, setLeafParticleCount] = useState(0);
   const [floatingTexts, setFloatingTexts] = useState<FloatingTextItem[]>([]);
   const [rabbitFlights, setRabbitFlights] = useState<RabbitFlight[]>([]);
+  const [rabbitPressure, setRabbitPressure] = useState<RabbitPressure | null>(null);
   const [sheepCombos, setSheepCombos] = useState<SheepCombo[]>([]);
+  const [mainCombo, setMainCombo] = useState<MainCombo | null>(null);
   const [tigerSlash, setTigerSlash] = useState<{ onTeam: Team; dmg: number } | null>(null);
   const [tigerRecoil, setTigerRecoil] = useState<{ attackerTeam: Team } | null>(null);
+  const [tigerImpact, setTigerImpact] = useState(false);
   const [mermaidEffect, setMermaidEffect] = useState<{ team: Team; type: 'catchup' | 'bonus' } | null>(null);
   const [mermaidPopup, setMermaidPopup] = useState<{ team: Team } | null>(null);
   const [boardBreathe, setBoardBreathe] = useState(false);
@@ -239,13 +265,19 @@ export function useAnimationQueue(
     lastEvents.forEach(ev => {
       if (ev.type === 'open') newOpenKeys.add(ev.key);
     });
-    if (newOpenKeys.size > 0) setSuppressedKeys(newOpenKeys);
+    if (newOpenKeys.size > 0) {
+      setSuppressedKeys(newOpenKeys);
+      // 이번 액션에서 새로 열린 카드만 강조한다 — 다음 액션이 오면 이 Set 자체가
+      // 교체되므로 이전 턴에 열어둔 카드의 강조는 자연히 사라진다.
+      setRecentlyOpenedKeys(newOpenKeys);
+    }
 
     // ── Pass 2: schedule animations ──────────────────────────────────────
     let cursor = 0;          // ms absolute time for sequential events
     let chainRemaining = 0;  // how many upcoming 'open' events are part of current chain
     let chainStaggerIdx = 0; // index within current chain (for stagger)
     let chainCursor = 0;     // time when current chain started
+    let chainOffset = 0;     // 체인 시작 시점부터의 누적 간격 (가속 스태거용)
     let comboCounter = 0;    // 이번 턴 누적 실용신양 추가 오픈 콤보 번호 (1부터)
 
     for (const ev of lastEvents) {
@@ -255,19 +287,25 @@ export function useAnimationQueue(
 
         let revealAt: number;
         if (chainRemaining > 0) {
-          // part of a sheep chain → stagger. cursor는 매 카드마다 실제 리빌 시점으로
-          // 갱신해, 연쇄 도중 끼어드는 collect/tiger/mermaid 이벤트가 (아직 다 안 열린
-          // 시점의) 낡은 cursor가 아니라 "지금까지 열린 카드"의 시점을 기준으로 재생되게 한다.
+          // part of a sheep chain → 갈수록 빨라지는 스태거("닥! 다다닥! 따다다닥!").
+          // cursor는 매 카드마다 실제 리빌 시점으로 갱신해, 연쇄 도중 끼어드는
+          // collect/tiger/mermaid 이벤트가 (아직 다 안 열린 시점의) 낡은 cursor가
+          // 아니라 "지금까지 열린 카드"의 시점을 기준으로 재생되게 한다.
           const staggerIdx = Math.min(chainStaggerIdx, CHAIN_MAX_VIS);
-          revealAt = chainCursor + staggerIdx * CHAIN_STAGGER;
+          revealAt = chainCursor + chainOffset;
+          chainOffset += sheepStaggerGap(staggerIdx);
           chainStaggerIdx++;
           chainRemaining--;
-          cursor = chainRemaining === 0 ? revealAt + FLIP_FULL + 80 : revealAt;
-          sched(() => playRandomSound('sheep'), revealAt);
+          const isLastInChain = chainRemaining === 0;
+          cursor = isLastInChain ? revealAt + FLIP_FULL + 80 : revealAt;
 
           comboCounter++;
-          const comboId = ++floatIdCounter;
           const combo = comboCounter;
+          // 진행될수록 피치를 살짝 올려 몰아치는 고조감을 준다 (최대 1.35배속)
+          const pitch = Math.min(1.35, 1 + staggerIdx * 0.035);
+          sched(() => playRandomSound('sheep', pitch), revealAt);
+
+          const comboId = ++floatIdCounter;
           sched(() => {
             setSheepCombos(prev => [...prev, { id: comboId, key, combo }]);
             sched(() => {
@@ -278,6 +316,14 @@ export function useAnimationQueue(
             setScreenShakeLevel(combo);
             sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
           }, revealAt);
+
+          if (isLastInChain) {
+            const finalId = ++floatIdCounter;
+            sched(() => {
+              setMainCombo({ id: finalId, combo });
+              sched(() => setMainCombo(null), MAIN_COMBO_DUR);
+            }, revealAt + FLIP_FULL);
+          }
         } else {
           revealAt = cursor;
           cursor += FLIP_FULL + 80; // single flip + small gap
@@ -309,6 +355,7 @@ export function useAnimationQueue(
         chainRemaining = ev.count;
         chainStaggerIdx = 0;
         chainCursor = cursor; // chain starts at current cursor
+        chainOffset = 0;
 
         const level = ev.level;
         sched(() => {
@@ -382,6 +429,15 @@ export function useAnimationQueue(
             }, RABBIT_FLIGHT_DUR);
           }
           addFloat(`+${ev.bonus}`, team, 'bonus');
+
+          // 상대 팀에게 "토끼가 불어나고 있다"는 압박을 짧게 경고 — 약한 진동 + 패널 강조
+          const targetTeam: Team = team === 'A' ? 'B' : 'A';
+          setRabbitPressure({ sourceTeam: team, targetTeam });
+          setScreenShakeLevel(prev => Math.max(prev, Math.min(2, 0.6 + ev.bonus / 25)));
+          sched(() => {
+            setRabbitPressure(null);
+            setScreenShakeLevel(0);
+          }, RABBIT_PRESSURE_DUR);
         }, cursor);
 
       } else if (ev.type === 'tigerAttack') {
@@ -394,8 +450,10 @@ export function useAnimationQueue(
           // "-dmg" 플로팅은 실용신양·상표토끼 표(ScorePanel의 table-hit-float)에서
           // 직접 표시하므로, 여기서 위치가 부정확한 범용 addFloat는 사용하지 않는다.
           setTigerSlash({ onTeam, dmg: ev.dmg });
+          setTigerImpact(true);
           playRandomSound('tiger');
           sched(() => setTigerSlash(null), TIGER_HIT_DUR);
+          sched(() => setTigerImpact(false), 600);
         }, cursor + 150);
 
       } else if (ev.type === 'mermaidCatchup') {
@@ -441,15 +499,19 @@ export function useAnimationQueue(
 
   return {
     suppressedKeys,
+    recentlyOpenedKeys,
     reactionMap,
     joltAllFaceDown,
     screenShakeLevel,
     leafParticleCount,
     floatingTexts,
     rabbitFlights,
+    rabbitPressure,
     sheepCombos,
+    mainCombo,
     tigerSlash,
     tigerRecoil,
+    tigerImpact,
     mermaidEffect,
     mermaidPopup,
     boardBreathe,

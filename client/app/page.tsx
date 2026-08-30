@@ -4,10 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LobbyPlayer, Team } from 'shared';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { playBgm } from '@/lib/bgm';
 
 export default function LobbyPage() {
   const router = useRouter();
   const ws = useWebSocket();
+
+  // 로비/대기실 BGM — 입장 즉시부터 게임 시작 전까지 계속 재생
+  useEffect(() => {
+    playBgm('/sounds/bgm_main.mp3', 1);
+  }, []);
 
   const [nickname, setNickname] = useState('');
   const [team, setTeam] = useState<Team>('A');
@@ -29,13 +35,13 @@ export default function LobbyPage() {
 
   const handleCreateRoom = () => {
     if (!nickname.trim()) return;
-    localStorage.setItem('cardBattle_team', team);
+    sessionStorage.setItem('cardBattle_team', team);
     ws.createRoom(nickname.trim(), team);
   };
 
   const handleJoinRoom = () => {
     if (!nickname.trim() || !joinRoomId.trim()) return;
-    localStorage.setItem('cardBattle_team', team);
+    sessionStorage.setItem('cardBattle_team', team);
     ws.joinRoom(joinRoomId.trim().toUpperCase(), nickname.trim(), team);
   };
 

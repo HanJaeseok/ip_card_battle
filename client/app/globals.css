@@ -156,8 +156,10 @@ body {
   100% { transform: perspective(500px) rotateY(90deg); }
 }
 @keyframes cardFlipIn {
-  0%   { transform: perspective(500px) rotateY(-90deg); }
-  100% { transform: perspective(500px) rotateY(0deg); }
+  0%   { transform: perspective(500px) rotateY(-90deg) scale(1); }
+  70%  { transform: perspective(500px) rotateY(0deg) scale(1); }
+  85%  { transform: perspective(500px) rotateY(0deg) scale(1.12); }
+  100% { transform: perspective(500px) rotateY(0deg) scale(1); }
 }
 
 .card-flip-out {
@@ -165,12 +167,26 @@ body {
   backface-visibility: hidden;
 }
 .card-flip-in {
-  animation: cardFlipIn 125ms ease-out forwards;
+  /* 회전 후 살짝 튀어오르는 펀치 바운스로 "쫀득한" 타격감을 준다 */
+  animation: cardFlipIn 180ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card-flip-out, .card-flip-in { animation: none; }
+}
+
+/* ── 이번 액션에서 새로 뒤집힌 카드 강조 (이전 턴 정보는 노출하지 않는다) ───────── */
+@keyframes cardRecentOpen {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+  30%  { box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.85); }
+  100% { box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.55); }
+}
+.card-recent-open {
+  animation: cardRecentOpen 0.6s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-recent-open { animation: none; box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.55); }
 }
 
 /* ── 윙크 ───────────────────────────────────────────────────────────────── */
@@ -276,7 +292,8 @@ body {
 /* ── 점수 패널 이펙트 ────────────────────────────────────────────────────── */
 @keyframes tigerSlash {
   0%   { opacity: 0; clip-path: polygon(0 50%, 0 50%, 0 50%); }
-  20%  { opacity: 0.85; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+  15%  { opacity: 1; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+  60%  { opacity: 0.9; }
   100% { opacity: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
 }
 .tiger-slash-overlay {
@@ -286,14 +303,35 @@ body {
   pointer-events: none;
   z-index: 10;
   animation: tigerSlash 1.2s ease-out forwards;
-  background: repeating-linear-gradient(
-    -35deg,
-    rgba(239, 68, 68, 0.18) 0px,
-    rgba(239, 68, 68, 0.18) 6px,
-    transparent 6px,
-    transparent 18px
-  );
-  border: 2px solid rgba(239, 68, 68, 0.5);
+  background:
+    repeating-linear-gradient(
+      -35deg,
+      rgba(239, 68, 68, 0.3) 0px,
+      rgba(239, 68, 68, 0.3) 5px,
+      transparent 5px,
+      transparent 16px
+    ),
+    repeating-linear-gradient(
+      35deg,
+      rgba(153, 27, 27, 0.22) 0px,
+      rgba(153, 27, 27, 0.22) 4px,
+      transparent 4px,
+      transparent 20px
+    );
+  border: 3px solid rgba(239, 68, 68, 0.75);
+  box-shadow: inset 0 0 22px 4px rgba(220, 38, 38, 0.5);
+}
+
+/* ── 특허랑이 발동 임박 경고 (공격력 바) ─────────────────────────────────── */
+@keyframes tigerImminentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+  50%       { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0); }
+}
+.tiger-imminent {
+  animation: tigerImminentPulse 0.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tiger-imminent { animation: none; outline: 2px solid #dc2626; }
 }
 
 @keyframes mermaidWave {
@@ -507,15 +545,47 @@ body {
 /* ── 특허랑이 공격 — 피격 패널 들썩임 ───────────────────────────────────────── */
 @keyframes panelHitShake {
   0%, 100% { transform: translate(0, 0); }
-  20%       { transform: translate(-6px, 3px); }
-  40%       { transform: translate(6px, -4px); }
-  60%       { transform: translate(-4px, 3px); }
-  80%       { transform: translate(3px, -2px); }
+  12%       { transform: translate(-9px, 5px); }
+  26%       { transform: translate(9px, -6px); }
+  40%       { transform: translate(-7px, 5px); }
+  54%       { transform: translate(6px, -4px); }
+  68%       { transform: translate(-4px, 3px); }
+  82%       { transform: translate(2px, -2px); }
 }
-.panel-hit-shake { animation: panelHitShake 0.4s ease-in-out; }
+.panel-hit-shake { animation: panelHitShake 0.6s ease-in-out; }
+
+/* ── 특허랑이 강탈 — 화면 전체 비네트 플래시 ─────────────────────────────── */
+@keyframes tigerVignette {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.tiger-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(127, 0, 0, 0.35) 100%);
+  animation: tigerVignette 0.6s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tiger-vignette { display: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .panel-recoil-a, .panel-recoil-b, .panel-hit-shake { animation: none; }
+}
+
+/* ── 상표토끼 압박 — 상대 팀 패널에 짧은 경고 ────────────────────────────────── */
+@keyframes panelRabbitPressure {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+  35%       { box-shadow: 0 0 0 4px rgba(236, 72, 153, 0.55); }
+}
+.panel-rabbit-pressure {
+  animation: panelRabbitPressure 0.7s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-rabbit-pressure { animation: none; outline: 2px solid rgba(236, 72, 153, 0.6); }
 }
 
 /* ── 특허랑이 공격 — 피격 테이블(실용신양/상표토끼) 들썩임 + 마이너스 플로팅 ──── */
@@ -583,6 +653,35 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .sheep-combo-text { display: none; }
+}
+
+/* ── 실용신양 연쇄 종료 — 화면 중앙 메인 콤보 배너 ───────────────────────────── */
+@keyframes mainComboPop {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  18%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  30%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  78%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.85); opacity: 0; }
+}
+.main-combo-banner {
+  position: fixed;
+  left: 50%;
+  top: 28%;
+  z-index: 70;
+  pointer-events: none;
+  font-weight: 900;
+  font-size: 2.6rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  animation: mainComboPop 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.main-combo-base { color: #f8fafc; }
+.main-combo-warm { color: #f97316; font-size: 3rem; }
+.main-combo-hot  { color: #dc2626; font-size: 3.6rem; }
+@media (prefers-reduced-motion: reduce) {
+  .main-combo-banner { animation: none; opacity: 0; }
 }
 
 /* ── 디자인어 효과 — 큰 인어 팝업 + 음표 ───────────────────────────────────── */

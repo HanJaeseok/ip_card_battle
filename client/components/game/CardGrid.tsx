@@ -7,6 +7,7 @@ export function CardGrid({
   isMyTurn,
   onCardClick,
   suppressedKeys,
+  recentlyOpenedKeys,
   reactionMap,
   joltAllFaceDown,
   breathe,
@@ -17,6 +18,7 @@ export function CardGrid({
   isMyTurn: boolean;
   onCardClick: (key: string) => void;
   suppressedKeys: ReadonlySet<string>;
+  recentlyOpenedKeys: ReadonlySet<string>;
   reactionMap: ReadonlyMap<string, number>;
   joltAllFaceDown: boolean;
   breathe: boolean;
@@ -54,6 +56,7 @@ export function CardGrid({
               cardKey={key}
               isMyTurn={isMyTurn}
               isSuppressed={isSuppressed}
+              isRecentlyOpened={recentlyOpenedKeys.has(key)}
               reactionNum={reactionNum}
               isJolting={isJolting}
               glowColor={collectGlowKeys.get(key) ?? null}

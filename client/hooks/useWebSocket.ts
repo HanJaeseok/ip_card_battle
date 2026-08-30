@@ -14,6 +14,16 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8080';
 const STORAGE_ROOM_ID = 'cardBattle_roomId';
 const STORAGE_PLAYER_ID = 'cardBattle_playerId';
 
+// localStorage는 같은 브라우저의 모든 탭이 공유해, 한 브라우저로 두 탭을 열어
+// 1:1 테스트를 하면 두 탭이 서로의 방/플레이어 세션을 덮어써 버린다.
+// sessionStorage는 탭 단위로 격리되어 있어 각 탭이 독립된 세션을 유지하면서도,
+// 같은 탭 안에서의 페이지 이동(로비 → 게임 화면)에는 그대로 값이 남아 재접속에 쓸 수 있다.
+const sessionStore = {
+  get: (key: string) => (typeof window === 'undefined' ? null : window.sessionStorage.getItem(key)),
+  set: (key: string, value: string) => window.sessionStorage.setItem(key, value),
+  remove: (key: string) => window.sessionStorage.removeItem(key),
+};
+
 export interface UseWebSocketReturn {
   connected: boolean;
   roomId: string | null;
@@ -53,8 +63,8 @@ export function useWebSocket(): UseWebSocketReturn {
       setError(null);
 
       // 저장된 세션 정보로 자동 재접속 시도
-      const savedRoomId = localStorage.getItem(STORAGE_ROOM_ID);
-      const savedPlayerId = localStorage.getItem(STORAGE_PLAYER_ID);
+      const savedRoomId = sessionStore.get(STORAGE_ROOM_ID);
+      const savedPlayerId = sessionStore.get(STORAGE_PLAYER_ID);
       if (savedRoomId && savedPlayerId) {
         ws.send(JSON.stringify({ type: 'reconnect', roomId: savedRoomId, playerId: savedPlayerId }));
       }
@@ -76,8 +86,8 @@ export function useWebSocket(): UseWebSocketReturn {
         case 'roomJoined':
           setRoomId(msg.roomId);
           setPlayerId(msg.playerId);
-          localStorage.setItem(STORAGE_ROOM_ID, msg.roomId);
-          localStorage.setItem(STORAGE_PLAYER_ID, msg.playerId);
+          sessionStore.set(STORAGE_ROOM_ID, msg.roomId);
+          sessionStore.set(STORAGE_PLAYER_ID, msg.playerId);
           break;
 
         case 'lobbyState':
@@ -96,10 +106,11 @@ export function useWebSocket(): UseWebSocketReturn {
           break;
 
         case 'error':
-          if (msg.code === 'INVALID_RECONNECT') {
-            // 재접속 실패: 저장된 세션 정보 제거
-            localStorage.removeItem(STORAGE_ROOM_ID);
-            localStorage.removeItem(STORAGE_PLAYER_ID);
+          if (msg.code === 'INVALID_RECONNECT' || msg.code === 'ROOM_NOT_FOUND') {
+            // 재접속 실패(세션 무효 또는 방 소멸): 저장된 세션 정보를 지워서
+            // 다음 접속부터는 죽은 방으로 재접속을 반복 시도하지 않게 한다.
+            sessionStore.remove(STORAGE_ROOM_ID);
+            sessionStore.remove(STORAGE_PLAYER_ID);
           }
           setError(msg.message);
           break;

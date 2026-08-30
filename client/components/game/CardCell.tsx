@@ -11,6 +11,7 @@ export function CardCell({
   cardKey,
   isMyTurn,
   isSuppressed,
+  isRecentlyOpened,
   reactionNum,
   isJolting,
   glowColor,
@@ -21,6 +22,7 @@ export function CardCell({
   cardKey: string;
   isMyTurn: boolean;
   isSuppressed: boolean;
+  isRecentlyOpened: boolean;
   reactionNum: number | null;
   isJolting: boolean;
   glowColor: string | null;
@@ -41,7 +43,7 @@ export function CardCell({
       flipTimers.current = [];
       setFlipPhase('out');
       const t1 = setTimeout(() => setFlipPhase('in'), 125);
-      const t2 = setTimeout(() => setFlipPhase('idle'), 250);
+      const t2 = setTimeout(() => setFlipPhase('idle'), 305);
       flipTimers.current = [t1, t2];
     }
   }, [isSuppressed]);
@@ -84,21 +86,17 @@ export function CardCell({
     const isWink = reaction !== null && reaction >= 2;
     const isGold = reaction !== null && reaction === 6;
 
-    // 페어를 못 찾고 남은 카드 — 오픈한 팀이 다음 오픈을 하기 전까지만 그 팀 색 테두리 유지.
-    // (서버가 해당 팀의 다음 오픈 시점에 openedBy를 null로 되돌려준다.)
-    // 글로우 중(막 페어가 맞은 순간)에는 이 로직 대신 card-pair-glow가 테두리를 담당한다.
-    let borderClass = 'border-2 border-jungle-400';
-    if (glowColor === null) {
-      if (card.openedBy === 'A') borderClass = 'border-2 border-emerald-500';
-      else if (card.openedBy === 'B') borderClass = 'border-2 border-blue-600';
-      else borderClass = 'border border-gray-300';
-    }
+    // 짝을 못 찾고 남은 카드는 누가 열었는지와 무관하게 항상 중립 회색 테두리만 쓴다.
+    // "이번 액션에서 새로 뒤집힌 카드"만 흰/검 강조 링으로 잠깐 구분해, 예전 턴 정보가
+    // 계속 노출되지 않게 한다 (글로우 중엔 card-pair-glow가 테두리를 담당).
+    const borderClass = 'border border-gray-300';
+    const highlightClass = glowColor === null && isRecentlyOpened ? 'card-recent-open' : '';
 
     return (
       <div
         data-card-key={cardKey}
         className={`
-          card-shadow w-11 h-14 rounded-lg bg-white ${borderClass}
+          card-shadow w-11 h-14 rounded-lg bg-white ${borderClass} ${highlightClass}
           flex flex-col items-center justify-center gap-0.5
           relative overflow-visible select-none
           ${flipPhase === 'in' ? 'card-flip-in' : ''}
