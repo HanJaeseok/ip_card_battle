@@ -23,24 +23,22 @@ export function RabbitFlightLayer({ flights }: { flights: RabbitFlight[] }) {
 function FlightGroup({ flight }: { flight: RabbitFlight }) {
   const [points, setPoints] = useState<Point[] | null>(null);
 
-  // 실제 DOM 위치를 측정해 카드 좌표 → 점수판 좌표로의 이동량을 계산한다.
-  // (보드가 팬/줌 되어 있어도 getBoundingClientRect는 항상 실제 화면 좌표를 반환한다)
+  // 상표토끼 스택 위치에서 점수판까지의 이동량을 계산한다 — 화면이 아무리
+  // 리사이즈돼도 getBoundingClientRect는 항상 실제 화면 좌표를 반환한다.
   useLayoutEffect(() => {
     const targetEl = document.querySelector(`[data-rabbit-target="${flight.team}"]`);
-    if (!targetEl) return;
+    const sourceEl = document.querySelector('[data-stack-area="rabbit"]');
+    if (!targetEl || !sourceEl) return;
     const targetRect = targetEl.getBoundingClientRect();
+    const sourceRect = sourceEl.getBoundingClientRect();
     const tx = targetRect.left + targetRect.width / 2;
     const ty = targetRect.top + targetRect.height / 2;
+    const x = sourceRect.left + sourceRect.width / 2;
+    const y = sourceRect.top + sourceRect.height / 2;
 
-    const next: Point[] = [];
-    for (const key of flight.sourceKeys) {
-      const el = document.querySelector(`[data-card-key="${CSS.escape(key)}"]`);
-      if (!el) continue;
-      const r = el.getBoundingClientRect();
-      const x = r.left + r.width / 2;
-      const y = r.top + r.height / 2;
-      next.push({ x, y, fx: tx - x, fy: ty - y });
-    }
+    const next: Point[] = Array.from({ length: flight.count }, () => ({
+      x, y, fx: tx - x, fy: ty - y,
+    }));
     setPoints(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flight.id]);

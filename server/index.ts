@@ -64,9 +64,9 @@ wss.on('connection', (ws) => {
         break;
       }
 
-      case 'openCard': {
+      case 'drawCard': {
         if (!currentRoomId || !currentPlayerId) return;
-        roomManager.getRoom(currentRoomId)?.handleOpenCard(currentPlayerId, msg.r, msg.c);
+        roomManager.getRoom(currentRoomId)?.handleDrawCard(currentPlayerId, msg.place);
         break;
       }
 

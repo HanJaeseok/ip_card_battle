@@ -16,9 +16,9 @@ export function SheepComboLayer({ combos }: { combos: SheepCombo[] }) {
 function ComboText({ combo }: { combo: SheepCombo }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
-  // 추가 오픈된 카드의 중앙 위치를 측정해 그 자리에서 콤보 텍스트를 띄운다.
+  // 실용신양 효과로 카드가 뽑힌 장소 위치를 측정해 그 자리에서 콤보 텍스트를 띄운다.
   useLayoutEffect(() => {
-    const el = document.querySelector(`[data-card-key="${CSS.escape(combo.key)}"]`);
+    const el = document.querySelector(`[data-place-key="${combo.place}"]`);
     if (!el) return;
     const r = el.getBoundingClientRect();
     setPos({ x: r.left + r.width / 2, y: r.top + r.height / 2 });

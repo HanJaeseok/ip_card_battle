@@ -1,19 +1,22 @@
 import { THRESHOLDS } from 'shared';
+import { predictTigerDmg } from '@/lib/predict';
 
 export function TigerAttackBar({
   tigerScore,
   lastLevelTiger,
   turn,
+  boardTotal,
 }: {
   tigerScore: number;
   lastLevelTiger: number;
   turn: number;
+  boardTotal: number;
 }) {
-  const atk = Math.round((lastLevelTiger + 1) * turn * 1.5);
   const threshold = THRESHOLDS.tiger;
   const scoreMod = tigerScore - lastLevelTiger * threshold;
   const progress = scoreMod / threshold;
-  const isImminent = progress >= 0.8;
+  const dmg = predictTigerDmg(tigerScore, boardTotal, lastLevelTiger, turn);
+  const isImminent = dmg > 0;
 
   return (
     <div
@@ -27,11 +30,10 @@ export function TigerAttackBar({
       />
       <div className="relative text-center py-1 px-3">
         <p className="text-[0.65rem] text-white/80 leading-none mb-0.5">
-          {threshold}점마다 · {scoreMod}/{threshold}
+          현재 카드 획득 +{boardTotal}
         </p>
         <p className="text-sm font-bold text-white tracking-wide leading-tight">
-          ⚔ 공격력 {atk}
-          {isImminent && ' 곧 발동!'}
+          ⚔ {isImminent ? `점수 획득시 공격력 ${dmg}` : '발동 없음'}
         </p>
       </div>
     </div>

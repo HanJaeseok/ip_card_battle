@@ -1,36 +1,19 @@
 'use client';
 
-import { MAX_TURN, EXPAND_TURN, BOARD_INITIAL, BOARD_EXPANDED } from 'shared';
+import { MAX_TURN, EXPAND_TURN, PLACES } from 'shared';
+import { PLACE_NAME, placeAnimalLabel } from '@/lib/places';
+import type { Place } from 'shared';
 
-// 실제 게임 카드와 똑같은 스타일로 뒤집기/페어를 재연하는 미니 카드
-function MiniCard({
-  faceUp,
-  emoji,
-  num,
-  highlight,
-}: {
-  faceUp: boolean;
-  emoji?: string;
-  num?: number;
-  highlight?: 'gold' | 'gray';
-}) {
-  if (!faceUp) {
-    return (
-      <div className="w-11 h-14 rounded-lg border border-gray-300 bg-white shadow-sm flex items-center justify-center shrink-0">
-        <span className="text-xs font-bold text-gray-700">?</span>
-      </div>
-    );
-  }
+function MiniPlace({ place }: { place: Place }) {
   return (
     <div
-      className={`w-11 h-14 rounded-lg bg-white shadow-sm flex flex-col items-center justify-center gap-0.5 shrink-0 ${
-        highlight === 'gold'
-          ? 'border-2 border-amber-400 ring-2 ring-amber-300'
-          : 'border border-gray-300'
-      }`}
+      className="w-20 h-14 rounded-lg bg-cover bg-center relative overflow-hidden shrink-0 border border-black/10"
+      style={{ backgroundImage: `url(/places/${place}.png)` }}
     >
-      <span className="text-xl leading-none">{emoji}</span>
-      <span className="text-sm font-bold text-jungle-800">{num}</span>
+      <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center">
+        <p className="text-white text-[0.65rem] font-bold leading-tight">{PLACE_NAME[place]}</p>
+        <p className="text-white/90 text-[0.6rem] leading-tight">{placeAnimalLabel(place)}</p>
+      </div>
     </div>
   );
 }
@@ -109,36 +92,42 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="overflow-y-auto px-5 py-4 flex flex-col gap-3 bg-gray-50">
-          {/* 카드 뒤집기 & 페어 재연 */}
+          {/* 장소와 뽑기 */}
           <Section
-            emoji="🃏"
-            title="카드를 뒤집어 같은 동물끼리 짝을 맞추세요"
+            emoji="🗺️"
+            title="네 장소 중 한 곳을 클릭해 카드를 뽑으세요"
             visual={
               <>
-                <MiniCard faceUp={false} />
-                <MiniCard faceUp={false} />
-                <span className="text-gray-400 text-lg">→</span>
-                <MiniCard faceUp emoji="🐯" num={3} highlight="gold" />
-                <MiniCard faceUp emoji="🐯" num={6} highlight="gold" />
-                <span className="text-amber-600 font-bold text-sm ml-1">+9점!</span>
+                {PLACES.map(p => (
+                  <MiniPlace key={p} place={p} />
+                ))}
               </>
             }
           >
-            보드 위에 같은 동물 카드가 <b>짝수 장</b> 뒤집혀 있게 되는 순간 그 카드를 전부
-            획득하고, 숫자를 모두 합한 만큼 점수를 얻습니다. 두 팀이 30초 제한시간 안에
-            번갈아 한 장씩 뒤집습니다(시간 초과 시 무작위 카드 자동 오픈).
+            맵 네 모서리에는 오두막·숲길·부둣가·강가가 있고, 각 장소마다 나올 수 있는
+            동물이 정해져 있습니다. 장소를 클릭하면 슬롯머신처럼 동물과 숫자가 빠르게
+            바뀌다가 하나로 확정되어 중앙의 그 동물 스택으로 날아갑니다. 동물이 3종류인
+            장소(숲길·강가)는 숫자 1~3이, 2종류인 장소(오두막·부둣가)는 숫자 4~6이 나옵니다.
+          </Section>
+
+          {/* 획득 규칙 */}
+          <Section emoji="🃏" title="짝수 장이 모이면 그 순간 획득!">
+            중앙 스택에 같은 동물 카드가 <b>짝수 장</b> 쌓이면 그 자리에서 전부 획득하고,
+            숫자를 모두 합한 만큼 점수를 얻습니다. 단, 정산은 이번 차례에 뽑을 카드를
+            <b> 모두 뽑은 뒤</b>에 한 번에 이루어집니다 — 실용신양 효과로 여러 장이 연달아
+            나와도, 그 카드들이 전부 나온 다음에야 어느 동물이 짝을 이뤘는지 확인합니다.
           </Section>
 
           {/* 실용신양 */}
           <Section
             emoji="🐑"
-            title="실용신양 — 점수가 쌓일수록 카드가 저절로 열려요"
-            visual={<MiniGaugeBar color="bg-lime-600" threshold={10} fraction="7/10" fillPct={70} text="추가 카드 오픈 +2장" />}
+            title="실용신양 — 점수가 쌓일수록 카드가 저절로 더 나와요"
+            visual={<MiniGaugeBar color="bg-lime-600" threshold={10} fraction="7/10" fillPct={70} text="추가 카드 뽑기 +2장" />}
           >
-            상시로 켜져 있는 효과예요. <b>내 실용신양 점수를 10으로 나눈 몫</b>만큼 내
-            차례마다 카드가 자동으로 더 열립니다 — 그래서 상대는 여러 장을 연달아
-            뒤집는데 나는 한 장만 뒤집는 상황이 생길 수 있어요. 점수가 오르면 다음
-            턴에 더 많이 열리고, 특허랑이에게 점수를 뺏기면 그만큼 바로 줄어듭니다.
+            상시로 켜져 있는 효과예요. <b>내 실용신양 점수를 10으로 나눈 몫</b>만큼, 내가
+            장소를 클릭할 때마다 양털뭉치가 무작위 장소로 굴러가 카드를 추가로 뽑아옵니다.
+            점수가 오르면 다음 차례에 더 많이 뽑히고, 특허랑이에게 점수를 뺏기면 그만큼
+            바로 줄어듭니다.
           </Section>
 
           {/* 상표토끼 */}
@@ -147,7 +136,7 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
             title="상표토끼 — 꾸준히 모으면 보너스"
             visual={<MiniGaugeBar color="bg-pink-500" threshold={10} fraction="4/10" fillPct={40} text="다음 보너스 +8점" />}
           >
-            내 턴이 끝날 때 상표토끼 점수가 <b>10점 단위 구간을 새로 넘으면</b>, (넘은
+            내 차례가 끝날 때 상표토끼 점수가 <b>10점 단위 구간을 새로 넘으면</b>, (넘은
             구간 수 × 현재 턴 수)만큼 보너스를 추가로 받습니다. 턴이 늦을수록 한 번에
             받는 보너스가 커집니다.
           </Section>
@@ -174,12 +163,11 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
             꽉 찰수록 곧 터진다는 뜻이니 상대 화면을 주시하세요!
           </Section>
 
-          {/* 보드 확장 & 종료 */}
-          <Section emoji="🗺️" title="보드 확장과 게임 종료">
-            {EXPAND_TURN}턴이 끝나면 보드 테두리에 카드가 추가되어 {BOARD_INITIAL}×{BOARD_INITIAL}
-            판이 {BOARD_EXPANDED}×{BOARD_EXPANDED}로 넓어집니다. 총 {MAX_TURN}턴이 지나거나
-            보드의 모든 카드가 열리면 게임이 종료되고, 4개 동물 점수를 합친 총점이 더
-            높은 팀이 승리합니다(동점이면 무승부).
+          {/* 카드 보충 & 종료 */}
+          <Section emoji="📦" title="카드 보충과 게임 종료">
+            {EXPAND_TURN}턴이 끝나면 네 장소의 카드 재고가 한 번 더 보충됩니다. 총{' '}
+            {MAX_TURN}턴이 지나거나 모든 카드가 다 뽑히면 게임이 종료되고, 4개 동물
+            점수를 합친 총점이 더 높은 팀이 승리합니다(동점이면 무승부).
           </Section>
         </div>
       </div>

@@ -1,4 +1,5 @@
-import type { ClientGameState, Team } from 'shared';
+import type { Animal, ClientGameState, Team } from 'shared';
+import { ANIMALS } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
 import { PlayerList } from './PlayerList';
 import { ScorePanel } from './ScorePanel';
@@ -40,6 +41,11 @@ export function TeamPanel({
   const hitShakeClass = tigerSlashActive ? 'panel-hit-shake' : '';
   const rabbitPressureClass = animState.rabbitPressure?.targetTeam === team ? 'panel-rabbit-pressure' : '';
 
+  const boardTotals = ANIMALS.reduce((acc, a) => {
+    acc[a] = gameState.stacks[a].filter(c => c.collectedBy === null).reduce((s, c) => s + c.num, 0);
+    return acc;
+  }, {} as Record<Animal, number>);
+
   return (
     <div
       className={`w-56 shrink-0 bg-white rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} transition-shadow ${recoilClass} ${hitShakeClass} ${rabbitPressureClass}`}
@@ -66,6 +72,7 @@ export function TeamPanel({
         mermaidEffectType={mermaidEffectType}
         scoreFlash={animState.scoreFlash}
         sheepReserveCount={animState.sheepReserve[team]}
+        boardTotals={boardTotals}
       />
     </div>
   );

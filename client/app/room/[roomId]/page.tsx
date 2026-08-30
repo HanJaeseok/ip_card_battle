@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Team } from 'shared';
+import type { Place, Team } from 'shared';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAnimationQueue } from '@/hooks/useAnimationQueue';
 import { GameLayout } from '@/components/game/GameLayout';
@@ -14,7 +14,7 @@ const GAME_BGM_VOLUME = 0.5; // 게임 효과음이 함께 들려야 하므로 B
 
 export default function GamePage() {
   const router = useRouter();
-  const { gameState, lastEvents, openCard, error, connected } = useWebSocket();
+  const { gameState, lastEvents, drawCard, error, connected } = useWebSocket();
   const [myTeam, setMyTeam] = useState<Team | null>(null);
 
   const animState = useAnimationQueue(lastEvents, gameState);
@@ -36,12 +36,11 @@ export default function GamePage() {
     }
   }, [gameState?.phase, gameState?.expanded]);
 
-  const handleCardClick = useCallback(
-    (key: string) => {
-      const [r, c] = key.split(',').map(Number);
-      openCard(r, c);
+  const handlePlaceClick = useCallback(
+    (place: Place) => {
+      drawCard(place);
     },
-    [openCard],
+    [drawCard],
   );
 
   if (!gameState) {
@@ -69,7 +68,7 @@ export default function GamePage() {
     <GameLayout
       gameState={gameState}
       myTeam={myTeam}
-      onCardClick={handleCardClick}
+      onPlaceClick={handlePlaceClick}
       error={error}
       animState={animState}
     />

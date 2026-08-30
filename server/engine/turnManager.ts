@@ -1,8 +1,8 @@
 import { EXPAND_TURN, MAX_TURN, ANIMALS } from 'shared';
 import type { GameEvent, GameState, Team } from 'shared';
-import { allCardsOpened, createBoard, createExpansionRing } from './board';
+import { initStacks } from './places';
 import { applyRabbitEffect } from './effects/rabbit';
-import type { RNG } from './board';
+import type { RNG } from './places';
 
 function determineWinner(state: GameState): Team | 'draw' {
   const scoreOf = (team: Team) =>
@@ -16,14 +16,14 @@ function determineWinner(state: GameState): Team | 'draw' {
 
 /**
  * 턴 종료 처리.
- * 호출 시점: 현재 activeTeam 플레이어가 카드를 오픈한 직후.
+ * 호출 시점: 현재 activeTeam 플레이어가 장소를 클릭한 직후.
  *
  * 순서:
  * 1. 상표토끼 턴 종료 훅
  * 2. 팀 교대 (A→B, B→A)
  * 3. B→A 교대 시 턴 카운터 증가
- * 4. 20턴 도달 시 보드 확장 (1회)
- * 5. 40턴 초과 또는 전 카드 오픈 시 게임 종료
+ * 4. EXPAND_TURN 도달 시 "더 신나지는" 시점 진입 (1회) — 이때부터 폭탄 등장
+ * 5. MAX_TURN 초과 시 게임 종료
  */
 export function advanceTurn(state: GameState, rng: RNG = Math.random): GameEvent[] {
   const events: GameEvent[] = [];
@@ -38,18 +38,15 @@ export function advanceTurn(state: GameState, rng: RNG = Math.random): GameEvent
   if (currentTeam === 'B') {
     state.turn++;
 
-    // 20턴 종료 시점에 보드 확장
+    // EXPAND_TURN 종료 시점부터 폭탄이 등장한다 (카드 재고 개념은 없음 — 뽑기는 항상 무한)
     if (state.turn === EXPAND_TURN + 1 && !state.expanded) {
-      createExpansionRing(state.board, rng);
       state.expanded = true;
       events.push({ type: 'expand' });
     }
   }
 
-  // 종료 판정 — 실용신양 상시효과로 한 팀의 턴 안에서 보드 전체가 소진될 수 있으므로,
-  // 어느 팀이 방금 플레이했든 매번 확인한다 (B팀 턴 뒤로만 검사하면, A팀 턴 중 보드가
-  // 모두 열려도 게임이 끝나지 않고 다음 팀에게 열 카드가 없는 채로 넘어가 멈춰버린다).
-  if (state.turn > MAX_TURN || allCardsOpened(state.board)) {
+  // 종료 판정
+  if (state.turn > MAX_TURN) {
     state.phase = 'ended';
     state.winner = determineWinner(state);
     events.push({ type: 'gameEnd', winner: state.winner });
@@ -86,7 +83,7 @@ export function initGame(
     turn: 1,
     activeTeam: 'A',
     activePlayerIndex: 0,
-    board: createBoard(rng),
+    stacks: initStacks(),
     expanded: false,
     teams: {
       A: makeTeam(teamAMembers),

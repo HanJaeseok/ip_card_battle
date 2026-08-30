@@ -88,6 +88,7 @@ export function ScorePanel({
   mermaidEffectType,
   scoreFlash,
   sheepReserveCount,
+  boardTotals,
 }: {
   team: Team;
   scores: Record<Animal, number>;
@@ -99,6 +100,7 @@ export function ScorePanel({
   mermaidEffectType: 'catchup' | 'bonus' | null;
   scoreFlash: ReadonlyMap<string, number>;
   sheepReserveCount: number;
+  boardTotals: Record<Animal, number>;
 }) {
   const myTotal = ANIMALS.reduce((s, a) => s + scores[a], 0);
   const opTotal = ANIMALS.reduce((s, a) => s + opponentScores[a], 0);
@@ -149,19 +151,36 @@ export function ScorePanel({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         {table('sheep')}
-        <SheepOpenBar sheepScore={scores.sheep} reserveCount={sheepReserveCount} />
+        <SheepOpenBar sheepScore={scores.sheep} boardTotal={boardTotals.sheep} reserveCount={sheepReserveCount} />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('rabbit', { targetAttr: team })}
-        <RabbitBonusBar rabbitScore={scores.rabbit} turn={turn} />
+        <RabbitBonusBar
+          rabbitScore={scores.rabbit}
+          lastLevelRabbit={lastLevel.rabbit}
+          turn={turn}
+          boardTotal={boardTotals.rabbit}
+        />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('mermaid')}
-        <MermaidExpectedBar mermaidScore={scores.mermaid} myTotal={myTotal} opTotal={opTotal} turn={turn} />
+        <MermaidExpectedBar
+          mermaidScore={scores.mermaid}
+          lastLevelMermaid={lastLevel.mermaid}
+          myTotal={myTotal}
+          opTotal={opTotal}
+          turn={turn}
+          boardTotal={boardTotals.mermaid}
+        />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('tiger')}
-        <TigerAttackBar tigerScore={scores.tiger} lastLevelTiger={lastLevel.tiger} turn={turn} />
+        <TigerAttackBar
+          tigerScore={scores.tiger}
+          lastLevelTiger={lastLevel.tiger}
+          turn={turn}
+          boardTotal={boardTotals.tiger}
+        />
       </div>
 
       <div className="bg-jungle-50 border border-jungle-200 rounded-lg px-3 py-2 text-center mt-1 relative overflow-hidden">

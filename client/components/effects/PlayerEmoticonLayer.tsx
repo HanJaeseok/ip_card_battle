@@ -1,6 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { PlayerEmoticon } from '@/hooks/useAnimationQueue';
 
 export function PlayerEmoticonLayer({ items }: { items: PlayerEmoticon[] }) {
@@ -32,7 +33,8 @@ function EmoticonBubble({ item }: { item: PlayerEmoticon }) {
 
   if (!anchor) return null;
 
-  const size = 200 + item.stackIndex * 20;
+  const size = 180;
+  const STACK_STEP = 60; // 새 이모티콘이 기존 것 아래로 쌓이는 간격(px)
 
   return (
     <span
@@ -49,7 +51,7 @@ function EmoticonBubble({ item }: { item: PlayerEmoticon }) {
         src={`/emoticon/${item.file}.png`}
         alt=""
         className="player-emoticon"
-        style={{ width: size, height: size }}
+        style={{ width: size, height: size, '--stack-offset': `${item.stackIndex * STACK_STEP}px` } as CSSProperties}
       />
     </span>
   );

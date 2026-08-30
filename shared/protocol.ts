@@ -1,4 +1,4 @@
-import type { Animal, CardNum, GamePhase, Team } from './types';
+import type { GameEvent, GameState, Place, Team } from './types';
 
 // ─── 클라이언트 → 서버 ───────────────────────────────────────────────────────
 
@@ -6,7 +6,7 @@ export type ClientMessage =
   | { type: 'createRoom'; nickname: string; team: Team }
   | { type: 'joinRoom'; roomId: string; nickname: string; team: Team }
   | { type: 'ready' }
-  | { type: 'openCard'; r: number; c: number }
+  | { type: 'drawCard'; place: Place }
   | { type: 'reconnect'; roomId: string; playerId: string };
 
 // ─── 서버 → 클라이언트 ──────────────────────────────────────────────────────
@@ -38,47 +38,13 @@ export type ErrorCode =
   | 'GAME_ALREADY_STARTED'
   | 'INVALID_RECONNECT';
 
-// ─── 클라이언트 게임 상태 (치팅 방지: 미오픈 카드 animal/num 제거) ────────────
+// ─── 클라이언트 게임 상태 ─────────────────────────────────────────────────────
+// 카드가 뽑히는 즉시 공개되므로(숨겨진 카드 상태가 없음) 서버 GameState를 그대로
+// 확장해서 쓴다 — 예전처럼 별도의 클라이언트 전용 board 직렬화가 필요 없다.
 
-export type ClientCard =
-  | { open: true; animal: Animal; num: CardNum; collectedBy: Team | null; openedBy: Team | null }
-  | { open: false; collectedBy: Team | null };
-
-export interface ClientBoardEntry {
-  key: string;  // "r,c"
-  card: ClientCard;
-}
-
-export interface ClientTeamState {
-  members: string[];
-  scores: Record<Animal, number>;
-  lastLevel: Record<Animal, number>;
-  playerIndex: number; // 팀 내 다음 차례 플레이어 인덱스 (이모티콘 등 UI 앵커링용)
-}
-
-export interface ClientGameState {
-  phase: GamePhase;
-  turn: number;
-  activeTeam: Team;
-  activePlayerIndex: number;
+export interface ClientGameState extends GameState {
   activePlayerNickname: string;
-  turnDeadline: number;           // Date.now() + 30000 (클라이언트 타이머용)
-  board: ClientBoardEntry[];      // Map → Array (JSON 직렬화)
-  expanded: boolean;
-  teams: Record<Team, ClientTeamState>;
-  winner: Team | 'draw' | null;
+  turnDeadline: number; // Date.now() + 30000 (클라이언트 타이머 표시용)
 }
 
-// ─── 클라이언트 게임 이벤트 (open 이벤트는 open:true 카드만) ─────────────────
-
-export type ClientGameEvent =
-  | { type: 'open'; key: string; card: Extract<ClientCard, { open: true }> }
-  | { type: 'collect'; animal: Animal; team: Team; score: number; keys: string[] }
-  | { type: 'sheepChain'; count: number; level: number; team: Team }
-  | { type: 'tigerAttack'; team: Team; dmg: number }
-  | { type: 'rabbitBonus'; team: Team; bonus: number }
-  | { type: 'mermaidCatchup'; team: Team; absorb: number }
-  | { type: 'mermaidBonus'; team: Team; bonus: number }
-  | { type: 'expand' }
-  | { type: 'gameEnd'; winner: Team | 'draw' }
-  | { type: 'timeout'; key: string };
+export type ClientGameEvent = GameEvent;

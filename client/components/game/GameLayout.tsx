@@ -1,14 +1,15 @@
-import type { ClientGameState, Team } from 'shared';
+import type { ClientGameState, Place, Team } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
 import { EffectLayer } from '@/components/effects/EffectLayer';
 import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
 import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
 import { MainComboBanner } from '@/components/effects/MainComboBanner';
+import { SheepLoadedBanner } from '@/components/effects/SheepLoadedBanner';
 import { PlayerEmoticonLayer } from '@/components/effects/PlayerEmoticonLayer';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
-import { BoardPanel } from './BoardPanel';
+import { GameBoard } from './GameBoard';
 import { CommentaryBoard } from './CommentaryBoard';
 
 // 실용신양 콤보 번호 → 진동 강도 스케일. 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다.
@@ -19,13 +20,13 @@ function shakeScale(combo: number): number {
 export function GameLayout({
   gameState,
   myTeam,
-  onCardClick,
+  onPlaceClick,
   error,
   animState,
 }: {
   gameState: ClientGameState;
   myTeam: Team | null;
-  onCardClick: (key: string) => void;
+  onPlaceClick: (place: Place) => void;
   error: string | null;
   animState: AnimationState;
 }) {
@@ -54,23 +55,22 @@ export function GameLayout({
       <main className="flex-1 flex gap-2 p-2 overflow-hidden min-h-0">
         <TeamPanel team="A" gameState={gameState} animState={animState} />
         <div className="flex-1 flex flex-col gap-2 min-h-0">
-          <BoardPanel
+          <GameBoard
             gameState={gameState}
             myTeam={myTeam}
-            onCardClick={onCardClick}
-            suppressedKeys={animState.suppressedKeys}
-            recentlyOpenedKeys={animState.recentlyOpenedKeys}
-            reactionMap={animState.reactionMap}
-            joltAllFaceDown={animState.joltAllFaceDown}
-            boardBreathe={animState.boardBreathe}
-            collectGlowKeys={animState.collectGlowKeys}
-            expandQuake={animState.expandQuake}
-            expandBurst={animState.expandBurst}
-            mermaidPopup={animState.mermaidPopup}
+            onPlaceClick={onPlaceClick}
             captions={animState.captions}
-            cardFocusBursts={animState.cardFocusBursts}
+            placeFocusBursts={animState.placeFocusBursts}
+            drawSlots={animState.drawSlots}
+            woolBalls={animState.woolBalls}
+            bombBursts={animState.bombBursts}
+            collectingCardIds={animState.collectingCardIds}
+            newCardId={animState.newCardId}
+            revealedCardIds={animState.revealedCardIds}
+            mermaidPopup={animState.mermaidPopup}
+            expandFlash={animState.expandFlash}
           />
-          <CommentaryBoard lines={animState.commentary} gameState={gameState} />
+          <CommentaryBoard lines={animState.commentary} />
         </div>
         <TeamPanel team="B" gameState={gameState} animState={animState} />
       </main>
@@ -83,6 +83,9 @@ export function GameLayout({
 
       {/* 상표토끼 보너스 — 카드 → 점수판 플라이트 (fixed, 화면 전역) */}
       <RabbitFlightLayer flights={animState.rabbitFlights} />
+
+      {/* 실용신양 발동 예고 — "N마리 장전!" */}
+      <SheepLoadedBanner loaded={animState.sheepLoaded} />
 
       {/* 실용신양 추가 오픈 콤보 텍스트 (fixed, 화면 전역) */}
       <SheepComboLayer combos={animState.sheepCombos} />

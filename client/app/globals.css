@@ -210,20 +210,32 @@ body {
 
 /* ── 실용신양 보유량 게이지 — 카드 소모 시 양 한 마리가 "뿅" 사라짐 ───────────── */
 @keyframes sheepPopBurst {
-  0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
-  60%  { transform: translate(-50%, -50%) scale(1.6) translateY(-6px); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(0.4) translateY(-16px); opacity: 0; }
+  0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+  60%  { transform: translate(-50%, -50%) scale(2) translateY(-10px); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.5) translateY(-24px); opacity: 0; }
 }
 .sheep-pop-burst {
   position: absolute;
   left: 50%;
   top: 50%;
-  font-size: 1.1rem;
+  font-size: 1.8rem;
   pointer-events: none;
   animation: sheepPopBurst 500ms ease-out forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .sheep-pop-burst { display: none; }
+}
+
+/* 실용신양 연쇄가 실제로 굴러가는 동안 게이지 자체가 은은하게 두근거려 눈에 띈다 */
+@keyframes sheepBarPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(163, 230, 53, 0.7); }
+  50%      { box-shadow: 0 0 0 6px rgba(163, 230, 53, 0); }
+}
+.sheep-bar-rolling {
+  animation: sheepBarPulse 0.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheep-bar-rolling { animation: none; }
 }
 
 /* ── 윙크 ───────────────────────────────────────────────────────────────── */
@@ -739,6 +751,32 @@ body {
   .main-combo-banner { animation: none; opacity: 0; }
 }
 
+/* ── 실용신양 발동 예고 — "실용신양의 N번째 힘!" 배너 ────────────────────────── */
+@keyframes sheepLoadedPop {
+  0%   { transform: translate(-50%, -50%) scale(0.5) rotate(-4deg); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.2) rotate(3deg); opacity: 1; }
+  32%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  80%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.85) rotate(0deg); opacity: 0; }
+}
+.sheep-loaded-banner {
+  position: fixed;
+  left: 50%;
+  top: 16%;
+  z-index: 71;
+  pointer-events: none;
+  font-weight: 900;
+  font-size: 2.2rem;
+  color: #f7fee7;
+  white-space: nowrap;
+  -webkit-text-stroke: 2px #365314;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: sheepLoadedPop 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheep-loaded-banner { animation: none; opacity: 0; }
+}
+
 /* ── 카드 오픈/페어/효과 자막 (보드 중앙 오버레이) ───────────────────────────── */
 @keyframes captionPop {
   0%   { transform: scale(0.5); opacity: 0; }
@@ -770,6 +808,7 @@ body {
 }
 .card-caption-effect-ally { color: #22c55e; }
 .card-caption-effect-enemy { color: #ef4444; }
+.card-caption-effect-neutral { color: #ca8a04; }
 @media (prefers-reduced-motion: reduce) {
   .card-caption { animation: none; opacity: 0; }
 }
@@ -822,13 +861,13 @@ body {
 /* ── 플레이어 반응 이모티콘 (프로필 옆) ──────────────────────────────────── */
 /* 등장(팝+흔들림) → 유지 → 마지막에 페이드아웃, 총 2000ms (JS 제거 타이밍과 일치) */
 @keyframes emoticonLifecycle {
-  0%   { transform: scale(0.4) rotate(-8deg); opacity: 0; }
-  18%  { transform: scale(1.15) rotate(6deg); opacity: 1; }
-  27%  { transform: scale(0.95) rotate(-4deg); opacity: 1; }
-  36%  { transform: scale(1.05) rotate(2deg); opacity: 1; }
-  45%  { transform: scale(1) rotate(0deg); opacity: 1; }
-  85%  { transform: scale(1) rotate(0deg); opacity: 1; }
-  100% { transform: scale(0.85) rotate(0deg); opacity: 0; }
+  0%   { transform: translateY(var(--stack-offset, 0px)) scale(0.4) rotate(-8deg); opacity: 0; }
+  18%  { transform: translateY(var(--stack-offset, 0px)) scale(1.15) rotate(6deg); opacity: 1; }
+  27%  { transform: translateY(var(--stack-offset, 0px)) scale(0.95) rotate(-4deg); opacity: 1; }
+  36%  { transform: translateY(var(--stack-offset, 0px)) scale(1.05) rotate(2deg); opacity: 1; }
+  45%  { transform: translateY(var(--stack-offset, 0px)) scale(1) rotate(0deg); opacity: 1; }
+  85%  { transform: translateY(var(--stack-offset, 0px)) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(0px) scale(0.85) rotate(0deg); opacity: 0; }
 }
 .player-emoticon {
   display: block;
@@ -891,4 +930,152 @@ body {
   .mermaid-popup { animation: none; opacity: 1; }
   .mermaid-popup-body { animation: none; }
   .mermaid-note { display: none; }
+}
+
+/* ── 장소 타일 — 평소엔 어둡게, 마우스 올리면 밝아짐 ─────────────────────────── */
+.place-tile {
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.55);
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+.place-tile-active:hover {
+  filter: brightness(1);
+  transform: scale(1.015);
+}
+.place-tile-disabled {
+  filter: brightness(0.4) grayscale(30%);
+}
+
+/* ── 중앙 동물 스택 — 카드 한 장 ──────────────────────────────────────────── */
+.stack-card {
+  position: relative;
+  width: 94px;
+  height: 122px;
+  border-radius: 14px;
+  background: #fff;
+  border: 2px solid #d1d5db;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+@keyframes stackCardPop {
+  0%   { transform: scale(0.4) translateY(-10px); opacity: 0; }
+  60%  { transform: scale(1.12) translateY(0); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.stack-card-new {
+  animation: stackCardPop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes stackCardFlingLeft {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(-115vw, 20vh) scale(0.35) rotate(-35deg); opacity: 0; }
+}
+@keyframes stackCardFlingRight {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(115vw, 20vh) scale(0.35) rotate(35deg); opacity: 0; }
+}
+.stack-card-fling-left { animation: stackCardFlingLeft 750ms ease-in forwards; z-index: 20 !important; }
+.stack-card-fling-right { animation: stackCardFlingRight 750ms ease-in forwards; z-index: 20 !important; }
+.stack-total-badge {
+  line-height: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stack-card-new, .stack-card-fling-left, .stack-card-fling-right { animation: none; }
+}
+
+/* ── 슬롯머신 뽑기 연출 ──────────────────────────────────────────────────── */
+.draw-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 88px;
+  min-height: 128px;
+  background: #fff;
+  border: 3px solid #fbbf24;
+  border-radius: 14px;
+  padding: 8px 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+@keyframes drawSlotShake {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+  25%       { transform: translate(-50%, -50%) rotate(-6deg) scale(1.05); }
+  50%       { transform: translate(-50%, -50%) rotate(0deg) scale(0.97); }
+  75%       { transform: translate(-50%, -50%) rotate(6deg) scale(1.05); }
+}
+.draw-slot-spin {
+  animation: drawSlotShake 0.13s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .draw-slot-spin { animation: none; }
+}
+
+/* ── 도토리 폭탄 — 미획득 스택 전체 초기화 ──────────────────────────────────── */
+/* 카드가 부르르 떨리다 옆으로 샤르륵 흘러내리며 사라진다 */
+@keyframes bombCardShakeFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  10%  { transform: translateY(0) rotate(-7deg); opacity: 1; }
+  20%  { transform: translateY(1px) rotate(7deg); opacity: 1; }
+  30%  { transform: translateY(0) rotate(-6deg); opacity: 1; }
+  40%  { transform: translateY(1px) rotate(6deg); opacity: 1; }
+  50%  { transform: translateY(0) rotate(-3deg); opacity: 1; }
+  60%  { transform: translateY(2px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(70px) rotate(14deg); opacity: 0; }
+}
+.bomb-card-rack {
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+.bomb-card-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 94px;
+  height: 122px;
+  border-radius: 14px;
+  background: #fff;
+  border: 2px solid #d1d5db;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #14532d;
+  animation: bombCardShakeFall 800ms ease-in both;
+}
+/* 중심에서 사방으로 튀어나갔다 사라지는 도토리 폭죽 */
+@keyframes acornBurst {
+  0%   { transform: translate(-50%, -50%) scale(0.4) rotate(0deg); opacity: 1; }
+  55%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--acorn-dx)), calc(-50% + var(--acorn-dy))) scale(1.15) rotate(200deg); opacity: 0; }
+}
+.bomb-acorn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 1.7rem;
+  animation: acornBurst 700ms ease-out both;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bomb-card-ghost, .bomb-acorn { animation: none; opacity: 0; }
+}
+
+/* ── 실용신양 울 볼 — 더 크고 눈에 띄게, 은은한 빛나는 궤적 포함 ───────────── */
+@keyframes woolSpin {
+  from { rotate: 0deg; }
+  to   { rotate: 360deg; }
+}
+.wool-ball {
+  font-size: 3.2rem;
+  animation: woolSpin 0.35s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(163, 230, 53, 0.85)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+@media (prefers-reduced-motion: reduce) {
+  .wool-ball { animation: none; }
 }

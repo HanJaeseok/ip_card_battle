@@ -1,5 +1,6 @@
 import { initGame } from '../engine/turnManager';
-import { processPlayerAction, processTimeout } from '../engine/gameEngine';
+import { processPlayerAction } from '../engine/gameEngine';
+import { PLACES } from 'shared';
 import type { GameState } from 'shared';
 import { ANIMALS, MAX_TURN } from 'shared';
 
@@ -55,20 +56,9 @@ function runGame(seed: number): {
       });
     }
 
-    // 미오픈 카드 중 무작위 선택
-    const unopened: string[] = [];
-    for (const [key, card] of state.board) {
-      if (!card.open && card.collectedBy === null) unopened.push(key);
-    }
-
-    if (unopened.length === 0) {
-      // 오픈할 카드 없음 → 타임아웃으로 턴 강제 진행
-      processTimeout(state, rng);
-    } else {
-      const idx = Math.floor(rng() * unopened.length);
-      const [rStr, cStr] = unopened[idx].split(',');
-      processPlayerAction(state, parseInt(rStr, 10), parseInt(cStr, 10), rng);
-    }
+    // 장소는 항상 뽑을 수 있으므로(무한 뽑기) 무작위로 1곳 선택
+    const place = PLACES[Math.floor(rng() * PLACES.length)];
+    processPlayerAction(state, place, rng);
   }
 
   const aFinal = totalScoreOf(state, 'A');

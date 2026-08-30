@@ -6,6 +6,7 @@ import type {
   ClientGameState,
   ClientMessage,
   LobbyPlayer,
+  Place,
   ServerMessage,
   Team,
 } from 'shared';
@@ -35,7 +36,7 @@ export interface UseWebSocketReturn {
   createRoom: (nickname: string, team: Team) => void;
   joinRoom: (roomId: string, nickname: string, team: Team) => void;
   sendReady: () => void;
-  openCard: (r: number, c: number) => void;
+  drawCard: (place: Place) => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -132,13 +133,13 @@ export function useWebSocket(): UseWebSocketReturn {
 
   const sendReady = useCallback(() => send({ type: 'ready' }), [send]);
 
-  const openCard = useCallback((r: number, c: number) => {
-    send({ type: 'openCard', r, c });
+  const drawCard = useCallback((place: Place) => {
+    send({ type: 'drawCard', place });
   }, [send]);
 
   return {
     connected, roomId, playerId,
     lobbyPlayers, gameState, lastEvents, error,
-    createRoom, joinRoom, sendReady, openCard,
+    createRoom, joinRoom, sendReady, drawCard,
   };
 }

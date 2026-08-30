@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
-import type { Team } from 'shared';
-import type { ClientMessage, ServerMessage } from 'shared';
+import type { Place, Team } from 'shared';
+import type { ServerMessage } from 'shared';
 import { processPlayerAction, processTimeout, initGame } from './engine/gameEngine';
 import type { GameState } from 'shared';
 import { TURN_TIME_SEC } from 'shared';
@@ -67,7 +67,7 @@ export class Room {
 
   // ─── 게임 진행 ───────────────────────────────────────────────────────────
 
-  handleOpenCard(playerId: string, r: number, c: number): void {
+  handleDrawCard(playerId: string, place: Place): void {
     if (!this.state || this.state.phase !== 'playing') {
       this.sendTo(playerId, { type: 'error', code: 'GAME_NOT_STARTED', message: '게임이 시작되지 않았습니다.' });
       return;
@@ -79,14 +79,7 @@ export class Room {
       return;
     }
 
-    const key = `${r},${c}`;
-    const card = this.state.board.get(key);
-    if (!card || card.open || card.collectedBy !== null) {
-      this.sendTo(playerId, { type: 'error', code: 'CARD_NOT_AVAILABLE', message: '선택할 수 없는 카드입니다.' });
-      return;
-    }
-
-    const { state, events } = processPlayerAction(this.state, r, c);
+    const { state, events } = processPlayerAction(this.state, place);
     this.state = state;
     this.resetTimer();
 
@@ -103,12 +96,13 @@ export class Room {
     const { state, events } = processTimeout(this.state);
     this.state = state;
 
-    const openEv = events.find(e => e.type === 'open');
-    const timeoutKey = openEv?.type === 'open' ? openEv.key : '';
+    const firstEv = events.find(e => e.type === 'draw' || e.type === 'bomb');
+    const timeoutPlace =
+      firstEv?.type === 'draw' || firstEv?.type === 'bomb' ? firstEv.place : null;
 
     const clientEvents = serializeEvents(events);
-    if (timeoutKey) {
-      clientEvents.unshift({ type: 'timeout', key: timeoutKey });
+    if (timeoutPlace) {
+      clientEvents.unshift({ type: 'timeout', place: timeoutPlace });
     }
 
     if (this.state.phase === 'playing') {

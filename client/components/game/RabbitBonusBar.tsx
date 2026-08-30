@@ -1,11 +1,21 @@
 import { THRESHOLDS } from 'shared';
+import { predictRabbitBonus } from '@/lib/predict';
 
-export function RabbitBonusBar({ rabbitScore, turn }: { rabbitScore: number; turn: number }) {
-  // 상표토끼는 10점 구간을 새로 넘으면 1 × 현재턴수 만큼 보너스를 받는다.
-  // 다음 발동까지 얼마나 남았는지 게이지로 보여줘 "점점 불어나는" 압박감을 준다.
+export function RabbitBonusBar({
+  rabbitScore,
+  lastLevelRabbit,
+  turn,
+  boardTotal,
+}: {
+  rabbitScore: number;
+  lastLevelRabbit: number;
+  turn: number;
+  boardTotal: number;
+}) {
   const threshold = THRESHOLDS.rabbit;
   const scoreMod = rabbitScore % threshold;
   const progress = (scoreMod / threshold) * 100;
+  const bonus = predictRabbitBonus(rabbitScore, boardTotal, lastLevelRabbit, turn);
 
   return (
     <div className="rounded-full bg-pink-500 shadow-sm overflow-hidden relative">
@@ -15,10 +25,10 @@ export function RabbitBonusBar({ rabbitScore, turn }: { rabbitScore: number; tur
       />
       <div className="relative text-center py-1 px-3">
         <p className="text-[0.65rem] text-white/80 leading-none mb-0.5">
-          {threshold}점마다 · {scoreMod}/{threshold}
+          현재 카드 획득 +{boardTotal}
         </p>
         <p className="text-sm font-bold text-white tracking-wide leading-tight">
-          🎯 다음 보너스 +{turn}점
+          🎯 {bonus > 0 ? `점수 획득시 +${bonus}` : '발동 없음'}
         </p>
       </div>
     </div>

@@ -1,57 +1,43 @@
 import { initGame } from '../engine/turnManager';
-import { openCard } from '../engine/openCard';
+import { drawCard } from '../engine/drawCard';
 import { advanceTurn } from '../engine/turnManager';
 import { applyRabbitEffect } from '../engine/effects/rabbit';
 import { applyTigerEffect } from '../engine/effects/tiger';
 import { applyMermaidEffect } from '../engine/effects/mermaid';
 import { applySheepEffect } from '../engine/effects/sheep';
-import { createBoard } from '../engine/board';
-import type { Card, GameState } from 'shared';
-import { MAX_TURN } from 'shared';
+import type { Animal, CardNum, StackedCard } from 'shared';
+import { MAX_TURN, SHEEP_SAFETY_CAP } from 'shared';
 
-// 결정론적 RNG (항상 0 반환)
+// 결정론적 RNG (항상 0 반환 — Math.floor(rng()*n)은 항상 0번째 원소를 고른다)
 const rng0 = () => 0;
+// 옵션 2개짜리 장소에서 항상 마지막(1번째) 원소를 고르게 하는 RNG
+const rngLast = () => 0.99;
 
-/** 빈 보드에 특정 카드를 직접 배치하는 헬퍼 */
-function makeState(cards: { key: string; card: Partial<Card> }[]): GameState {
-  const state = initGame(['A1'], ['B1'], rng0);
-  state.board.clear();
-  for (const { key, card } of cards) {
-    state.board.set(key, {
-      animal: 'sheep',
-      num: 1,
-      open: false,
-      collectedBy: null,
-      openedBy: null,
-      ...card,
-    });
-  }
-  return state;
+let cardIdSeed = 0;
+function stackedCard(animal: Animal, num: CardNum): StackedCard {
+  return { id: ++cardIdSeed, animal, num, collectedBy: null };
 }
 
 // ─── 홀수 잔류 ───────────────────────────────────────────────────────────────
 describe('홀수 잔류', () => {
-  it('3장 오픈 시 아무것도 수집하지 않음', () => {
-    const state = makeState([
-      { key: '0,0', card: { animal: 'rabbit', num: 3, open: true } },
-      { key: '0,1', card: { animal: 'rabbit', num: 2, open: true } },
-      { key: '0,2', card: { animal: 'rabbit', num: 1, open: false } },
-    ]);
-    openCard(state, 0, 2, rng0);
-    // 3장 → 홀수 → 수집 없음
+  it('3장 스택 시 아무것도 수집하지 않음', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.stacks.rabbit.push(stackedCard('rabbit', 3), stackedCard('rabbit', 2));
+    // house = [rabbit, sheep] — rng0는 항상 0번째(rabbit)를 뽑는다
+    drawCard(state, 'house', rng0);
+    // 2장 + 1장 = 3장(홀수) → 수집 없음
     expect(state.teams['A'].scores.rabbit).toBe(0);
-    for (const card of state.board.values()) {
-      expect(card.collectedBy).toBeNull();
-    }
+    expect(state.stacks.rabbit.every(c => c.collectedBy === null)).toBe(true);
   });
 
-  it('짝수(2장) 오픈 시 즉시 수집', () => {
-    const state = makeState([
-      { key: '0,0', card: { animal: 'tiger', num: 4, open: true } },
-      { key: '0,1', card: { animal: 'tiger', num: 6, open: false } },
-    ]);
-    openCard(state, 0, 1, rng0);
+  it('짝수(2장) 스택 시 즉시 수집', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.stacks.tiger.push(stackedCard('tiger', 4));
+    // dock = [mermaid, tiger] — rngLast는 항상 마지막(tiger)을 뽑는다
+    drawCard(state, 'dock', rngLast);
+    // dock은 2종 장소라 새로 뽑히는 카드 숫자는 4~6 중 rngLast로 고정된 6 → 기존 4 + 새 6 = 10
     expect(state.teams['A'].scores.tiger).toBe(10);
+    expect(state.stacks.tiger.every(c => c.collectedBy === 'A')).toBe(true);
   });
 });
 
@@ -199,56 +185,27 @@ describe('디자인어 — 캐치업/리드 분기', () => {
   });
 });
 
-// ─── 실용신양 연쇄 cap ────────────────────────────────────────────────────────
-describe('실용신양 — 연쇄 cap', () => {
-  it('SHEEP_SAFETY_CAP(350) 이상 오픈 시도 시 350에서 중단', () => {
-    // 보드에 카드 400장 (sheep 200장 포함) — 실제 구현에서는 초기 보드가 100장이므로
-    // 여기서는 sheep 효과 발동 카운트를 측정하는 데 집중한다.
+// ─── 실용신양 뽑기 상한 ────────────────────────────────────────────────────────
+describe('실용신양 — 뽑기 상한', () => {
+  it(`SHEEP_SAFETY_CAP(${SHEEP_SAFETY_CAP}) 이상 뽑기 시도 시 그 값에서 중단`, () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    // 보드를 400장으로 수동 세팅
-    state.board.clear();
-    for (let i = 0; i < 400; i++) {
-      state.board.set(`${i},0`, {
-        animal: 'sheep',
-        num: 6,
-        open: false,
-        collectedBy: null,
-        openedBy: null,
-      });
-    }
-    // sheep 점수를 매우 높게 설정해 n이 크도록
     state.teams['A'].scores.sheep = 3500; // level=350
 
     const events = applySheepEffect(state, rng0);
-    // sheepChain 이벤트의 count 합계가 350 이하여야 함
-    const totalOpened = events
-      .filter(e => e.type === 'sheepChain')
-      .reduce((sum, e) => sum + (e as { type: 'sheepChain'; count: number }).count, 0);
-    expect(totalOpened).toBeLessThanOrEqual(350);
+    const rollCount = events.find(e => e.type === 'sheepRoll');
+    expect(rollCount && rollCount.type === 'sheepRoll' ? rollCount.count : 0).toBeLessThanOrEqual(SHEEP_SAFETY_CAP);
   });
 });
 
 describe('실용신양 — 상시효과 (lastLevel과 무관하게 현재 점수 기준)', () => {
-  it('lastLevel이 얼마든 간에 floor(score/10)만큼 항상 오픈', () => {
+  it('lastLevel이 얼마든 간에 floor(score/10)만큼 항상 뽑음', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.board.clear();
-    for (let i = 0; i < 10; i++) {
-      state.board.set(`${i},0`, {
-        animal: 'mermaid', // sheep이 아닌 카드로 채워도 무관하게 발동해야 함
-        num: 1,
-        open: false,
-        collectedBy: null,
-        openedBy: null,
-      });
-    }
     state.teams['A'].scores.sheep = 25; // level=2
     state.teams['A'].lastLevel.sheep = 10; // 과거 값이 남아 있어도 무시되어야 함
 
     const events = applySheepEffect(state, rng0);
-    const totalOpened = events
-      .filter(e => e.type === 'sheepChain')
-      .reduce((sum, e) => sum + (e as { type: 'sheepChain'; count: number }).count, 0);
-    expect(totalOpened).toBe(2);
+    const roll = events.find(e => e.type === 'sheepRoll');
+    expect(roll && roll.type === 'sheepRoll' ? roll.count : 0).toBe(2);
   });
 
   it('점수가 10 미만이면 발동하지 않음', () => {
@@ -282,17 +239,34 @@ describe('턴 진행', () => {
     expect(state.phase).toBe('ended');
     expect(events.some(e => e.type === 'gameEnd')).toBe(true);
   });
+});
 
-  it('전 카드 오픈 시 조기 종료', () => {
+// ─── 폭탄 ────────────────────────────────────────────────────────────────────
+describe('폭탄 — EXPAND_TURN 이후에만 등장', () => {
+  it('expanded=false면 폭탄이 절대 발생하지 않음', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    // 모든 카드를 오픈 상태로 설정
-    for (const card of state.board.values()) {
-      card.open = true;
-    }
-    state.turn = 5;
-    state.activeTeam = 'B';
-    const events = advanceTurn(state, rng0);
-    expect(state.phase).toBe('ended');
-    expect(events.some(e => e.type === 'gameEnd')).toBe(true);
+    state.expanded = false;
+    // 0.01은 BOMB_CHANCE(0.3)보다 작지만, expanded가 false면 애초에 확률 판정을 안 한다.
+    const events = drawCard(state, 'house', () => 0.01);
+    expect(events.some(e => e.type === 'bomb')).toBe(false);
+  });
+
+  it('expanded=true & 확률 성공 시 폭탄 발생 — 해당 동물의 미획득 스택만 제거', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.expanded = true;
+    state.stacks.rabbit.push(stackedCard('rabbit', 3));
+    const alreadyCollected = stackedCard('rabbit', 5);
+    alreadyCollected.collectedBy = 'A';
+    state.stacks.rabbit.push(alreadyCollected);
+
+    // 0.01 < BOMB_CHANCE(0.3) → 폭탄. house=[rabbit, sheep] 중 인덱스 0=rabbit이 타깃.
+    const events = drawCard(state, 'house', () => 0.01);
+    const bombEv = events.find((e): e is Extract<typeof events[number], { type: 'bomb' }> => e.type === 'bomb');
+    expect(bombEv).toBeDefined();
+    expect(bombEv?.animal).toBe('rabbit');
+
+    // 이미 획득된 기록은 남고, 미획득 카드만 사라진다.
+    expect(state.stacks.rabbit).toHaveLength(1);
+    expect(state.stacks.rabbit[0].collectedBy).toBe('A');
   });
 });
