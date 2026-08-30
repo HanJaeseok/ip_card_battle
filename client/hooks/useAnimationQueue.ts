@@ -379,6 +379,34 @@ export function useAnimationQueue(
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
 
+    // ── 이전 액션이 "켜놓고 나중에 끄기"로 예약해둔 연출들을 강제로 정리한다 ──
+    // 위에서 timersRef를 통째로 취소했기 때문에, 이전 액션이 예약해둔 "일정 시간
+    // 후 끄기/제거" 콜백들도 함께 사라진다. 새 액션이 도착했다는 것 자체가 서버
+    // 기준으로는 이전 액션이 이미 완전히 끝났다는 뜻이므로(특히 빠르게 다음 수를
+    // 두는 컴퓨터 상대), 켜진 채로 방치되면 화면에 영원히 남는 연출들을 여기서
+    // 전부 끈다. 반대로 emoticons/placeFocusBursts/sheepLoaded는 schedPersistent로
+    // 이미 timersRef 취소의 영향을 받지 않도록 설계되어 있으므로 건드리지 않는다.
+    setScreenShakeLevel(0);
+    setLeafParticleCount(0);
+    setFloatingTexts([]);
+    setRabbitFlights([]);
+    setRabbitPressure(null);
+    setSheepCombos([]);
+    setMainCombo(null);
+    setTigerSlash(null);
+    setTigerRecoil(null);
+    setTigerImpact(false);
+    setMermaidEffect(null);
+    setMermaidPopup(null);
+    setScoreFlash(EMPTY_SCORE_MAP);
+    setExpandFlash(false);
+    setCaptions([]);
+    setDrawSlots([]);
+    setWoolBalls([]);
+    setBombBursts([]);
+    setCollectingCardIds(EMPTY_ID_SET);
+    setNewCardId(null);
+
     // 이번 액션의 정산 연출이 끝날 때까지는 화면상 "행동한 팀"의 턴으로 유지한다.
     setIsSettling(true);
 
