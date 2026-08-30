@@ -31,6 +31,7 @@ export function GameBoard({
   collectingCardIds,
   newCardId,
   revealedCardIds,
+  displayedActiveTeam,
   mermaidPopup,
   expandFlash,
 }: {
@@ -45,15 +46,21 @@ export function GameBoard({
   collectingCardIds: ReadonlySet<number>;
   newCardId: number | null;
   revealedCardIds: ReadonlySet<number>;
+  displayedActiveTeam: Team;
   mermaidPopup: { team: Team } | null;
   expandFlash: boolean;
 }) {
-  const isMyTurn = myTeam !== null && gameState.activeTeam === myTeam;
+  // 장소 클릭 가능 여부는 실제 서버 상태(gameState.activeTeam)를 그대로 따라야 한다 —
+  // 정산 연출 중에는 이미 서버상 내 차례가 아니므로 클릭이 막혀 있는 게 맞다.
+  const canAct = myTeam !== null && gameState.activeTeam === myTeam;
+  // 테두리 펄스·동물 무드(happy/focus)는 정산 연출이 끝날 때까지 "내 차례"로 유지되는
+  // 화면상 턴을 따른다.
+  const isMyTurnDisplayed = myTeam !== null && displayedActiveTeam === myTeam;
 
   return (
     <div
       className={`flex-1 relative bg-jungle-50/50 rounded-2xl border-2 p-2 grid gap-2 ${
-        isMyTurn ? 'board-my-turn' : 'border-jungle-200'
+        isMyTurnDisplayed ? 'board-my-turn' : 'border-jungle-200'
       }`}
       style={{
         gridTemplateAreas: '"house center center dock" "forest center center river"',
@@ -65,7 +72,7 @@ export function GameBoard({
         <div key={place} style={{ gridArea: GRID_AREA[place] }}>
           <PlaceTile
             place={place}
-            disabled={!isMyTurn}
+            disabled={!canAct}
             onClick={onPlaceClick}
             showBombWarning={gameState.expanded}
           />
@@ -78,7 +85,7 @@ export function GameBoard({
           collectingIds={collectingCardIds}
           newCardId={newCardId}
           revealedCardIds={revealedCardIds}
-          isMyTurn={isMyTurn}
+          isMyTurn={isMyTurnDisplayed}
         />
       </div>
 

@@ -18,7 +18,9 @@ export function TeamPanel({
   const teamState = gameState.teams[team];
   const opTeam: Team = team === 'A' ? 'B' : 'A';
   const opponentScores = gameState.teams[opTeam].scores;
-  const isActiveTeam = gameState.activeTeam === team;
+  // 정산 연출이 끝날 때까지는 "화면상" 활성 팀(displayedActiveTeam)을 기준으로 삼는다 —
+  // 실제 gameState.activeTeam은 액션 처리 즉시 다음 팀으로 넘어가 있기 때문.
+  const isActiveTeam = animState.displayedActiveTeam === team;
 
   const teamColor = team === 'A' ? 'text-team-a' : 'text-team-b';
   const teamRing = isActiveTeam
@@ -29,7 +31,7 @@ export function TeamPanel({
 
   // 지금이 내 차례인지 상대 차례인지를 양쪽 팀 영역 배경색으로 동일하게 표시한다
   // (연두 = 내 차례, 연핑크 = 상대 차례) — A/B팀 색과는 별개의 전역 신호.
-  const isMyTurn = myTeam !== null && gameState.activeTeam === myTeam;
+  const isMyTurn = myTeam !== null && animState.displayedActiveTeam === myTeam;
   const turnBgClass = myTeam === null ? 'bg-white' : isMyTurn ? 'bg-lime-100' : 'bg-rose-100';
 
   const label = team === 'A' ? '🟢 A팀' : '🔵 B팀';
@@ -62,7 +64,7 @@ export function TeamPanel({
       <PlayerList
         team={team}
         members={teamState.members}
-        activePlayerIndex={gameState.activePlayerIndex}
+        activePlayerIndex={animState.displayedActivePlayerIndex}
         isActiveTeam={isActiveTeam}
       />
 

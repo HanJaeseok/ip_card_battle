@@ -2,15 +2,19 @@
 
 import { useState, useEffect } from 'react';
 
-export function TurnTimer({ deadline }: { deadline: number }) {
+export function TurnTimer({ deadline, paused }: { deadline: number; paused: boolean }) {
   const [remaining, setRemaining] = useState(30);
 
   useEffect(() => {
+    // 정산 애니메이션이 재생 중일 때는 실제 서버 타이머는 계속 흐르지만, 화면에는
+    // 마지막으로 보여준 값 그대로 멈춰 있는 것처럼 표시해 다음 턴으로 성급히
+    // 넘어간 듯한 느낌을 주지 않는다.
+    if (paused) return;
     const tick = () => setRemaining(Math.max(0, (deadline - Date.now()) / 1000));
     tick();
     const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [deadline]);
+  }, [deadline, paused]);
 
   const pct = (remaining / 30) * 100;
   const isUrgent = remaining <= 5;

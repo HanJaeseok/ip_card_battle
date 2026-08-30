@@ -43,7 +43,12 @@ export function GameLayout({
       <LeafDecoration position="bl" />
       <LeafDecoration position="br" />
 
-      <GameHeader gameState={gameState} />
+      <GameHeader
+        gameState={gameState}
+        displayedActiveTeam={animState.displayedActiveTeam}
+        displayedActivePlayerIndex={animState.displayedActivePlayerIndex}
+        isSettling={animState.isSettling}
+      />
 
       {error && (
         <div className="bg-red-100 border-b border-red-200 text-red-700 text-sm text-center py-1.5 px-4 shrink-0">
@@ -67,6 +72,7 @@ export function GameLayout({
             collectingCardIds={animState.collectingCardIds}
             newCardId={animState.newCardId}
             revealedCardIds={animState.revealedCardIds}
+            displayedActiveTeam={animState.displayedActiveTeam}
             mermaidPopup={animState.mermaidPopup}
             expandFlash={animState.expandFlash}
           />

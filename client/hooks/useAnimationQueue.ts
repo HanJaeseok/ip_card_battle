@@ -223,6 +223,9 @@ export interface AnimationState {
   newCardId: number | null; // 방금 스택에 추가된 카드 (팝인 강조용)
   revealedCardIds: ReadonlySet<number>; // 슬롯머신 연출이 끝나 실제 스택에 그려도 되는 카드
   sheepReserve: Record<Team, number>;
+  displayedActiveTeam: Team; // 정산 연출이 끝나야 실제 activeTeam으로 갱신되는 "화면상" 활성 팀
+  displayedActivePlayerIndex: number;
+  isSettling: boolean; // 이번 액션의 정산 연출이 아직 재생 중인지
 }
 
 const EMPTY_SCORE_MAP = new Map<string, number>() as ReadonlyMap<string, number>;
@@ -278,6 +281,13 @@ export function useAnimationQueue(
   const [revealedCardIds, setRevealedCardIds] = useState<ReadonlySet<number>>(EMPTY_ID_SET);
   const [sheepReserve, setSheepReserve] = useState<Record<Team, number>>({ A: 0, B: 0 });
 
+  // 실제 서버 상태(gameState.activeTeam)는 액션 처리 즉시 다음 팀으로 넘어가지만,
+  // 화면에는 이번 액션의 정산 연출이 완전히 끝날 때까지 "행동한 팀"을 그대로 유지해
+  // 보여준다 — 정산 도중 배경/테두리 색이 성급하게 바뀌어 혼란을 주지 않기 위함.
+  const [displayedActiveTeam, setDisplayedActiveTeam] = useState<Team>(gameState?.activeTeam ?? 'A');
+  const [displayedActivePlayerIndex, setDisplayedActivePlayerIndex] = useState<number>(gameState?.activePlayerIndex ?? 0);
+  const [isSettling, setIsSettling] = useState(false);
+
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // 다음 액션이 들어올 때 timersRef를 통째로 비우기 때문에, 그보다 오래 지속되는
   // 이모티콘 등의 "제거" 타이머는 여기 따로 담아 언마운트 시에만 정리한다.
@@ -309,6 +319,10 @@ export function useAnimationQueue(
       });
       return changed ? next : prev;
     });
+    // 재생할 정산 애니메이션이 없는 갱신이므로 곧바로 실제 턴 상태와 동기화한다.
+    setDisplayedActiveTeam(gameState.activeTeam);
+    setDisplayedActivePlayerIndex(gameState.activePlayerIndex);
+    setIsSettling(false);
   }, [gameState, lastEvents]);
 
   const sched = (fn: () => void, delayMs: number) => {
@@ -364,6 +378,9 @@ export function useAnimationQueue(
 
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
+
+    // 이번 액션의 정산 연출이 끝날 때까지는 화면상 "행동한 팀"의 턴으로 유지한다.
+    setIsSettling(true);
 
     const gameState = gameStateRef.current;
     const beforeScores = prevScoresRef.current;
@@ -790,6 +807,16 @@ export function useAnimationQueue(
         addCaption('🌰 도토리 폭탄 등장! 턴마다 확률 UP', 'effect', cursor);
         cursor += 950;
       }
+
+      // 정산 연출이 여기서 끝난다 — 이 시점에야 비로소 화면상의 턴을 실제 서버 상태로 넘긴다.
+      sched(() => {
+        setIsSettling(false);
+        const latest = gameStateRef.current;
+        if (latest) {
+          setDisplayedActiveTeam(latest.activeTeam);
+          setDisplayedActivePlayerIndex(latest.activePlayerIndex);
+        }
+      }, cursor);
     }
 
     // ── Pass 2: 플레이어 이모티콘 판정 (턴인 사람 / 상대) ───────────────────
@@ -838,12 +865,15 @@ export function useAnimationQueue(
   }, [lastEvents]);
 
   // 게임이 끝나면 아직 재생 대기 중인 예약된 효과음/애니메이션을 전부 취소한다.
+  // 취소된 타이머 중엔 정산 종료를 알리는 턴 전환 콜백도 포함되므로, isSettling이
+  // 영원히 true로 멈춰있지 않도록 여기서 직접 정리해준다.
   useEffect(() => {
     if (gameState?.phase === 'ended') {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
       persistentTimersRef.current.forEach(clearTimeout);
       persistentTimersRef.current = [];
+      setIsSettling(false);
     }
   }, [gameState?.phase]);
 
@@ -873,6 +903,9 @@ export function useAnimationQueue(
     collectingCardIds,
     newCardId,
     revealedCardIds,
+    displayedActiveTeam,
+    displayedActivePlayerIndex,
+    isSettling,
     sheepReserve,
   };
 }
