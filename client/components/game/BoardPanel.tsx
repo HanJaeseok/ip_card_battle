@@ -196,6 +196,13 @@ export function BoardPanel({
         />
       </div>
 
+      {/* 내 차례가 아닐 때 — 카드판을 살짝 어둡게 해 "지금은 상대 차례"임을 은은하게 알림 */}
+      <div
+        className={`absolute inset-0 pointer-events-none transition-opacity duration-300 bg-black/20 ${
+          isMyTurn ? 'opacity-0' : 'opacity-100'
+        }`}
+      />
+
       {/* 보드 확장 — 섬광 + 충격파 링 + 떨어지는 먼지/잔해 (뷰포트 기준) */}
       {expandBurst > 0 && (
         <>

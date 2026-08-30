@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { LobbyPlayer, Team } from 'shared';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { playBgm } from '@/lib/bgm';
+import { HowToPlayModal } from '@/components/ui/HowToPlayModal';
 
 export default function LobbyPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function LobbyPage() {
   const [joinRoomId, setJoinRoomId] = useState('');
   const [mode, setMode] = useState<'home' | 'create' | 'join' | 'waiting'>('home');
   const [isReady, setIsReady] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
 
   // 방 입장 감지
   useEffect(() => {
@@ -53,7 +55,16 @@ export default function LobbyPage() {
   return (
     <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4">
       <h1 className="text-4xl mb-2">🐑🐰🧜‍♀️🐯</h1>
-      <h2 className="text-xl font-semibold text-green-800 mb-8">한국특허정보원 카드배틀</h2>
+      <h2 className="text-xl font-semibold text-green-800 mb-3">한국특허정보원 카드배틀</h2>
+
+      <button
+        onClick={() => setShowHowTo(true)}
+        className="text-sm text-green-700 bg-green-100 hover:bg-green-200 px-4 py-1.5 rounded-full mb-6 font-semibold transition"
+      >
+        📖 게임 방법
+      </button>
+
+      {showHowTo && <HowToPlayModal onClose={() => setShowHowTo(false)} />}
 
       {!ws.connected && (
         <p className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-lg mb-4 text-sm">
