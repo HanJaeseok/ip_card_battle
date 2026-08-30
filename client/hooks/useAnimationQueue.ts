@@ -515,8 +515,9 @@ export function useAnimationQueue(
 
         addPlaceFocus(place, slotAt);
 
+        // 슬롯이 뜨는 순간 바로 card_1/card_2 사운드를 재생한다(스핀이 끝날 때까지 기다리지 않음).
         const pitch = inRoll ? Math.min(1.35, 1 + (bonusRollIdx - 1) * 0.035) : 1;
-        sched(() => playRandomSound('card', pitch), revealAt);
+        sched(() => playRandomSound('card', pitch), slotAt);
 
         sched(() => {
           setNewCardId(card.id);

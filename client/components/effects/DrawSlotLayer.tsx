@@ -52,7 +52,7 @@ function SlotDraw({ item }: { item: DrawSlotItem }) {
 
   const spinOptions = PLACE_ANIMALS[item.place];
   const displayAnimal: Animal = phase === 'spin' ? spinOptions[spinFrame % spinOptions.length] : item.animal;
-  const displayNum: CardNum | number = phase === 'spin' ? (spinFrame % 6) + 1 : item.num;
+  const displayNum: CardNum | number = phase === 'spin' ? (spinFrame % 9) + 1 : item.num;
 
   const style: React.CSSProperties =
     phase === 'fly'

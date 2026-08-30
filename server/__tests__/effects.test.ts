@@ -33,8 +33,8 @@ describe('홀수 잔류', () => {
     state.stacks.tiger.push(stackedCard('tiger', 4));
     // dock = [mermaid, tiger] — rngLast는 항상 마지막(tiger)을 뽑는다
     drawCard(state, 'dock', rngLast);
-    // dock은 2종 장소라 새로 뽑히는 카드 숫자는 4~6 중 rngLast로 고정된 6 → 기존 4 + 새 6 = 10
-    expect(state.teams['A'].scores.tiger).toBe(10);
+    // dock은 2종 장소라 새로 뽑히는 카드 숫자는 1~5 중 rngLast로 고정된 5 → 기존 4 + 새 5 = 9
+    expect(state.teams['A'].scores.tiger).toBe(9);
     expect(state.stacks.tiger.every(c => c.collectedBy === 'A')).toBe(true);
   });
 });
@@ -246,7 +246,7 @@ describe('폭탄 — EXPAND_TURN 이후에만 등장', () => {
     alreadyCollected.collectedBy = 'A';
     state.stacks.rabbit.push(alreadyCollected);
 
-    // 0.01 < BOMB_BASE_CHANCE(0.1) → 폭탄. house=[rabbit, sheep] 중 인덱스 0=rabbit이 타깃.
+    // 0.01 < BOMB_BASE_CHANCE(0.3) → 폭탄. house=[rabbit, sheep] 중 인덱스 0=rabbit이 타깃.
     const events = drawCard(state, 'house', () => 0.01);
     const bombEv = events.find((e): e is Extract<typeof events[number], { type: 'bomb' }> => e.type === 'bomb');
     expect(bombEv).toBeDefined();

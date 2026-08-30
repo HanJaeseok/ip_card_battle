@@ -3,8 +3,11 @@
 import { useLayoutEffect, useState } from 'react';
 import type { PlaceFocusItem } from '@/hooks/useAnimationQueue';
 
-// 지금 막 클릭된 장소로 시선을 모으는 연출 — 주변이 어두워지고 그 장소만
-// 밝게 남으며, 테두리 링이 확대되며 페이드아웃된다.
+const RING_COUNT = 3;
+const RING_STAGGER_MS = 90; // "샤샤샥" — 연달아 빠르게 뻗어나가는 느낌
+
+// 지금 막 클릭된 장소로 시선을 모으는 연출 — 화면을 어둡게 하지 않고, 그 장소
+// 테두리에서 빠르게 연달아 뻗어나가는 링 3개로 시선을 모은다.
 export function CardFocusLayer({ items }: { items: PlaceFocusItem[] }) {
   return (
     <>
@@ -28,28 +31,20 @@ function FocusBurst({ item }: { item: PlaceFocusItem }) {
 
   if (!rect) return null;
 
-  const cx = rect.x + rect.w / 2;
-  const cy = rect.y + rect.h / 2;
-
   return (
-    <>
-      {/* 다른 곳은 어두워지고 지금 클릭된 장소만 밝게 남는 스포트라이트 */}
-      <span
-        className="card-spotlight-dim"
-        style={{ '--spot-x': `${cx}px`, '--spot-y': `${cy}px` } as React.CSSProperties}
-      />
-      <span
-        className="card-focus-burst"
-        style={{
-          position: 'fixed',
-          left: rect.x,
-          top: rect.y,
-          width: rect.w,
-          height: rect.h,
-        }}
-      >
-        <span className="card-focus-ring" />
-      </span>
-    </>
+    <span
+      className="card-focus-burst"
+      style={{
+        position: 'fixed',
+        left: rect.x,
+        top: rect.y,
+        width: rect.w,
+        height: rect.h,
+      }}
+    >
+      {Array.from({ length: RING_COUNT }, (_, i) => (
+        <span key={i} className="card-focus-ring-fast" style={{ animationDelay: `${i * RING_STAGGER_MS}ms` }} />
+      ))}
+    </span>
   );
 }

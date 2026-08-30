@@ -1,6 +1,6 @@
 export type Animal = 'sheep' | 'rabbit' | 'mermaid' | 'tiger';
 export type Team = 'A' | 'B';
-export type CardNum = 1 | 2 | 3 | 4 | 5 | 6;
+export type CardNum = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 export type GamePhase = 'lobby' | 'playing' | 'ended';
 
 // 맵 네 모서리의 장소 — 각 장소를 클릭하면 괄호 안 동물 중 하나가 무작위로 나온다.

@@ -813,46 +813,23 @@ body {
   .card-caption { animation: none; opacity: 0; }
 }
 
-/* ── 카드 포커스(시선 집중) 연출 ─────────────────────────────────────────── */
-@keyframes cardFocusRing {
-  0%   { transform: scale(0.4); opacity: 0; border-width: 3px; }
-  35%  { transform: scale(1.05); opacity: 0.9; border-width: 2px; }
-  100% { transform: scale(1.9); opacity: 0; border-width: 1px; }
+/* ── 카드 포커스(시선 집중) 연출 — 화면을 어둡게 하지 않고, 클릭된 장소
+   테두리에서 빠르게 연달아 3개의 링이 뻗어나가며 "샤샤샥" 느낌을 준다. ────── */
+@keyframes cardFocusRingFast {
+  0%   { transform: scale(0.5); opacity: 0.95; border-width: 4px; }
+  100% { transform: scale(1.7); opacity: 0; border-width: 1px; }
 }
 .card-focus-burst {
   pointer-events: none;
   z-index: 55;
 }
-/* ── 카드 스포트라이트 — 뒤집히는 카드만 남기고 나머지를 어둡게 ─────────────── */
-@keyframes cardSpotlightFade {
-  0%   { opacity: 0; }
-  15%  { opacity: 1; }
-  70%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-.card-spotlight-dim {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 52;
-  background: radial-gradient(
-    circle at var(--spot-x) var(--spot-y),
-    transparent 0px,
-    transparent 42px,
-    rgba(0, 0, 0, 0.6) 110px
-  );
-  animation: cardSpotlightFade 480ms ease-out forwards;
-}
-@media (prefers-reduced-motion: reduce) {
-  .card-spotlight-dim { display: none; }
-}
-.card-focus-ring {
+.card-focus-ring-fast {
   position: absolute;
   inset: -6px;
-  border: 2px solid rgba(255, 255, 255, 0.95);
+  border: 3px solid rgba(255, 255, 255, 0.95);
   border-radius: 10px;
-  box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.6);
-  animation: cardFocusRing 480ms ease-out forwards;
+  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.7);
+  animation: cardFocusRingFast 260ms ease-out forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .card-focus-burst { display: none; }
