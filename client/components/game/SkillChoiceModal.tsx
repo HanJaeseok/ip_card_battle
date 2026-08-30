@@ -31,9 +31,7 @@ export function SkillChoiceModal({
             <TurnTimer deadline={gameState.turnDeadline} paused={false} />
           </div>
           <p className="text-red-400 text-xs font-bold leading-relaxed px-4">
-            &lt;주의&gt; 사용한 레벨만큼 에너지 소모
-            <br />
-            초과분은 다음 레벨을 위해 그대로 남습니다.
+            &lt;주의&gt; 선택한 동물의 레벨이 모두 스킬에 활용되어 0이 됩니다.
           </p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 divide-x-0 sm:divide-x-2 divide-y-2 sm:divide-y-0 divide-jungle-700">
@@ -41,6 +39,7 @@ export function SkillChoiceModal({
             const preview = previewSkill(gameState, team, animal);
             const hasEffect = preview.myScoreDelta > 0 || preview.oppScoreDelta > 0 || preview.extraDraws > 0;
             const eligible = preview.level > 0;
+            const rawScore = gameState.teams[team].scores[animal];
 
             return (
               <button
@@ -53,11 +52,9 @@ export function SkillChoiceModal({
                 style={{ backgroundImage: `url(/skills/${animal}_skill.png)` }}
               >
                 <div className="skill-choice-dim absolute inset-0" />
-                {eligible && (
-                  <span className="skill-outline-text absolute top-2 right-3 z-10 text-[0.65rem] font-bold text-red-300">
-                    에너지 -{preview.level * THRESHOLDS[animal]}
-                  </span>
-                )}
+                <span className="skill-outline-text absolute top-2 right-3 z-10 text-[0.65rem] font-bold text-white">
+                  경험치 {rawScore}/{THRESHOLDS[animal]}
+                </span>
                 <div className="relative z-10 flex flex-col gap-2 p-4">
                   <h3
                     className="skill-outline-text text-xl font-extrabold"

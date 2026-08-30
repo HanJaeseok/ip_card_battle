@@ -278,12 +278,14 @@ export function useAnimationQueue(
     text: string,
     tier: CaptionItem['tier'],
     atMs: number,
-    opts?: { placeKey?: Place; stackAnimal?: Animal; team?: Team },
+    opts?: { placeKey?: Place; stackAnimal?: Animal; team?: Team; durationOverride?: number },
   ) => {
     const id = ++floatIdCounter;
+    const { durationOverride, ...rest } = opts ?? {};
+    const duration = durationOverride ?? CAPTION_DUR[tier];
     sched(() => {
-      setCaptions(prev => [...prev, { id, text, tier, ...opts }]);
-      sched(() => setCaptions(prev => prev.filter(c => c.id !== id)), CAPTION_DUR[tier]);
+      setCaptions(prev => [...prev, { id, text, tier, ...rest }]);
+      sched(() => setCaptions(prev => prev.filter(c => c.id !== id)), duration);
     }, atMs);
   };
 
@@ -607,7 +609,12 @@ export function useAnimationQueue(
         ev.clearedCards.forEach(c => cardCacheRef.current.set(c.id, c));
 
         addPlaceFocus(place, revealAt);
-        addCaption(`🌰 ${ANIMAL_INFO[animal].short} 카드 전부 폭발!`, 'pair', revealAt, { stackAnimal: animal });
+        // 도토리 폭탄 자막은 무슨 일이 일어났는지 이해할 시간이 필요하므로 일반 페어
+        // 자막(800ms)보다 2초 더 오래(2800ms) 화면에 남겨둔다.
+        addCaption(`🌰 ${ANIMAL_INFO[animal].short} 카드 전부 폭발!`, 'pair', revealAt, {
+          stackAnimal: animal,
+          durationOverride: CAPTION_DUR.pair + 2000,
+        });
 
         const bombInRoll = inRoll;
         const bombProgressTeam = bonusRollTeam;
