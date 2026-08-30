@@ -1,6 +1,7 @@
 'use client';
 
 import type { Animal, ClientGameState, Team } from 'shared';
+import { THRESHOLDS } from 'shared';
 import { previewSkill } from '@/lib/skills';
 import { SKILL_TITLE, SKILL_COLOR, describeSkill } from '@/lib/skillInfo';
 import { TurnTimer } from './TurnTimer';
@@ -52,6 +53,11 @@ export function SkillChoiceModal({
                 style={{ backgroundImage: `url(/skills/${animal}_skill.png)` }}
               >
                 <div className="skill-choice-dim absolute inset-0" />
+                {eligible && (
+                  <span className="skill-outline-text absolute top-2 right-3 z-10 text-[0.65rem] font-bold text-red-300">
+                    에너지 -{preview.level * THRESHOLDS[animal]}
+                  </span>
+                )}
                 <div className="relative z-10 flex flex-col gap-2 p-4">
                   <h3
                     className="skill-outline-text text-xl font-extrabold"
