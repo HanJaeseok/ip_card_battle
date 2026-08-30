@@ -385,6 +385,32 @@ export function useAnimationQueue(
     const gameState = gameStateRef.current;
     const beforeScores = prevScoresRef.current;
 
+    // ── 이전 액션에서 아직 "등장" 애니메이션이 끝나지 않은 채로 남아있던 카드를
+    // 여기서 즉시 노출시킨다. 위에서 방금 이전 타이머를 전부 취소했기 때문에,
+    // 만약 이전 액션의 뽑기 애니메이션(특히 긴 실용신양 연쇄)이 채 끝나기도 전에
+    // 이번 액션(다음 팀의 차례, 특히 빠르게 두는 컴퓨터 상대)이 도착하면 그 카드들의
+    // "등장" 예약이 취소되어 영원히 투명한 채로 남는 버그가 있었다 — 이번 액션 자신이
+    // 새로 뽑은 카드만 제외하고, 나머지는 지금 화면에 즉시 반영한다.
+    if (gameState) {
+      const thisActionCardIds = new Set(
+        lastEvents.filter((e): e is Extract<ClientGameEvent, { type: 'draw' }> => e.type === 'draw')
+          .map(e => e.card.id),
+      );
+      setRevealedCardIds(prev => {
+        let changed = false;
+        const next = new Set(prev);
+        ANIMALS.forEach(a => {
+          gameState.stacks[a].forEach(c => {
+            if (c.collectedBy === null && !next.has(c.id) && !thisActionCardIds.has(c.id)) {
+              next.add(c.id);
+              changed = true;
+            }
+          });
+        });
+        return changed ? next : prev;
+      });
+    }
+
     // ── Pass 0: 해설판 커멘터리 생성 (즉시 반영, 통합 로그) ─────────────────
     if (gameState) {
       type Slot = { id: string; key: DeltaKey; delta: number };

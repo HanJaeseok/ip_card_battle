@@ -9,8 +9,8 @@ import { serializeEvents, serializeState } from './serializer';
 // 싱글 모드 컴퓨터 플레이어는 실제 WebSocket 연결이 없으므로 고정 ID로 취급한다.
 const CPU_PLAYER_ID = 'CPU';
 const CPU_NICKNAME = '컴퓨터';
-const CPU_THINK_MIN_MS = 700;
-const CPU_THINK_MAX_MS = 1600;
+const CPU_THINK_MIN_MS = 1500;
+const CPU_THINK_MAX_MS = 2500;
 
 interface PlayerConnection {
   ws: WebSocket;

@@ -1,4 +1,4 @@
-import { BOMB_BASE_CHANCE, BOMB_CHANCE_STEP, EXPAND_TURN, PLACE_ANIMALS, ANIMALS } from 'shared';
+import { bombChanceForTurn, PLACE_ANIMALS, ANIMALS } from 'shared';
 import type { GameEvent, GameState, Place } from 'shared';
 import { applySheepEffect } from './effects/sheep';
 import { applyTigerEffect } from './effects/tiger';
@@ -34,15 +34,9 @@ export function drawCardInternal(state: GameState, place: Place, rng: RNG): Game
   return _drawOne(state, place, rng);
 }
 
-/** EXPAND_TURN+1턴(11턴)에 BOMB_BASE_CHANCE, 이후 턴마다 BOMB_CHANCE_STEP씩 증가(100% 상한). */
-function bombChance(turn: number): number {
-  const turnsSinceStart = Math.max(0, turn - (EXPAND_TURN + 1));
-  return Math.min(1, BOMB_BASE_CHANCE + BOMB_CHANCE_STEP * turnsSinceStart);
-}
-
 function _drawOne(state: GameState, place: Place, rng: RNG): GameEvent[] {
   // EXPAND_TURN 이후에만 도토리 폭탄이 등장한다.
-  if (state.expanded && rng() < bombChance(state.turn)) {
+  if (state.expanded && rng() < bombChanceForTurn(state.turn)) {
     const options = PLACE_ANIMALS[place];
     const animal = options[Math.floor(rng() * options.length)];
     const stack = state.stacks[animal];
