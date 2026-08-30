@@ -30,9 +30,9 @@ export function SkillChoiceModal({
             <TurnTimer deadline={gameState.turnDeadline} paused={false} />
           </div>
           <p className="text-red-400 text-xs font-bold leading-relaxed px-4">
-            &lt;주의&gt; 레벨 초기화
+            &lt;주의&gt; 사용한 레벨만큼 에너지 소모
             <br />
-            IP 선택시 에너지를 모두 소모합니다!
+            초과분은 다음 레벨을 위해 그대로 남습니다.
           </p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 divide-x-0 sm:divide-x-2 divide-y-2 sm:divide-y-0 divide-jungle-700">

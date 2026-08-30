@@ -14,7 +14,7 @@ import { processPlayerAction, processSkillChoice, processPass } from '../engine/
 import { eligibleAnimals, levelOf, totalScore } from '../engine/skills';
 import { PLACES } from 'shared';
 import type { Animal, GameState, Team } from 'shared';
-import { ANIMALS, SKILL_PCT_PER_LEVEL } from 'shared';
+import { ANIMALS, SKILL_COEFFICIENTS } from 'shared';
 
 function makeLCG(seed: number): () => number {
   let s = seed >>> 0;
@@ -34,9 +34,10 @@ function skillValue(state: GameState, team: Team, animal: Animal): number {
   const opponent: Team = team === 'A' ? 'B' : 'A';
   const level = levelOf(state, team, animal);
   if (animal === 'sheep') return level * AVG_CARD_VALUE;
-  if (animal === 'rabbit') return Math.round(totalScore(state, team) * SKILL_PCT_PER_LEVEL * level);
-  if (animal === 'mermaid') return Math.round(Math.abs(totalScore(state, team) - totalScore(state, opponent)) * SKILL_PCT_PER_LEVEL * level);
-  return Math.round(totalScore(state, opponent) * SKILL_PCT_PER_LEVEL * level); // tiger
+  const coef = SKILL_COEFFICIENTS[animal];
+  if (animal === 'rabbit') return Math.round(totalScore(state, team) * coef * level);
+  if (animal === 'mermaid') return Math.round(Math.abs(totalScore(state, team) - totalScore(state, opponent)) * coef * level);
+  return Math.round(totalScore(state, opponent) * coef * level); // tiger
 }
 
 /** 지금 이 팀이 고를 수 있는 스킬들의 "즉시 가치"를 계산해 가장 높은 것을 고르는 탐욕적 선택. */
@@ -171,7 +172,7 @@ function runBatch(label: string, pick: PickFn, gameCount: number) {
     totalBScore += bScore;
   }
 
-  console.log(`\n=== ${label} (${gameCount}게임, 계수 = 레벨×${SKILL_PCT_PER_LEVEL * 100}%) ===\n`);
+  console.log(`\n=== ${label} (${gameCount}게임, 계수: 양/토끼/호랑이 ${SKILL_COEFFICIENTS.rabbit * 100}%, 인어 ${SKILL_COEFFICIENTS.mermaid * 100}%) ===\n`);
   console.log(`A팀 승 ${aWins} (${(100 * aWins / gameCount).toFixed(1)}%) / B팀 승 ${bWins} (${(100 * bWins / gameCount).toFixed(1)}%) / 무승부 ${draws}`);
   console.log(`평균 최종 점수(팀 합계) — A: ${(totalAScore / gameCount).toFixed(1)}, B: ${(totalBScore / gameCount).toFixed(1)}\n`);
 

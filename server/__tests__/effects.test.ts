@@ -4,7 +4,7 @@ import { advanceTurn } from '../engine/turnManager';
 import { processPlayerAction, processSkillChoice } from '../engine/gameEngine';
 import { applySkillChoice, levelOf } from '../engine/skills';
 import type { Animal, CardNum, StackedCard } from 'shared';
-import { MAX_TURN, SHEEP_SAFETY_CAP, SKILL_PCT_PER_LEVEL } from 'shared';
+import { MAX_TURN, SHEEP_SAFETY_CAP, SKILL_COEFFICIENTS, THRESHOLDS } from 'shared';
 
 // 결정론적 RNG (항상 0 반환 — Math.floor(rng()*n)은 항상 0번째 원소를 고른다)
 const rng0 = () => 0;
@@ -73,38 +73,50 @@ describe('스킬 선택 — 실용신양', () => {
 });
 
 describe('스킬 선택 — 상표토끼', () => {
-  it('내 총점의 5%×레벨만큼 상표토끼 점수에 더해지고, 사용 통계가 기록된다', () => {
+  it('내 총점의 계수×레벨만큼 상표토끼 점수에 더해지고, 사용 통계가 기록된다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].scores.rabbit = 20; // level=2
+    state.teams['A'].scores.rabbit = 20; // level=2, 정확히 배수라 초과분 없음
     state.teams['A'].scores.sheep = 30; // 총점 50
 
     const ev = applySkillChoice(state, 'A', 'rabbit');
-    const expected = Math.round(50 * SKILL_PCT_PER_LEVEL * 2); // 5
+    const expected = Math.round(50 * SKILL_COEFFICIENTS.rabbit * 2); // 5
     expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
-    // 레벨 초기화 후 효과로 얻은 값만 다시 쌓인다(기존 20점은 사라짐)
+    // 사용한 레벨(2×10=20점)만 차감되고, 효과로 얻은 값이 그 위에 더해진다
     expect(state.teams['A'].scores.rabbit).toBe(expected);
     expect(state.teams['A'].skillStats.rabbit).toEqual({ count: 1, totalLevel: 2 });
+  });
+
+  it('임계값을 초과해 쌓아둔 점수는 사용 후에도 사라지지 않고 남는다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.rabbit = 25; // level=2(20점 사용), 초과분 5점
+    state.teams['A'].scores.sheep = 30; // 총점 55
+
+    const ev = applySkillChoice(state, 'A', 'rabbit');
+    const expected = Math.round(55 * SKILL_COEFFICIENTS.rabbit * 2);
+    expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
+    // 25 - (2×10) + 효과값 = 5(초과분) + 효과값 — 초과분이 사라지지 않아야 한다
+    expect(state.teams['A'].scores.rabbit).toBe(5 + expected);
   });
 });
 
 describe('스킬 선택 — 디자인어', () => {
-  it('상대와의 총점 차이의 5%×레벨만큼 획득 (뒤처져 있어도 앞서 있어도 동일 공식)', () => {
+  it('상대와의 총점 차이의 계수×레벨만큼 획득 (뒤처져 있어도 앞서 있어도 동일 공식)', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].scores.mermaid = 20; // level=1, A 총점=20
+    state.teams['A'].scores.mermaid = 20; // level=1, A 총점=20, 정확히 배수라 초과분 없음
     state.teams['B'].scores.sheep = 100; // B 총점=100, 총점 차이 80
 
     const ev = applySkillChoice(state, 'A', 'mermaid');
-    const expected = Math.round(80 * SKILL_PCT_PER_LEVEL * 1); // 4
+    const expected = Math.round(80 * SKILL_COEFFICIENTS.mermaid * 1); // 8 (계수 10%)
     expect(ev.type === 'skillApplied' && ev.myScoreDelta).toBe(expected);
-    // 레벨 초기화 후 효과로 얻은 값만 다시 쌓인다
+    // 사용한 레벨(1×20=20점)만 차감되고, 효과로 얻은 값이 그 위에 더해진다
     expect(state.teams['A'].scores.mermaid).toBe(expected);
     // 상대 점수는 건드리지 않는다(흡수가 아니라 그냥 획득)
     expect(state.teams['B'].scores.sheep).toBe(100);
   });
 });
 
-describe('스킬 선택 — 레벨 초기화', () => {
-  it('레벨이 0인 동물을 고르면 아무 효과도 없고 초기화도 일어나지 않는다', () => {
+describe('스킬 선택 — 레벨 부족', () => {
+  it('레벨이 0인 동물을 고르면 아무 효과도 없고 점수도 그대로다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     const ev = applySkillChoice(state, 'A', 'sheep');
     expect(ev.type === 'skillApplied' && ev.level).toBe(0);
@@ -114,20 +126,22 @@ describe('스킬 선택 — 레벨 초기화', () => {
 });
 
 describe('스킬 선택 — 특허랑이', () => {
-  it('상대 총점의 5%×레벨만큼 상대 점수를 깎는다 (음수 방지)', () => {
+  it('상대 총점의 계수×레벨만큼 상대 점수를 깎는다 (음수 방지)', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].scores.tiger = 40; // level=2
+    state.teams['A'].scores.tiger = 40; // level=2, 정확히 배수라 초과분 없음
     state.teams['B'].scores.sheep = 10;
     state.teams['B'].scores.rabbit = 10; // 총점 20
 
     const ev = applySkillChoice(state, 'A', 'tiger');
-    const expectedLoss = Math.round(20 * SKILL_PCT_PER_LEVEL * 2); // 2
+    const expectedLoss = Math.round(20 * SKILL_COEFFICIENTS.tiger * 2); // 2
     expect(ev.type === 'skillApplied' && ev.oppScoreDelta).toBe(expectedLoss);
 
     const remaining = state.teams['B'].scores.sheep + state.teams['B'].scores.rabbit;
     expect(remaining).toBe(20 - expectedLoss);
     expect(state.teams['B'].scores.sheep).toBeGreaterThanOrEqual(0);
     expect(state.teams['B'].scores.rabbit).toBeGreaterThanOrEqual(0);
+    // 특허랑이 자신의 점수는 사용한 레벨(2×20=40점)만큼 차감된다(정확히 배수이므로 0)
+    expect(state.teams['A'].scores.tiger).toBe(40 - 2 * THRESHOLDS.tiger);
   });
 
   it('레벨이 0이면(아직 임계값 미달) 아무 효과도 없다', () => {

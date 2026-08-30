@@ -1,8 +1,18 @@
+import type { Animal } from './types';
+
 // 동물별 레벨 임계값 — level = floor(score / threshold)
 export const THRESHOLDS = { sheep: 10, rabbit: 10, mermaid: 20, tiger: 20 } as const;
 
-// 턴이 끝날 때 고르는 4가지 스킬의 공통 계수 — 레벨 1당 5%
-export const SKILL_PCT_PER_LEVEL = 0.05;
+// 턴이 끝날 때 고르는 4가지 스킬의 동물별 계수 — 레벨 1당 이 비율만큼 효과가 커진다.
+// 디자인어만 다른 셋(5%)보다 높은 10%인 이유: 디자인어는 "점수 차이"라는, 상표토끼의
+// "내 총점"보다 구조적으로 훨씬 작은 값을 기준으로 삼기 때문에(시뮬레이션 실측 약
+// 1.8~2.6배 차이) 같은 계수를 쓰면 항상 체감 효과가 작다 — 이를 보정한 값.
+export const SKILL_COEFFICIENTS: Record<Animal, number> = {
+  sheep: 0.05,
+  rabbit: 0.05,
+  mermaid: 0.10,
+  tiger: 0.05,
+};
 
 export const EXPAND_TURN = 14; // 이 턴이 끝나면 더 신나지는 시점 — 이때부터 폭탄이 등장한다
 export const MAX_TURN = 30;

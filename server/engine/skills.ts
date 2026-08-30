@@ -1,4 +1,4 @@
-import { ANIMALS, THRESHOLDS, SKILL_PCT_PER_LEVEL } from 'shared';
+import { ANIMALS, THRESHOLDS, SKILL_COEFFICIENTS } from 'shared';
 import type { Animal, GameEvent, GameState, Team } from 'shared';
 
 /** 레벨 = floor(누적 점수 / 임계값). 임계값은 동물마다 다르다(양·토끼 10, 인어·호랑이 20). */
@@ -35,12 +35,15 @@ function distributeDeduct(state: GameState, team: Team, amount: number): void {
 }
 
 /**
- * 턴을 마친 팀이 4가지 스킬 중 하나를 고르면 호출된다. 각 동물의 "레벨"(초기화 직전 값)을
- * 배율로 사용하며, 스킬을 고른 동물의 점수(경험치)는 발동 직후 항상 0으로 초기화된다.
- * - 🐑 실용신양: 다음 내 턴에 (레벨)회 추가로 뽑는다.
- * - 🐰 상표토끼: 내 총점의 `5% × 레벨` 만큼 상표토끼 점수에 더한다(초기화 후 다시 채워짐).
- * - 🧜‍♀️ 디자인어: 상대와의 총점 차이의 `5% × 레벨` 만큼 디자인어 점수에 더한다.
- * - 🐯 특허랑이: 상대 총점의 `5% × 레벨` 만큼 상대 점수를 깎는다.
+ * 턴을 마친 팀이 4가지 스킬 중 하나를 고르면 호출된다. 각 동물의 "레벨"(차감 직전 값)을
+ * 배율로 사용하며, 스킬을 고른 동물의 점수(경험치)는 사용한 레벨만큼(레벨×임계값)만
+ * 차감된다 — 임계값을 초과해 쌓아둔 점수는 다음 레벨을 위해 그대로 남는다. 이렇게 해야
+ * "레벨이 되자마자 바로 쓰면 초과분을 전부 잃는" 트랩 없이, 아무 때나 스킬을 써도 손해를
+ * 보지 않으면서 "더 모아서 크게 쓸지"는 여전히 선택할 수 있다.
+ * - 🐑 실용신양: 다음 내 턴에 (레벨)회 추가로 뽑아 자원을 확보한다.
+ * - 🐰 상표토끼(스노우볼): 내가 잘 나갈수록 강해진다 — 내 총점의 `계수 × 레벨` 만큼 획득.
+ * - 🧜‍♀️ 디자인어: 상대와의 총점 차이의 `계수 × 레벨` 만큼 획득.
+ * - 🐯 특허랑이(역전기): 상대가 앞서갈수록 강해진다 — 상대 총점의 `계수 × 레벨` 만큼 상대 점수를 깎는다.
  *
  * 레벨이 0인 동물을 골랐다면(정상적인 클라이언트라면 UI에서 막힘) 아무 일도 일어나지 않는다.
  */
@@ -53,23 +56,25 @@ export function applySkillChoice(state: GameState, team: Team, animal: Animal): 
   let extraDrawsQueued = 0;
 
   if (level > 0) {
+    const coef = SKILL_COEFFICIENTS[animal];
+
     if (animal === 'sheep') {
       extraDrawsQueued = level;
       state.teams[team].pendingExtraDraws = level;
     } else if (animal === 'rabbit') {
-      myScoreDelta = Math.round(totalScore(state, team) * SKILL_PCT_PER_LEVEL * level);
+      myScoreDelta = Math.round(totalScore(state, team) * coef * level);
     } else if (animal === 'mermaid') {
       const diff = Math.abs(totalScore(state, team) - totalScore(state, opponent));
-      myScoreDelta = Math.round(diff * SKILL_PCT_PER_LEVEL * level);
+      myScoreDelta = Math.round(diff * coef * level);
     } else if (animal === 'tiger') {
-      const loss = Math.round(totalScore(state, opponent) * SKILL_PCT_PER_LEVEL * level);
+      const loss = Math.round(totalScore(state, opponent) * coef * level);
       distributeDeduct(state, opponent, loss);
       oppScoreDelta = loss;
     }
 
-    // 레벨 초기화 — 스킬을 고른 동물의 에너지를 전부 소모한다. 효과로 얻은 점수(있다면)는
-    // 방금 초기화된 그 버킷에 다시 쌓인다.
-    state.teams[team].scores[animal] = myScoreDelta;
+    // 사용한 레벨만큼만 차감 — 임계값을 초과해 쌓아둔 점수는 그대로 남기고, 효과로
+    // 얻은 점수(있다면)를 그 위에 더한다.
+    state.teams[team].scores[animal] = state.teams[team].scores[animal] - level * THRESHOLDS[animal] + myScoreDelta;
 
     const stat = state.teams[team].skillStats[animal];
     stat.count += 1;
