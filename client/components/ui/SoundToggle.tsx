@@ -23,7 +23,7 @@ function ToggleButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-2 py-1 rounded-md text-xs font-semibold transition-colors shrink-0 ${
+      className={`w-14 shrink-0 py-1 rounded-md text-xs font-semibold text-center transition-colors ${
         active
           ? 'bg-jungle-700 text-white'
           : 'bg-gray-200 text-gray-400 line-through'
