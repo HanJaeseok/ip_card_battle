@@ -26,7 +26,7 @@ export function CommentaryBoard({
   return (
     <div className="h-[21rem] shrink-0 bg-white rounded-2xl border border-jungle-200 px-4 py-3 flex flex-col">
       <div className="flex items-center gap-3 shrink-0 mb-1">
-        <p className="text-sm text-jungle-400 font-semibold shrink-0">해설</p>
+        <p className="text-sm text-jungle-400 font-semibold shrink-0">남은 카드</p>
         <IpStatusBar gameState={gameState} />
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">

@@ -50,6 +50,7 @@ export interface CaptionItem {
   id: number;
   text: string;
   tier: 'flip' | 'pair' | 'effect'; // 무엇을 뒤집었는지 / 페어 성사 / 효과 발동
+  cardKey?: string; // flip/pair는 해당 카드 위에 앵커링, effect는 보드 중앙 고정(생략)
 }
 
 export interface PlayerEmoticon {
@@ -60,6 +61,11 @@ export interface PlayerEmoticon {
   stackIndex: number;   // 같은 앵커에 몇 번째로 겹쳐 쌓였는지 (크기/z-index 산출용)
 }
 
+export interface CardFocusItem {
+  id: number;
+  cardKey: string;
+}
+
 type EmoticonMood = 'happy' | 'burn' | 'cry' | 'stone' | 'focus';
 
 function emoticonFile(animal: Animal, mood: EmoticonMood): string {
@@ -68,6 +74,17 @@ function emoticonFile(animal: Animal, mood: EmoticonMood): string {
 
 function sumScores(scores: Record<Animal, number>): number {
   return scores.sheep + scores.rabbit + scores.mermaid + scores.tiger;
+}
+
+// 50/50 판정은 Math.random()을 쓰면 두 클라이언트가 서로 다른 결과를 그려 화면이
+// 어긋난다. 양쪽이 동일하게 받는 이벤트 수치로 시드를 만들어 결정론적으로 고른다.
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+function seededPick<T>(seed: string, a: T, b: T): T {
+  return (hashString(seed) & 1) === 0 ? a : b;
 }
 
 interface EmoticonPlanItem {
@@ -81,11 +98,10 @@ interface EmoticonPlanItem {
  * "턴인 사람"과 "상대(피해자)" 이모티콘을 어떤 걸 띄울지 판정한다.
  *
  * 우선순위 규칙:
- * - 각 동물별로 "실제 효과 발동" > "카드만 뒤집혔지만 페어 실패" 순으로 더 구체적인
- *   상황을 우선한다(둘 다 해당될 순 없으므로 else-if로 충분).
  * - 실용신양은 "레벨 상승(강화)"을 그 외의 "여러 장 뒤집었지만 무소득"보다 우선한다.
  * - 네 동물은 서로 배타적이지 않으므로(같은 액션에서 여러 동물이 동시에 관여 가능)
  *   해당하는 것을 전부 큐에 쌓는다 — 여러 개면 화면에서 겹쳐 쌓이며 표시된다.
+ * - 단순히 카드 한 장만 열고 페어가 안 된 경우는 너무 사소해 이모티콘을 띄우지 않는다.
  */
 function buildEmoticonPlan(
   events: ClientGameEvent[],
@@ -95,7 +111,6 @@ function buildEmoticonPlan(
 ): EmoticonPlanItem[] {
   const opp: Team = actingTeam === 'A' ? 'B' : 'A';
   const plan: EmoticonPlanItem[] = [];
-  const coinFlip = () => Math.random() < 0.5;
 
   const openedCount: Record<Animal, number> = { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 };
   const collectedAnimals = new Set<Animal>();
@@ -104,10 +119,18 @@ function buildEmoticonPlan(
     else if (ev.type === 'collect') collectedAnimals.add(ev.animal);
   });
 
-  const rabbitBonus = events.find(e => e.type === 'rabbitBonus');
-  const tigerAttack = events.find(e => e.type === 'tigerAttack');
-  const mermaidBonus = events.find(e => e.type === 'mermaidBonus');
-  const mermaidCatchup = events.find(e => e.type === 'mermaidCatchup');
+  const rabbitBonus = events.find(
+    (e): e is Extract<ClientGameEvent, { type: 'rabbitBonus' }> => e.type === 'rabbitBonus',
+  );
+  const tigerAttack = events.find(
+    (e): e is Extract<ClientGameEvent, { type: 'tigerAttack' }> => e.type === 'tigerAttack',
+  );
+  const mermaidBonus = events.find(
+    (e): e is Extract<ClientGameEvent, { type: 'mermaidBonus' }> => e.type === 'mermaidBonus',
+  );
+  const mermaidCatchup = events.find(
+    (e): e is Extract<ClientGameEvent, { type: 'mermaidCatchup' }> => e.type === 'mermaidCatchup',
+  );
   const sheepChains = events.filter(e => e.type === 'sheepChain');
 
   const totalAfterAct = sumScores(after[actingTeam]);
@@ -117,8 +140,6 @@ function buildEmoticonPlan(
   // ── 턴인 사람 ──────────────────────────────────────────────────────────
   if (rabbitBonus) {
     plan.push({ team: actingTeam, animal: 'rabbit', mood: isAhead ? 'happy' : 'burn' });
-  } else if (openedCount.rabbit === 1 && !collectedAnimals.has('rabbit')) {
-    plan.push({ team: actingTeam, animal: 'rabbit', mood: coinFlip() ? 'cry' : 'stone' });
   }
 
   const sheepLevelBefore = Math.floor(before[actingTeam].sheep / THRESHOLDS.sheep);
@@ -127,22 +148,22 @@ function buildEmoticonPlan(
     plan.push({ team: actingTeam, animal: 'sheep', mood: 'focus' });
   } else if (openedCount.sheep >= 2 && !collectedAnimals.has('sheep')) {
     plan.push({ team: actingTeam, animal: 'sheep', mood: 'happy' });
-  } else if (openedCount.sheep === 1 && !collectedAnimals.has('sheep')) {
-    plan.push({ team: actingTeam, animal: 'sheep', mood: coinFlip() ? 'cry' : 'stone' });
   }
 
   if (mermaidBonus) {
     plan.push({ team: actingTeam, animal: 'mermaid', mood: 'happy' });
   } else if (mermaidCatchup) {
-    plan.push({ team: actingTeam, animal: 'mermaid', mood: isAhead ? 'happy' : (coinFlip() ? 'burn' : 'focus') });
-  } else if (openedCount.mermaid === 1 && !collectedAnimals.has('mermaid')) {
-    plan.push({ team: actingTeam, animal: 'mermaid', mood: coinFlip() ? 'cry' : 'stone' });
+    const mood = isAhead
+      ? 'happy'
+      : seededPick(`mermaid:${actingTeam}:${mermaidCatchup.absorb}:${totalAfterAct}`, 'burn', 'focus');
+    plan.push({ team: actingTeam, animal: 'mermaid', mood });
   }
 
   if (tigerAttack) {
-    plan.push({ team: actingTeam, animal: 'tiger', mood: isAhead ? 'happy' : (coinFlip() ? 'burn' : 'focus') });
-  } else if (openedCount.tiger === 1 && !collectedAnimals.has('tiger')) {
-    plan.push({ team: actingTeam, animal: 'tiger', mood: coinFlip() ? 'cry' : 'stone' });
+    const mood = isAhead
+      ? 'happy'
+      : seededPick(`tiger:${actingTeam}:${tigerAttack.dmg}:${totalAfterAct}`, 'burn', 'focus');
+    plan.push({ team: actingTeam, animal: 'tiger', mood });
   }
 
   // ── 상대(피해자) ──────────────────────────────────────────────────────
@@ -191,6 +212,7 @@ export interface AnimationState {
   commentary: CommentaryLine[];
   captions: CaptionItem[];
   emoticons: PlayerEmoticon[];
+  cardFocusBursts: CardFocusItem[];
 }
 
 const EMPTY_SET = new Set<string>() as ReadonlySet<string>;
@@ -258,8 +280,15 @@ export function useAnimationQueue(
   const [commentary, setCommentary] = useState<CommentaryLine[]>([]);
   const [captions, setCaptions] = useState<CaptionItem[]>([]);
   const [emoticons, setEmoticons] = useState<PlayerEmoticon[]>([]);
+  const [cardFocusBursts, setCardFocusBursts] = useState<CardFocusItem[]>([]);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // 다음 액션이 들어올 때 timersRef를 통째로 비우기 때문에, 그보다 오래 지속되는
+  // 이모티콘 등의 "제거" 타이머는 여기 따로 담아 언마운트 시에만 정리한다.
+  // (안 그러면 제거 타이머가 취소되어 이모티콘이 화면에 영구히 쌓이는 버그가 생긴다)
+  const persistentTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => persistentTimersRef.current.forEach(clearTimeout), []);
+
   // 직전 액션 종료 시점의 팀별 점수 스냅샷 — 이번 액션의 전/후 비교(이모티콘 판정용)에 쓴다.
   const prevScoresRef = useRef<Record<Team, Record<Animal, number>> | null>(null);
 
@@ -283,20 +312,36 @@ export function useAnimationQueue(
   };
 
   const CAPTION_DUR: Record<CaptionItem['tier'], number> = { flip: 550, pair: 800, effect: 950 };
-  const addCaption = (text: string, tier: CaptionItem['tier'], atMs: number) => {
+  const addCaption = (text: string, tier: CaptionItem['tier'], atMs: number, cardKey?: string) => {
     const id = ++floatIdCounter;
     sched(() => {
-      setCaptions(prev => [...prev, { id, text, tier }]);
+      setCaptions(prev => [...prev, { id, text, tier, cardKey }]);
       sched(() => setCaptions(prev => prev.filter(c => c.id !== id)), CAPTION_DUR[tier]);
     }, atMs);
   };
 
-  const EMOTICON_DUR = 2200;
+  const EMOTICON_DUR = 2000; // 2초 후 페이드아웃하며 사라짐 (CSS 애니메이션 길이와 일치시켜야 함)
   const addEmoticon = (team: Team, playerIndex: number, file: string, stackIndex: number, atMs: number) => {
     const id = ++floatIdCounter;
     sched(() => {
       setEmoticons(prev => [...prev, { id, team, playerIndex, file, stackIndex }]);
-      sched(() => setEmoticons(prev => prev.filter(e => e.id !== id)), EMOTICON_DUR);
+      // 제거 타이머는 새 액션이 와도 취소되면 안 되므로 persistentTimersRef에 담는다.
+      const removeTimer = setTimeout(() => {
+        setEmoticons(prev => prev.filter(e => e.id !== id));
+      }, EMOTICON_DUR);
+      persistentTimersRef.current.push(removeTimer);
+    }, atMs);
+  };
+
+  const CARD_FOCUS_DUR = 480;
+  const addCardFocus = (cardKey: string, atMs: number) => {
+    const id = ++floatIdCounter;
+    sched(() => {
+      setCardFocusBursts(prev => [...prev, { id, cardKey }]);
+      const removeTimer = setTimeout(() => {
+        setCardFocusBursts(prev => prev.filter(f => f.id !== id));
+      }, CARD_FOCUS_DUR);
+      persistentTimersRef.current.push(removeTimer);
     }, atMs);
   };
 
@@ -479,6 +524,9 @@ export function useAnimationQueue(
         const cardVolume = inChain ? Math.min(1, CARD_FLIP_BASE_VOLUME + (chainIdx - 1) * CARD_FLIP_VOLUME_STEP) : 1;
         sched(() => playRandomSound('card', 1, cardVolume), revealAt);
 
+        // 지금 뒤집히는 카드로 시선을 모으는 포커스 연출
+        addCardFocus(key, revealAt);
+
         // 카드 뒤집기
         sched(() => {
           setSuppressedKeys(prev => {
@@ -501,8 +549,8 @@ export function useAnimationQueue(
           });
         }, reactionAt + REACTION_DUR);
 
-        // 무엇을 뒤집었는지 큰 자막으로 강조
-        addCaption(`${ANIMAL_INFO[ev.card.animal].short}!`, 'flip', reactionAt);
+        // 무엇을 뒤집었는지 큰 자막으로 강조 — 그 카드 바로 위에 표시
+        addCaption(`${ANIMAL_INFO[ev.card.animal].short}!`, 'flip', reactionAt, key);
 
         // 이 카드에 딸린 효과를 순서대로("정산") 재생 — 하나씩 끝나야 다음 단계로 넘어간다
         let t = reactionAt;
@@ -514,7 +562,7 @@ export function useAnimationQueue(
             const glowColor = PAIR_COLORS[Math.floor(Math.random() * PAIR_COLORS.length)];
             const at = t;
 
-            addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at);
+            addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at, keys[0]);
 
             sched(() => {
               setCollectGlowKeys(prev => {
@@ -636,13 +684,15 @@ export function useAnimationQueue(
         addCaption('상표토끼 발동!', 'effect', cursor);
 
         sched(() => {
+          // 효과음은 발동 즉시 재생 — 날아가는 연출이 끝날 때까지 기다리면 싱크가 어긋난다.
+          const digits = String(Math.max(1, ev.bonus)).length;
+          playRandomSoundSequence('rabbit', digits);
+
           if (sourceKeys.length > 0) {
             const flightId = ++floatIdCounter;
             setRabbitFlights(prev => [...prev, { id: flightId, team, sourceKeys }]);
             sched(() => {
               setRabbitFlights(prev => prev.filter(f => f.id !== flightId));
-              const digits = String(Math.max(1, ev.bonus)).length;
-              playRandomSoundSequence('rabbit', digits);
             }, RABBIT_FLIGHT_DUR);
           }
           addFloat(`+${ev.bonus}`, team, 'bonus');
@@ -745,5 +795,6 @@ export function useAnimationQueue(
     commentary,
     captions,
     emoticons,
+    cardFocusBursts,
   };
 }

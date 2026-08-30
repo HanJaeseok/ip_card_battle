@@ -1,11 +1,20 @@
 'use client';
 
+import { isBgmMuted, subscribeAudioSettings } from './audioSettings';
+
 // 배경음악(BGM) 전용 재생기 — 페이지/컴포넌트가 리마운트되어도 끊기지 않도록
 // 모듈 스코프의 싱글턴 Audio 하나만 유지하며, 같은 곡이 이미 재생 중이면
 // 볼륨만 갱신하고 처음부터 다시 틀지 않는다.
 let audio: HTMLAudioElement | null = null;
 let currentSrc: string | null = null;
 let retryBound = false;
+
+// 설정에서 BGM을 껐다 켰다 하면 현재 재생 중인 트랙에도 즉시 반영한다.
+if (typeof window !== 'undefined') {
+  subscribeAudioSettings(() => {
+    if (audio) audio.muted = isBgmMuted();
+  });
+}
 
 function tryPlay() {
   if (!audio) return;
@@ -36,6 +45,7 @@ export function playBgm(src: string, volume = 1) {
   const next = new Audio(src);
   next.loop = true;
   next.volume = volume;
+  next.muted = isBgmMuted();
   audio = next;
   currentSrc = src;
   tryPlay();

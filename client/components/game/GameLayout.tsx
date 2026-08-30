@@ -68,6 +68,7 @@ export function GameLayout({
             expandBurst={animState.expandBurst}
             mermaidPopup={animState.mermaidPopup}
             captions={animState.captions}
+            cardFocusBursts={animState.cardFocusBursts}
           />
           <CommentaryBoard lines={animState.commentary} gameState={gameState} />
         </div>

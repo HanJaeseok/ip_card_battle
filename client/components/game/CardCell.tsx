@@ -135,6 +135,7 @@ export function CardCell({
     const textClass = canClick ? 'text-gray-900' : 'text-gray-400';
     return (
       <button
+        data-card-key={cardKey}
         onClick={() => canClick && onClick(cardKey)}
         disabled={!canClick}
         className={`

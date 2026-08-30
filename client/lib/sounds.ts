@@ -1,5 +1,7 @@
 'use client';
 
+import { isSfxMuted } from './audioSettings';
+
 type SoundAnimal = 'sheep' | 'mermaid' | 'tiger' | 'rabbit' | 'card';
 
 type Manifest = Record<SoundAnimal, string[]>;
@@ -31,6 +33,7 @@ if (typeof window !== 'undefined') {
 }
 
 function playSrc(src: string, rate = 1, volume = 1) {
+  if (isSfxMuted()) return;
   const base = audioCache.get(src);
   const audio = base ? (base.cloneNode(true) as HTMLAudioElement) : new Audio(src);
   audio.playbackRate = rate;
