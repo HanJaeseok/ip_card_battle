@@ -30,8 +30,21 @@ function AnimalTable({
   const preview = previewSkill(gameState, team, animal);
   const hasEffect = preview.myScoreDelta > 0 || preview.oppScoreDelta > 0 || preview.extraDraws > 0;
 
+  // 팀 패널이 overflow-y-auto라 absolute 툴팁은 스크롤 영역에 잘려 보이지 않는다.
+  // 마우스를 올린 카드의 위치를 직접 측정해 position:fixed로 화면 위에 그린다.
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTooltipPos({ x: r.left + r.width / 2, y: r.top });
+  };
+
   return (
-    <div className="relative group border border-gray-200 rounded-lg overflow-hidden bg-white">
+    <div
+      className="relative border border-gray-200 rounded-lg overflow-hidden bg-white"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setTooltipPos(null)}
+    >
       <div className="flex items-stretch">
         <div className="flex items-center justify-center px-3 py-2 flex-1 min-w-0">
           <span className="text-3xl leading-none">{ANIMAL_INFO[animal].emoji}</span>
@@ -56,18 +69,29 @@ function AnimalTable({
       </div>
 
       {/* 호버 툴팁 — 스킬 설명 + 지금 고르면 얻을 기댓값 */}
-      <div className="skill-tooltip absolute left-1/2 -translate-x-1/2 bottom-full mb-1 w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-30 pointer-events-none">
-        <div className="bg-jungle-950 text-white text-xs rounded-lg px-3 py-2 shadow-xl text-center">
-          <p className="font-bold mb-1">{SKILL_TITLE[animal]} (Lv. {level})</p>
-          <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level)}</p>
-          <p className={`mt-1 font-bold ${hasEffect ? 'text-amber-300' : 'text-gray-400'}`}>
-            {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
-            {preview.myScoreDelta > 0 && `내 점수 +${preview.myScoreDelta}점`}
-            {preview.oppScoreDelta > 0 && `상대 점수 -${preview.oppScoreDelta}점`}
-            {!hasEffect && '아직 레벨 0 (효과 없음)'}
-          </p>
+      {tooltipPos && (
+        <div
+          className="w-52 pointer-events-none"
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: 'translate(-50%, calc(-100% - 6px))',
+            zIndex: 100,
+          }}
+        >
+          <div className="bg-jungle-950 text-white text-xs rounded-lg px-3 py-2 shadow-xl text-center">
+            <p className="font-bold mb-1">{SKILL_TITLE[animal]} (Lv. {level})</p>
+            <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level)}</p>
+            <p className={`mt-1 font-bold ${hasEffect ? 'text-amber-300' : 'text-gray-400'}`}>
+              {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
+              {preview.myScoreDelta > 0 && `내 점수 +${preview.myScoreDelta}점`}
+              {preview.oppScoreDelta > 0 && `상대 점수 -${preview.oppScoreDelta}점`}
+              {!hasEffect && '아직 레벨 0 (효과 없음)'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

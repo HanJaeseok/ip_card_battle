@@ -31,7 +31,7 @@ export function PlaceTile({
       onClick={handleClick}
       disabled={disabled}
       className={`place-tile relative w-full h-full rounded-2xl overflow-hidden select-none ${
-        disabled ? 'place-tile-disabled' : 'place-tile-active cursor-pointer'
+        disabled ? 'place-tile-disabled pointer-events-none' : 'place-tile-active cursor-pointer'
       } ${pressed ? 'place-tile-pressed' : ''}`}
       style={{ backgroundImage: `url(/places/${place}.png)` }}
     >
