@@ -1,5 +1,9 @@
 import type { ClientBoardEntry } from 'shared';
+import { BOARD_INITIAL, BOARD_EXPANDED } from 'shared';
 import { CardCell } from './CardCell';
+
+// 서버(board.ts)의 확장 링 좌표 계산과 반드시 동일해야 한다.
+const EXPAND_OFFSET = Math.floor((BOARD_EXPANDED - BOARD_INITIAL) / 2);
 
 export function CardGrid({
   board,
@@ -24,8 +28,8 @@ export function CardGrid({
   breathe: boolean;
   collectGlowKeys: ReadonlyMap<string, string>;
 }) {
-  const minRC = expanded ? -2 : 0;
-  const maxRC = expanded ? 11 : 9;
+  const minRC = expanded ? -EXPAND_OFFSET : 0;
+  const maxRC = expanded ? BOARD_INITIAL + EXPAND_OFFSET - 1 : BOARD_INITIAL - 1;
   const size = maxRC - minRC + 1;
 
   const boardMap = new Map(board.map(e => [e.key, e]));
@@ -34,8 +38,8 @@ export function CardGrid({
     <div
       className={`relative grid gap-1 ${breathe ? 'board-breathe' : ''}`}
       style={{
-        gridTemplateColumns: `repeat(${size}, minmax(0, 44px))`,
-        gridTemplateRows: `repeat(${size}, minmax(0, 56px))`,
+        gridTemplateColumns: `repeat(${size}, minmax(0, 64px))`,
+        gridTemplateRows: `repeat(${size}, minmax(0, 80px))`,
       }}
     >
       {Array.from({ length: size }, (_, ri) =>
@@ -48,7 +52,7 @@ export function CardGrid({
           const reactionNum = reactionMap.get(key) ?? null;
           // jolt: only face-down (not suppressed == not yet flipped)
           const isJolting = joltAllFaceDown && entry?.card.open === false && !isSuppressed;
-          const isExpandedCell = r < 0 || r > 9 || c < 0 || c > 9;
+          const isExpandedCell = r < 0 || r >= BOARD_INITIAL || c < 0 || c >= BOARD_INITIAL;
           return (
             <CardCell
               key={key}

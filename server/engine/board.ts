@@ -32,7 +32,7 @@ function makeCards(animal: Animal, count: number, rng: RNG): Card[] {
   }));
 }
 
-/** 10×10 초기 보드 생성 */
+/** BOARD_INITIAL × BOARD_INITIAL 초기 보드 생성 */
 export function createBoard(rng: RNG = Math.random): Map<string, Card> {
   const cards: Card[] = [];
   for (const animal of ANIMALS) {
@@ -51,8 +51,8 @@ export function createBoard(rng: RNG = Math.random): Map<string, Card> {
 }
 
 /**
- * 20턴 확장 시 14×14 외곽 링에 카드 추가.
- * 기존 좌표(0~9)는 유지, 외곽만 확장(-2~11 범위).
+ * EXPAND_TURN 종료 시 BOARD_EXPANDED × BOARD_EXPANDED 외곽 링에 카드 추가.
+ * 기존 좌표(0~BOARD_INITIAL-1)는 유지, 외곽만 확장한다.
  */
 export function createExpansionRing(board: Map<string, Card>, rng: RNG = Math.random): void {
   const newSize = BOARD_EXPANDED;

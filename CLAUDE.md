@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-**한국특허정보원 카드배틀** — 10×10 보드에서 4종 아기 동물 카드(실용신양·상표토끼·디자인어·특허랑이)를 팀 대전으로 짝 맞추는 실시간 멀티플레이 웹 게임. 상세 규칙·밸런스 수치·마일스톤은 `ROADMAP.md` 참조.
+**한국특허정보원 카드배틀** — 6×6 보드(중반에 10×10으로 확장)에서 4종 아기 동물 카드(실용신양·상표토끼·디자인어·특허랑이)를 팀 대전으로 짝 맞추는 실시간 멀티플레이 웹 게임. 정확한 보드/턴 수치는 `shared/constants.ts` 참조, 상세 규칙·마일스톤은 `ROADMAP.md` 참조.
 
 ## 기술 스택
 
@@ -44,8 +44,8 @@ npm test -- <파일명>   # 단일 파일 테스트
 - 30초 턴 타이머는 서버가 `turnDeadline` timestamp로 관리; 클라이언트 타이머는 표시 전용.
 
 ### 보드 좌표계
-- `Map<"r,c", Card>` (음수 좌표 허용) — 20턴 확장 시 외곽 링만 추가하면 되므로 재배치 불필요.
-- 초기: 0~9, 확장 후: 외곽 링 추가 (예: -2~11).
+- `Map<"r,c", Card>` (음수 좌표 허용) — 확장 시(EXPAND_TURN) 외곽 링만 추가하면 되므로 재배치 불필요.
+- 초기: 0~(BOARD_INITIAL-1), 확장 후: 외곽 링 추가 (좌표 범위는 `shared/constants.ts` 값에 따라 자동 계산됨, `server/engine/board.ts` 참조).
 
 ### lastLevel 방식 임계값 판정
 ```js

@@ -54,7 +54,7 @@ export function CardCell({
   );
 
   if (!entry) {
-    return <div className="w-11 h-14" />;
+    return <div className="w-16 h-20" />;
   }
 
   const { card } = entry;
@@ -68,11 +68,11 @@ export function CardCell({
     return (
       <div
         data-card-key={cardKey}
-        className="card-shadow w-11 h-14 rounded-lg border border-black/20 flex flex-col items-center justify-center gap-0.5 cursor-not-allowed"
+        className="card-shadow w-16 h-20 rounded-lg border border-black/20 flex flex-col items-center justify-center gap-0.5 cursor-not-allowed"
         style={{ backgroundColor: teamBg }}
       >
-        <span className="text-base leading-none opacity-50">{ANIMAL_INFO[card.animal].emoji}</span>
-        <span className="text-xs font-bold text-white/40 tabular-nums">{card.num}</span>
+        <span className="text-xl leading-none opacity-50">{ANIMAL_INFO[card.animal].emoji}</span>
+        <span className="text-sm font-bold text-white/40 tabular-nums">{card.num}</span>
       </div>
     );
   }
@@ -96,7 +96,7 @@ export function CardCell({
       <div
         data-card-key={cardKey}
         className={`
-          card-shadow w-11 h-14 rounded-lg bg-white ${borderClass} ${highlightClass}
+          card-shadow w-16 h-20 rounded-lg bg-white ${borderClass} ${highlightClass}
           flex flex-col items-center justify-center gap-0.5
           relative overflow-visible select-none
           ${flipPhase === 'in' ? 'card-flip-in' : ''}
@@ -107,11 +107,11 @@ export function CardCell({
         style={glowColor !== null ? ({ '--pair-color': glowColor } as React.CSSProperties) : undefined}
       >
         <span
-          className={`text-xl leading-none ${isWink ? 'card-wink' : ''}`}
+          className={`text-3xl leading-none ${isWink ? 'card-wink' : ''}`}
         >
           {ANIMAL_INFO[card.animal].emoji}
         </span>
-        <span className="text-sm font-bold text-jungle-800 tabular-nums">
+        <span className="text-lg font-black text-jungle-900 tabular-nums">
           {card.num}
         </span>
 
@@ -127,32 +127,32 @@ export function CardCell({
   const isFaceDown = isSuppressed || !card.open || flipPhase === 'out';
   if (isFaceDown) {
     const canClick = isMyTurn && !isSuppressed && !card.open;
-    // 내 차례: 코팅된 것처럼 반짝이는 흰 카드로 클릭을 유도.
-    // 상대 차례: 아무 효과 없는 옅은 회색으로 비활성 느낌만 준다.
-    const bgClass = canClick
-      ? isExpandedCell ? 'bg-gray-50' : 'bg-white'
-      : isExpandedCell ? 'bg-gray-300' : 'bg-gray-200';
-    const textClass = canClick ? 'text-gray-900' : 'text-gray-400';
+    // 짙은 녹색 바탕에 연두색 나뭇잎 — 내 차례엔 밝게 빛나 클릭을 유도하고,
+    // 상대 차례엔 어둡게 가라앉혀 비활성 느낌을 준다.
     return (
       <button
         data-card-key={cardKey}
         onClick={() => canClick && onClick(cardKey)}
         disabled={!canClick}
         className={`
-          card-shadow w-11 h-14 rounded-lg border border-gray-300 transition-all select-none
-          ${bgClass} ${textClass}
+          card-shadow card-back w-16 h-20 rounded-lg transition-all select-none
+          flex items-center justify-center
+          ${canClick ? 'card-back-active' : 'card-back-dim'}
+          ${isExpandedCell ? 'card-back-expanded' : ''}
           ${flipPhase === 'out' ? 'card-flip-out' : ''}
           ${isJolting && !isSuppressed ? 'card-jolt' : ''}
           ${canClick ? 'card-shiny hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-not-allowed'}
         `}
       >
-        <span className="text-xs font-bold">?</span>
+        <span className="text-2xl leading-none" style={{ filter: canClick ? undefined : 'grayscale(60%)' }}>
+          🍃
+        </span>
       </button>
     );
   }
 
   // 기본 fallback (shouldn't reach here)
-  return <div className="w-11 h-14" />;
+  return <div className="w-16 h-20" />;
 }
 
 function DustParticles() {

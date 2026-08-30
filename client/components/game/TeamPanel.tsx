@@ -65,6 +65,7 @@ export function TeamPanel({
         tigerHitDmg={tigerHitDmg}
         mermaidEffectType={mermaidEffectType}
         scoreFlash={animState.scoreFlash}
+        sheepReserveCount={animState.sheepReserve[team]}
       />
     </div>
   );

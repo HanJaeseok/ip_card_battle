@@ -67,7 +67,7 @@ export interface CardFocusItem {
   cardKey: string;
 }
 
-type EmoticonMood = 'happy' | 'burn' | 'cry' | 'stone' | 'focus';
+type EmoticonMood = 'happy' | 'burn' | 'cry' | 'stone';
 
 function emoticonFile(animal: Animal, mood: EmoticonMood): string {
   return `${animal}_${mood}`;
@@ -77,15 +77,17 @@ function sumScores(scores: Record<Animal, number>): number {
   return scores.sheep + scores.rabbit + scores.mermaid + scores.tiger;
 }
 
-// 50/50 판정은 Math.random()을 쓰면 두 클라이언트가 서로 다른 결과를 그려 화면이
-// 어긋난다. 양쪽이 동일하게 받는 이벤트 수치로 시드를 만들어 결정론적으로 고른다.
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return h;
-}
-function seededPick<T>(seed: string, a: T, b: T): T {
-  return (hashString(seed) & 1) === 0 ? a : b;
+/** 특허랑이/디자인어에게 상대의 실용신양·상표토끼 중 어느 쪽이 더 많이 깎였는지 판정한다.
+ *  둘 다 안 깎였으면 null, 동률이면 원래 점수가 더 낮아 비중이 더 컸던 쪽을 고른다. */
+function biggerDropAnimal(
+  before: Record<Animal, number>,
+  after: Record<Animal, number>,
+): 'sheep' | 'rabbit' | null {
+  const sheepDrop = before.sheep - after.sheep;
+  const rabbitDrop = before.rabbit - after.rabbit;
+  if (sheepDrop <= 0 && rabbitDrop <= 0) return null;
+  if (sheepDrop === rabbitDrop) return before.rabbit <= before.sheep ? 'rabbit' : 'sheep';
+  return rabbitDrop > sheepDrop ? 'rabbit' : 'sheep';
 }
 
 interface EmoticonPlanItem {
@@ -132,8 +134,6 @@ function buildEmoticonPlan(
   const mermaidCatchup = events.find(
     (e): e is Extract<ClientGameEvent, { type: 'mermaidCatchup' }> => e.type === 'mermaidCatchup',
   );
-  const sheepChains = events.filter(e => e.type === 'sheepChain');
-
   const totalAfterAct = sumScores(after[actingTeam]);
   const totalAfterOpp = sumScores(after[opp]);
   const isAhead = totalAfterAct > totalAfterOpp;
@@ -143,46 +143,28 @@ function buildEmoticonPlan(
     plan.push({ team: actingTeam, animal: 'rabbit', mood: isAhead ? 'happy' : 'burn' });
   }
 
-  const sheepLevelBefore = Math.floor(before[actingTeam].sheep / THRESHOLDS.sheep);
-  const sheepLevelAfter = Math.floor(after[actingTeam].sheep / THRESHOLDS.sheep);
-  if (sheepChains.length > 0 && sheepLevelAfter > sheepLevelBefore) {
-    plan.push({ team: actingTeam, animal: 'sheep', mood: 'focus' });
-  } else if (openedCount.sheep >= 2 && !collectedAnimals.has('sheep')) {
+  if (openedCount.sheep >= 2 && !collectedAnimals.has('sheep')) {
     plan.push({ team: actingTeam, animal: 'sheep', mood: 'happy' });
   }
 
-  if (mermaidBonus) {
+  // 효과가 실제로 발동했다면(내가 뒤지고 있어 효과 폭이 작더라도) 그냥 happy로
+  // 통일한다 — "발동했는데 focus/burn이 뜨는" 게 오히려 헷갈린다는 피드백 반영.
+  if (mermaidBonus || mermaidCatchup) {
     plan.push({ team: actingTeam, animal: 'mermaid', mood: 'happy' });
-  } else if (mermaidCatchup) {
-    const mood = isAhead
-      ? 'happy'
-      : seededPick(`mermaid:${actingTeam}:${mermaidCatchup.absorb}:${totalAfterAct}`, 'burn', 'focus');
-    plan.push({ team: actingTeam, animal: 'mermaid', mood });
   }
 
   if (tigerAttack) {
-    const mood = isAhead
-      ? 'happy'
-      : seededPick(`tiger:${actingTeam}:${tigerAttack.dmg}:${totalAfterAct}`, 'burn', 'focus');
-    plan.push({ team: actingTeam, animal: 'tiger', mood });
+    plan.push({ team: actingTeam, animal: 'tiger', mood: 'happy' });
   }
 
-  // ── 상대(피해자) ──────────────────────────────────────────────────────
+  // ── 상대(피해자) — 토끼/양 중 더 많이 깎인 쪽 하나만 보여준다 ──────────────
   if (tigerAttack) {
-    const sheepDrop = before[opp].sheep - after[opp].sheep;
-    const rabbitDrop = before[opp].rabbit - after[opp].rabbit;
-    if (rabbitDrop > sheepDrop) plan.push({ team: opp, animal: 'rabbit', mood: 'cry' });
-    else if (sheepDrop > rabbitDrop) plan.push({ team: opp, animal: 'sheep', mood: 'cry' });
-    else if (sheepDrop > 0) {
-      plan.push({ team: opp, animal: 'rabbit', mood: 'cry' });
-      plan.push({ team: opp, animal: 'sheep', mood: 'cry' });
-    }
+    const hurt = biggerDropAnimal(before[opp], after[opp]);
+    if (hurt) plan.push({ team: opp, animal: hurt, mood: 'cry' });
   }
   if (mermaidCatchup) {
-    const sheepDrop = before[opp].sheep - after[opp].sheep;
-    const rabbitDrop = before[opp].rabbit - after[opp].rabbit;
-    if (rabbitDrop > 0) plan.push({ team: opp, animal: 'rabbit', mood: 'cry' });
-    if (sheepDrop > 0) plan.push({ team: opp, animal: 'sheep', mood: 'cry' });
+    const hurt = biggerDropAnimal(before[opp], after[opp]);
+    if (hurt) plan.push({ team: opp, animal: hurt, mood: 'cry' });
   }
 
   return plan;
@@ -214,6 +196,7 @@ export interface AnimationState {
   captions: CaptionItem[];
   emoticons: PlayerEmoticon[];
   cardFocusBursts: CardFocusItem[];
+  sheepReserve: Record<Team, number>;
 }
 
 const EMPTY_SET = new Set<string>() as ReadonlySet<string>;
@@ -282,6 +265,7 @@ export function useAnimationQueue(
   const [captions, setCaptions] = useState<CaptionItem[]>([]);
   const [emoticons, setEmoticons] = useState<PlayerEmoticon[]>([]);
   const [cardFocusBursts, setCardFocusBursts] = useState<CardFocusItem[]>([]);
+  const [sheepReserve, setSheepReserve] = useState<Record<Team, number>>({ A: 0, B: 0 });
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // 다음 액션이 들어올 때 timersRef를 통째로 비우기 때문에, 그보다 오래 지속되는
@@ -361,6 +345,9 @@ export function useAnimationQueue(
     // 각 이벤트가 특정 (팀,동물) 점수에 미친 델타를 순서대로 모아두고,
     // 최종 gameState 값에서 역산해 이벤트별 "변동 전 -> 변동 후"를 복원한다.
     const gameState = gameStateRef.current;
+    // 직전 액션 종료 시점의 스냅샷 — 실용신양 보유량 애니메이션(Pass 2)과
+    // 이모티콘 전/후 비교(Pass 3)에서 함께 쓴다.
+    const beforeScores = prevScoresRef.current;
     if (gameState) {
       type Slot = { id: string; key: DeltaKey; delta: number };
       const slots: Slot[] = [];
@@ -476,7 +463,9 @@ export function useAnimationQueue(
     let cursor = 0;          // ms absolute time for sequential events
     let chainRemaining = 0;  // how many upcoming 'open' events are part of current chain
     let chainIdx = 0;        // index within current chain (for pitch/combo escalation)
+    let chainTeam: Team | null = null; // 현재 연쇄를 발생시킨 팀 (실용신양 보유량 게이지용)
     let comboCounter = 0;    // 이번 턴 누적 실용신양 추가 오픈 콤보 번호 (1부터)
+    let sheepReserveInited = false; // 이번 액션에서 보유량 게이지 기준값을 이미 세팅했는지
 
     let idx = 0;
     while (idx < lastEvents.length) {
@@ -522,6 +511,14 @@ export function useAnimationQueue(
               setMainCombo({ id: finalId, combo });
               sched(() => setMainCombo(null), MAIN_COMBO_DUR);
             }, revealAt + FLIP_FULL);
+          }
+
+          // 이 카드가 실용신양 보유량 하나를 소모 — 게이지에서 양 한 마리가 "뿅" 사라진다
+          if (chainTeam) {
+            const team = chainTeam;
+            sched(() => {
+              setSheepReserve(prev => ({ ...prev, [team]: Math.max(0, prev[team] - 1) }));
+            }, revealAt);
           }
         }
 
@@ -657,6 +654,16 @@ export function useAnimationQueue(
       } else if (ev.type === 'sheepChain') {
         chainRemaining = ev.count;
         chainIdx = 0;
+        chainTeam = ev.team;
+
+        // 이 액션에서 처음 만나는 sheepChain일 때만 "턴 시작 시점의 보유량"으로
+        // 게이지를 리셋한다 — 그래야 우리 턴이 시작되는 순간 양이 다시 꽉 찬 채로
+        // 보였다가, 카드가 한 장씩 열릴 때마다 하나씩 사라지는 것처럼 보인다.
+        if (!sheepReserveInited && beforeScores) {
+          sheepReserveInited = true;
+          const fullCount = Math.floor(beforeScores[ev.team].sheep / THRESHOLDS.sheep);
+          setSheepReserve(prev => ({ ...prev, [ev.team]: fullCount }));
+        }
 
         addCaption('실용신양 강화!', 'effect', cursor, { team: ev.team });
 
@@ -732,7 +739,6 @@ export function useAnimationQueue(
     // ── Pass 3: 플레이어 이모티콘 판정 (턴인 사람 / 상대) ───────────────────
     // 게임이 끝나는 액션은 턴 로테이션이 갱신되지 않아 앵커 역산이 어긋날 수 있으므로 건너뛴다.
     if (gameState && gameState.phase !== 'ended') {
-      const beforeScores = prevScoresRef.current;
       const afterScores: Record<Team, Record<Animal, number>> = {
         A: { ...gameState.teams.A.scores },
         B: { ...gameState.teams.B.scores },
@@ -814,5 +820,6 @@ export function useAnimationQueue(
     captions,
     emoticons,
     cardFocusBursts,
+    sheepReserve,
   };
 }

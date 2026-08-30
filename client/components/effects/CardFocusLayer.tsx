@@ -3,8 +3,8 @@
 import { useLayoutEffect, useState } from 'react';
 import type { CardFocusItem } from '@/hooks/useAnimationQueue';
 
-// 지금 막 뒤집히는 카드로 시선을 모으는 연출 — 사방에서 짧은 빔이 모여들었다가
-// 카드 전체가 확대되며 페이드아웃된다.
+// 지금 막 뒤집히는 카드로 시선을 모으는 연출 — 주변이 어두워지고 그 카드만
+// 밝게 남으며, 테두리 링이 확대되며 페이드아웃된다.
 export function CardFocusLayer({ items }: { items: CardFocusItem[] }) {
   return (
     <>
@@ -49,10 +49,6 @@ function FocusBurst({ item }: { item: CardFocusItem }) {
         }}
       >
         <span className="card-focus-ring" />
-        <span className="card-focus-beam-wrap n"><span className="card-focus-beam" /></span>
-        <span className="card-focus-beam-wrap s"><span className="card-focus-beam" /></span>
-        <span className="card-focus-beam-wrap e"><span className="card-focus-beam" /></span>
-        <span className="card-focus-beam-wrap w"><span className="card-focus-beam" /></span>
       </span>
     </>
   );

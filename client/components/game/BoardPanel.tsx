@@ -163,7 +163,9 @@ export function BoardPanel({
   return (
     <div
       ref={containerRef}
-      className={`flex-1 overflow-hidden relative bg-jungle-50/50 rounded-2xl border border-jungle-200 ${expandQuake ? 'quake-expand' : ''}`}
+      className={`flex-1 overflow-hidden relative bg-jungle-50/50 rounded-2xl transition-colors ${
+        isMyTurn ? 'border-4 board-my-turn' : 'border border-jungle-200'
+      } ${expandQuake ? 'quake-expand' : ''}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -195,13 +197,6 @@ export function BoardPanel({
           collectGlowKeys={collectGlowKeys}
         />
       </div>
-
-      {/* 내 차례가 아닐 때 — 카드판을 살짝 어둡게 해 "지금은 상대 차례"임을 은은하게 알림 */}
-      <div
-        className={`absolute inset-0 pointer-events-none transition-opacity duration-300 bg-black/20 ${
-          isMyTurn ? 'opacity-0' : 'opacity-100'
-        }`}
-      />
 
       {/* 보드 확장 — 섬광 + 충격파 링 + 떨어지는 먼지/잔해 (뷰포트 기준) */}
       {expandBurst > 0 && (

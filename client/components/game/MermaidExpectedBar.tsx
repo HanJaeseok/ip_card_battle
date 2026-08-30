@@ -25,7 +25,8 @@ export function MermaidExpectedBar({
   }
 
   const threshold = THRESHOLDS.mermaid;
-  const progress = ((mermaidScore % threshold) / threshold) * 100;
+  const scoreMod = mermaidScore % threshold;
+  const progress = (scoreMod / threshold) * 100;
 
   return (
     <div
@@ -37,10 +38,13 @@ export function MermaidExpectedBar({
         className="absolute inset-y-0 left-0 bg-black/30 transition-all"
         style={{ width: `${progress}%` }}
       />
-      <div className="relative text-center py-1.5 px-3">
-        <span className="text-sm font-bold text-white tracking-wide leading-tight">
+      <div className="relative text-center py-1 px-3">
+        <p className="text-[0.65rem] text-white/80 leading-none mb-0.5">
+          {threshold}점마다 · {scoreMod}/{threshold}
+        </p>
+        <p className="text-sm font-bold text-white tracking-wide leading-tight">
           {label} +{value}
-        </span>
+        </p>
       </div>
     </div>
   );

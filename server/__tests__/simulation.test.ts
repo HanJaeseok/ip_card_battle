@@ -1,7 +1,10 @@
 import { initGame } from '../engine/turnManager';
 import { processPlayerAction, processTimeout } from '../engine/gameEngine';
 import type { GameState } from 'shared';
-import { ANIMALS } from 'shared';
+import { ANIMALS, MAX_TURN } from 'shared';
+
+// 게임 중반 시점 스냅샷 — MAX_TURN이 바뀌어도 "게임의 약 37.5% 지점"을 가리키도록 비례 계산
+const SNAPSHOT_TURN = Math.round(MAX_TURN * 0.375);
 
 // ─── 시드 가능한 선형 합동 RNG ────────────────────────────────────────────────
 function makeLCG(seed: number): () => number {
@@ -34,7 +37,7 @@ function runGame(seed: number): {
   const rng = makeLCG(seed);
   const state = initGame(['botA'], ['botB'], rng);
 
-  // 15턴 시점 리더 기록
+  // 게임 중반(SNAPSHOT_TURN) 시점 리더 기록
   const history: Array<{ turn: number; aScore: number; bScore: number }> = [];
 
   let safetyCount = 0;
@@ -43,10 +46,10 @@ function runGame(seed: number): {
       throw new Error(`시뮬레이션 무한루프 감지 (seed=${seed})`);
     }
 
-    // 15턴 시점 스냅샷
-    if (state.turn === 15 && !history.some(h => h.turn === 15)) {
+    // 중반 시점 스냅샷
+    if (state.turn === SNAPSHOT_TURN && !history.some(h => h.turn === SNAPSHOT_TURN)) {
       history.push({
-        turn: 15,
+        turn: SNAPSHOT_TURN,
         aScore: totalScoreOf(state, 'A'),
         bScore: totalScoreOf(state, 'B'),
       });
@@ -75,7 +78,7 @@ function runGame(seed: number): {
     winner: state.winner ?? 'draw',
     scores: { A: aFinal, B: bFinal },
     finalTurn: state.turn,
-    leader15: getLeaderAt(state, 15, history),
+    leader15: getLeaderAt(state, SNAPSHOT_TURN, history),
   };
 }
 
@@ -99,14 +102,14 @@ describe('봇 대전 시뮬레이션 (500게임)', () => {
     expect(results.every(r => r.winner !== undefined)).toBe(true);
   });
 
-  it('평균 종료 턴이 20~41 범위 내', () => {
-    // B팀이 40번째 턴을 마친 후 state.turn이 41로 증가되어 종료되므로 상한은 41
+  it(`평균 종료 턴이 ${MAX_TURN / 2}~${MAX_TURN + 1} 범위 내`, () => {
+    // B팀이 MAX_TURN번째 턴을 마친 후 state.turn이 (MAX_TURN+1)로 증가되어 종료되므로 상한은 MAX_TURN+1
     const avgTurn = results.reduce((s, r) => s + r.finalTurn, 0) / GAME_COUNT;
-    expect(avgTurn).toBeGreaterThanOrEqual(20);
-    expect(avgTurn).toBeLessThanOrEqual(41);
+    expect(avgTurn).toBeGreaterThanOrEqual(MAX_TURN / 2);
+    expect(avgTurn).toBeLessThanOrEqual(MAX_TURN + 1);
   });
 
-  it('15턴 리더 고착률 ≈ 59% (±10%)', () => {
+  it(`${SNAPSHOT_TURN}턴 리더 고착률 ≈ 59% (±10%)`, () => {
     const validGames = results.filter(r => r.leader15 !== 'tie');
     if (validGames.length === 0) return; // 모두 동점이면 스킵
 

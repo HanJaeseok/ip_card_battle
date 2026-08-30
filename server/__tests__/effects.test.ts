@@ -7,6 +7,7 @@ import { applyMermaidEffect } from '../engine/effects/mermaid';
 import { applySheepEffect } from '../engine/effects/sheep';
 import { createBoard } from '../engine/board';
 import type { Card, GameState } from 'shared';
+import { MAX_TURN } from 'shared';
 
 // 결정론적 RNG (항상 0 반환)
 const rng0 = () => 0;
@@ -273,9 +274,9 @@ describe('턴 진행', () => {
     expect(state.turn).toBe(1);
   });
 
-  it('40턴 초과 시 게임 종료', () => {
+  it('MAX_TURN 초과 시 게임 종료', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.turn = 40;
+    state.turn = MAX_TURN;
     state.activeTeam = 'B';
     const events = advanceTurn(state, rng0);
     expect(state.phase).toBe('ended');

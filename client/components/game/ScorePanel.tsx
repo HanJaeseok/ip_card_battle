@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Animal, Team } from 'shared';
-import { ANIMALS, THRESHOLDS } from 'shared';
+import { ANIMALS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
 import { TigerAttackBar } from './TigerAttackBar';
 import { MermaidExpectedBar } from './MermaidExpectedBar';
@@ -87,6 +87,7 @@ export function ScorePanel({
   tigerHitDmg,
   mermaidEffectType,
   scoreFlash,
+  sheepReserveCount,
 }: {
   team: Team;
   scores: Record<Animal, number>;
@@ -97,6 +98,7 @@ export function ScorePanel({
   tigerHitDmg: number | null;
   mermaidEffectType: 'catchup' | 'bonus' | null;
   scoreFlash: ReadonlyMap<string, number>;
+  sheepReserveCount: number;
 }) {
   const myTotal = ANIMALS.reduce((s, a) => s + scores[a], 0);
   const opTotal = ANIMALS.reduce((s, a) => s + opponentScores[a], 0);
@@ -147,7 +149,7 @@ export function ScorePanel({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         {table('sheep')}
-        <SheepOpenBar sheepScore={scores.sheep} count={Math.floor(scores.sheep / THRESHOLDS.sheep)} />
+        <SheepOpenBar sheepScore={scores.sheep} reserveCount={sheepReserveCount} />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('rabbit', { targetAttr: team })}
