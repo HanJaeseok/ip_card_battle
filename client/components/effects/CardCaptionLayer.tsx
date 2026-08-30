@@ -1,22 +1,38 @@
 'use client';
 
 import { useLayoutEffect, useState } from 'react';
+import type { Team } from 'shared';
 import type { CaptionItem } from '@/hooks/useAnimationQueue';
 
 // 카드판 위에 "무엇을 뒤집었는지 / 페어 성사 / 효과 발동"을 큰 자막으로 강조한다.
 // flip/pair는 실제로 뒤집힌 카드 바로 위에, effect는 보드 중앙에 고정 표시한다.
-export function CardCaptionLayer({ captions }: { captions: CaptionItem[] }) {
+// effect 자막은 우리 팀이 발동시켰으면 초록, 상대 팀이면 빨강으로 구분한다.
+export function CardCaptionLayer({
+  captions,
+  myTeam,
+}: {
+  captions: CaptionItem[];
+  myTeam: Team | null;
+}) {
   const effectCaptions = captions.filter(c => c.tier === 'effect');
   const anchoredCaptions = captions.filter(c => c.tier !== 'effect');
 
   return (
     <>
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 pointer-events-none z-40">
-        {effectCaptions.map(c => (
-          <span key={c.id} className="card-caption card-caption-effect">
-            {c.text}
-          </span>
-        ))}
+        {effectCaptions.map(c => {
+          const sideClass =
+            myTeam === null || c.team === undefined
+              ? 'card-caption-effect-enemy'
+              : c.team === myTeam
+                ? 'card-caption-effect-ally'
+                : 'card-caption-effect-enemy';
+          return (
+            <span key={c.id} className={`card-caption card-caption-effect ${sideClass}`}>
+              {c.text}
+            </span>
+          );
+        })}
       </div>
       {anchoredCaptions.map(c => (
         <AnchoredCaption key={c.id} caption={c} />

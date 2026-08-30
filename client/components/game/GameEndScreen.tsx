@@ -97,7 +97,18 @@ export function GameEndScreen({
 
       {/* 승리 텍스트 */}
       <div className="winner-bounce-in flex flex-col items-center gap-3">
-        <div style={{ fontSize: '5rem' }}>{winnerEmoji}</div>
+        {flavorAnimal && (winner === 'A' || winner === 'B') ? (
+          <img
+            src={`/skills/${flavorAnimal}_skill.png`}
+            alt={ANIMAL_INFO[flavorAnimal].name}
+            className="w-40 h-40 rounded-full object-cover shadow-xl"
+            style={{
+              border: `5px solid ${winner === 'A' ? '#22c55e' : '#3b82f6'}`,
+            }}
+          />
+        ) : (
+          <div style={{ fontSize: '5rem' }}>{winnerEmoji}</div>
+        )}
         <h2 className="text-3xl font-bold text-jungle-900">{winnerText}</h2>
         {flavorAnimal && (
           <p className="text-sm text-jungle-500 -mt-1">{FLAVOR_TEXT[flavorAnimal]}</p>

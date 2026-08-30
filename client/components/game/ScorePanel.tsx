@@ -147,7 +147,7 @@ export function ScorePanel({
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         {table('sheep')}
-        <SheepOpenBar count={Math.floor(scores.sheep / THRESHOLDS.sheep)} />
+        <SheepOpenBar sheepScore={scores.sheep} count={Math.floor(scores.sheep / THRESHOLDS.sheep)} />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('rabbit', { targetAttr: team })}
@@ -155,7 +155,7 @@ export function ScorePanel({
       </div>
       <div className="flex flex-col gap-1.5">
         {table('mermaid')}
-        <MermaidExpectedBar myTotal={myTotal} opTotal={opTotal} turn={turn} />
+        <MermaidExpectedBar mermaidScore={scores.mermaid} myTotal={myTotal} opTotal={opTotal} turn={turn} />
       </div>
       <div className="flex flex-col gap-1.5">
         {table('tiger')}

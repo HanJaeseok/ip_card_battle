@@ -28,22 +28,32 @@ function FocusBurst({ item }: { item: CardFocusItem }) {
 
   if (!rect) return null;
 
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+
   return (
-    <span
-      className="card-focus-burst"
-      style={{
-        position: 'fixed',
-        left: rect.x,
-        top: rect.y,
-        width: rect.w,
-        height: rect.h,
-      }}
-    >
-      <span className="card-focus-ring" />
-      <span className="card-focus-beam-wrap n"><span className="card-focus-beam" /></span>
-      <span className="card-focus-beam-wrap s"><span className="card-focus-beam" /></span>
-      <span className="card-focus-beam-wrap e"><span className="card-focus-beam" /></span>
-      <span className="card-focus-beam-wrap w"><span className="card-focus-beam" /></span>
-    </span>
+    <>
+      {/* 다른 곳은 어두워지고 지금 뒤집히는 카드만 밝게 남는 스포트라이트 */}
+      <span
+        className="card-spotlight-dim"
+        style={{ '--spot-x': `${cx}px`, '--spot-y': `${cy}px` } as React.CSSProperties}
+      />
+      <span
+        className="card-focus-burst"
+        style={{
+          position: 'fixed',
+          left: rect.x,
+          top: rect.y,
+          width: rect.w,
+          height: rect.h,
+        }}
+      >
+        <span className="card-focus-ring" />
+        <span className="card-focus-beam-wrap n"><span className="card-focus-beam" /></span>
+        <span className="card-focus-beam-wrap s"><span className="card-focus-beam" /></span>
+        <span className="card-focus-beam-wrap e"><span className="card-focus-beam" /></span>
+        <span className="card-focus-beam-wrap w"><span className="card-focus-beam" /></span>
+      </span>
+    </>
   );
 }

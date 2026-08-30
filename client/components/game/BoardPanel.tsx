@@ -231,7 +231,7 @@ export function BoardPanel({
       {mermaidPopup && <MermaidPopup team={mermaidPopup.team} />}
 
       {/* 무엇을 뒤집었는지 / 페어 / 효과 발동 자막 */}
-      <CardCaptionLayer captions={captions} />
+      <CardCaptionLayer captions={captions} myTeam={myTeam} />
 
       {/* 지금 뒤집히는 카드로 시선을 모으는 포커스 연출 */}
       <CardFocusLayer items={cardFocusBursts} />

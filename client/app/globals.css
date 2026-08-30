@@ -49,7 +49,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: '맑은 고딕', 'Malgun Gothic', Arial, Helvetica, sans-serif;
 }
 
 /* ── 현재 플레이어 글로우 펄스 ──────────────────────────────────────── */
@@ -711,9 +711,10 @@ body {
 }
 .card-caption-effect {
   font-size: 3.3rem;
-  color: #ef4444;
   animation-duration: 950ms;
 }
+.card-caption-effect-ally { color: #22c55e; }
+.card-caption-effect-enemy { color: #ef4444; }
 @media (prefers-reduced-motion: reduce) {
   .card-caption { animation: none; opacity: 0; }
 }
@@ -733,6 +734,29 @@ body {
 .card-focus-burst {
   pointer-events: none;
   z-index: 55;
+}
+/* ── 카드 스포트라이트 — 뒤집히는 카드만 남기고 나머지를 어둡게 ─────────────── */
+@keyframes cardSpotlightFade {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.card-spotlight-dim {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 52;
+  background: radial-gradient(
+    circle at var(--spot-x) var(--spot-y),
+    transparent 0px,
+    transparent 42px,
+    rgba(0, 0, 0, 0.6) 110px
+  );
+  animation: cardSpotlightFade 480ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-spotlight-dim { display: none; }
 }
 .card-focus-ring {
   position: absolute;

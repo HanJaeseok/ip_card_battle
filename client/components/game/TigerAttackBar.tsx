@@ -16,14 +16,20 @@ export function TigerAttackBar({
 
   return (
     <div
-      className={`text-center py-1.5 px-3 rounded-full shadow-sm transition-colors ${
+      className={`rounded-full shadow-sm overflow-hidden relative transition-colors ${
         isImminent ? 'bg-red-600 tiger-imminent' : 'bg-orange-600'
       }`}
     >
-      <span className="text-sm font-bold text-white tracking-wide leading-tight">
-        ⚔ 공격력 {atk}
-        {isImminent && ' 곧 발동!'}
-      </span>
+      <div
+        className="absolute inset-y-0 left-0 bg-black/30 transition-all"
+        style={{ width: `${Math.min(100, progress * 100)}%` }}
+      />
+      <div className="relative text-center py-1.5 px-3">
+        <span className="text-sm font-bold text-white tracking-wide leading-tight">
+          ⚔ 공격력 {atk}
+          {isImminent && ' 곧 발동!'}
+        </span>
+      </div>
     </div>
   );
 }

@@ -51,6 +51,7 @@ export interface CaptionItem {
   text: string;
   tier: 'flip' | 'pair' | 'effect'; // 무엇을 뒤집었는지 / 페어 성사 / 효과 발동
   cardKey?: string; // flip/pair는 해당 카드 위에 앵커링, effect는 보드 중앙 고정(생략)
+  team?: Team; // effect 자막 색상(우리팀 초록 / 상대팀 빨강) 판정용
 }
 
 export interface PlayerEmoticon {
@@ -312,10 +313,15 @@ export function useAnimationQueue(
   };
 
   const CAPTION_DUR: Record<CaptionItem['tier'], number> = { flip: 550, pair: 800, effect: 950 };
-  const addCaption = (text: string, tier: CaptionItem['tier'], atMs: number, cardKey?: string) => {
+  const addCaption = (
+    text: string,
+    tier: CaptionItem['tier'],
+    atMs: number,
+    opts?: { cardKey?: string; team?: Team },
+  ) => {
     const id = ++floatIdCounter;
     sched(() => {
-      setCaptions(prev => [...prev, { id, text, tier, cardKey }]);
+      setCaptions(prev => [...prev, { id, text, tier, cardKey: opts?.cardKey, team: opts?.team }]);
       sched(() => setCaptions(prev => prev.filter(c => c.id !== id)), CAPTION_DUR[tier]);
     }, atMs);
   };
@@ -550,7 +556,7 @@ export function useAnimationQueue(
         }, reactionAt + REACTION_DUR);
 
         // 무엇을 뒤집었는지 큰 자막으로 강조 — 그 카드 바로 위에 표시
-        addCaption(`${ANIMAL_INFO[ev.card.animal].short}!`, 'flip', reactionAt, key);
+        addCaption(`${ANIMAL_INFO[ev.card.animal].short}!`, 'flip', reactionAt, { cardKey: key });
 
         // 이 카드에 딸린 효과를 순서대로("정산") 재생 — 하나씩 끝나야 다음 단계로 넘어간다
         let t = reactionAt;
@@ -562,7 +568,7 @@ export function useAnimationQueue(
             const glowColor = PAIR_COLORS[Math.floor(Math.random() * PAIR_COLORS.length)];
             const at = t;
 
-            addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at, keys[0]);
+            addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at, { cardKey: keys[0] });
 
             sched(() => {
               setCollectGlowKeys(prev => {
@@ -594,7 +600,7 @@ export function useAnimationQueue(
             const onTeam: Team = gev.team === 'A' ? 'B' : 'A';
             const at = t;
 
-            addCaption('특허랑이 발동!', 'effect', at + 150);
+            addCaption('특허랑이 발동!', 'effect', at + 150, { team: gev.team });
 
             sched(() => {
               setTigerRecoil({ attackerTeam: gev.team });
@@ -614,7 +620,7 @@ export function useAnimationQueue(
 
           } else if (gev.type === 'mermaidCatchup') {
             const at = t;
-            addCaption('디자인어 발동!', 'effect', at);
+            addCaption('디자인어 발동!', 'effect', at, { team: gev.team });
             sched(() => {
               setMermaidEffect({ team: gev.team, type: 'catchup' });
               setMermaidPopup({ team: gev.team });
@@ -628,7 +634,7 @@ export function useAnimationQueue(
 
           } else if (gev.type === 'mermaidBonus') {
             const at = t;
-            addCaption('디자인어 발동!', 'effect', at);
+            addCaption('디자인어 발동!', 'effect', at, { team: gev.team });
             sched(() => {
               setMermaidEffect({ team: gev.team, type: 'bonus' });
               setMermaidPopup({ team: gev.team });
@@ -652,7 +658,7 @@ export function useAnimationQueue(
         chainRemaining = ev.count;
         chainIdx = 0;
 
-        addCaption('실용신양 강화!', 'effect', cursor);
+        addCaption('실용신양 강화!', 'effect', cursor, { team: ev.team });
 
         const level = ev.level;
         sched(() => {
@@ -681,7 +687,7 @@ export function useAnimationQueue(
               .map(e => e.key)
           : [];
 
-        addCaption('상표토끼 발동!', 'effect', cursor);
+        addCaption('상표토끼 발동!', 'effect', cursor, { team });
 
         sched(() => {
           // 효과음은 발동 즉시 재생 — 날아가는 연출이 끝날 때까지 기다리면 싱크가 어긋난다.
@@ -769,6 +775,18 @@ export function useAnimationQueue(
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastEvents]);
+
+  // 게임이 끝나면 아직 재생 대기 중인 예약된 효과음/애니메이션을 전부 취소한다.
+  // (마지막 액션에 실용신양 연쇄 등으로 사운드가 몇 초 뒤까지 예약돼 있으면,
+  // 종료 화면으로 넘어간 뒤에도 게임 효과음이 계속 흘러나오는 문제가 있었다)
+  useEffect(() => {
+    if (gameState?.phase === 'ended') {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      persistentTimersRef.current.forEach(clearTimeout);
+      persistentTimersRef.current = [];
+    }
+  }, [gameState?.phase]);
 
   return {
     suppressedKeys,

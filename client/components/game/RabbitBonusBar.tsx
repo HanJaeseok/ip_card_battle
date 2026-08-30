@@ -9,7 +9,7 @@ export function RabbitBonusBar({ rabbitScore, turn }: { rabbitScore: number; tur
   return (
     <div className="rounded-full bg-pink-500 shadow-sm overflow-hidden relative">
       <div
-        className="absolute inset-y-0 left-0 bg-pink-300/60 transition-all"
+        className="absolute inset-y-0 left-0 bg-black/30 transition-all"
         style={{ width: `${progress}%` }}
       />
       <div className="relative text-center py-1.5 px-3">
