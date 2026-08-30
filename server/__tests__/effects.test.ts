@@ -193,15 +193,26 @@ describe('턴 진행', () => {
 
 // ─── 카드 선택 ↔ 스킬 선택 대기 상태 ───────────────────────────────────────────
 describe('장소 클릭 후에는 스킬을 고를 때까지 턴이 넘어가지 않는다', () => {
-  it('processPlayerAction 직후 pendingChoice가 세팅되고 activeTeam은 그대로다', () => {
+  it('processPlayerAction 직후 pendingChoice가 세팅되고 activeTeam은 그대로다 (고를 수 있는 스킬이 있을 때만)', () => {
     const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.sheep = 10; // level=1이어야 고를 스킬이 있어 대기 상태가 된다
     const { state: s1 } = processPlayerAction(state, 'house', rng0);
     expect(s1.pendingChoice).toBe('A');
     expect(s1.activeTeam).toBe('A');
   });
 
+  it('고를 수 있는 스킬이 하나도 없으면 대기하지 않고 즉시 자동 패스 후 턴이 넘어간다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    const { state: s1, events } = processPlayerAction(state, 'house', rng0);
+    expect(s1.pendingChoice).toBeNull();
+    expect(s1.activeTeam).toBe('B');
+    const passEv = events.find(e => e.type === 'skillPassed');
+    expect(passEv).toMatchObject({ type: 'skillPassed', team: 'A', auto: true });
+  });
+
   it('pendingChoice가 있는 동안 추가 장소 클릭은 무시된다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
+    state.teams['A'].scores.sheep = 10;
     const { state: s1 } = processPlayerAction(state, 'house', rng0);
     const { events } = processPlayerAction(s1, 'house', rng0);
     expect(events).toHaveLength(0);

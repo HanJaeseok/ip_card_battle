@@ -1,7 +1,7 @@
 import type { Animal, GameEvent, GameState, Place } from 'shared';
 import { drawCard } from './drawCard';
 import { advanceTurn, initGame } from './turnManager';
-import { applySkillChoice, applyPass, randomEligibleSkill, levelOf } from './skills';
+import { applySkillChoice, applyPass, randomEligibleSkill, levelOf, eligibleAnimals } from './skills';
 import { randomPlace } from './places';
 import type { RNG } from './places';
 
@@ -9,7 +9,10 @@ export { initGame } from './turnManager';
 
 /**
  * 장소 클릭 처리 — 엔진의 진입점 ①.
- * 뽑기+정산까지 끝나면 곧바로 턴을 넘기지 않고, 그 팀이 스킬을 고를 때까지 대기한다.
+ * 뽑기+정산까지 끝난 뒤, 그 팀이 고를 수 있는 스킬이 하나라도 있으면 고를 때까지 대기한다.
+ * 고를 수 있는 스킬이 아예 없다면(레벨 0) 화면에 선택창을 띄워 왕복할 필요 없이 이 안에서
+ * 곧바로 패스 처리하고 턴까지 넘긴다 — 그래야 매 턴 "레벨 부족" 왕복 때문에 방금 재생 중이던
+ * 뽑기 애니메이션이 다음 액션에 의해 끊기는 일이 없다.
  */
 export function processPlayerAction(
   state: GameState,
@@ -22,7 +25,13 @@ export function processPlayerAction(
   events.push(...drawCard(state, place, rng));
 
   if (state.phase === 'playing') {
-    state.pendingChoice = state.activeTeam;
+    const team = state.activeTeam;
+    if (eligibleAnimals(state, team).length > 0) {
+      state.pendingChoice = team;
+    } else {
+      events.push(applyPass(team, true));
+      events.push(...advanceTurn(state));
+    }
   }
 
   return { state, events };
@@ -54,7 +63,7 @@ export function processPass(state: GameState): { state: GameState; events: GameE
   if (state.phase !== 'playing' || state.pendingChoice === null) return { state, events: [] };
 
   const team = state.pendingChoice;
-  const events: GameEvent[] = [applyPass(team)];
+  const events: GameEvent[] = [applyPass(team, false)];
   state.pendingChoice = null;
   events.push(...advanceTurn(state));
 

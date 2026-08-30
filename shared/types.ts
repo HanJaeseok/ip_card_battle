@@ -64,7 +64,7 @@ export type GameEvent =
       oppScoreDelta: number;   // 상대 총점에서 깎인 값(양수로 표기, 실제로는 감소)
       extraDrawsQueued: number; // 실용신양을 골랐을 때, 다음 내 턴에 예약된 추가 뽑기 수
     }
-  | { type: 'skillPassed'; team: Team } // "아무것도 하지 않음"을 선택(또는 고를 수 있는 스킬이 없어 자동 패스)
+  | { type: 'skillPassed'; team: Team; auto: boolean } // "아무것도 하지 않음"을 선택(auto=true면 고를 수 있는 스킬이 없어 화면에 알리지 않고 자동 처리)
   | { type: 'expand' }
   | { type: 'gameEnd'; winner: Team | 'draw' }
   | { type: 'timeout'; place: Place }

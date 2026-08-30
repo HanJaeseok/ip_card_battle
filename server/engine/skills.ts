@@ -79,9 +79,13 @@ export function applySkillChoice(state: GameState, team: Team, animal: Animal): 
   return { type: 'skillApplied', team, animal, level, myScoreDelta, oppScoreDelta, extraDrawsQueued };
 }
 
-/** 아무 스킬도 쓰지 않고 턴을 넘긴다. */
-export function applyPass(team: Team): GameEvent {
-  return { type: 'skillPassed', team };
+/**
+ * 아무 스킬도 쓰지 않고 턴을 넘긴다.
+ * auto=true면 고를 수 있는 스킬이 아예 없어 서버가 즉시 대신 처리한 것 — 화면에
+ * 알릴 필요 없는 침묵 처리이므로 클라이언트는 이 값을 보고 캡션/해설을 생략한다.
+ */
+export function applyPass(team: Team, auto: boolean): GameEvent {
+  return { type: 'skillPassed', team, auto };
 }
 
 /** 제한시간 내에 고르지 않으면 서버가 대신 무작위로 하나를 골라준다(고를 수 있는 게 없으면 null=패스). */

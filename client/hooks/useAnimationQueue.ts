@@ -450,7 +450,7 @@ export function useAnimationQueue(
           if (ev.oppScoreDelta > 0) parts.push(`상대 점수 -${ev.oppScoreDelta}`);
           if (ev.extraDrawsQueued > 0) parts.push(`다음 턴 추가 뽑기 ${ev.extraDrawsQueued}회 예약`);
           newLines.push({ team: ev.team, text: parts.join(' ') });
-        } else if (ev.type === 'skillPassed') {
+        } else if (ev.type === 'skillPassed' && !ev.auto) {
           newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 아무것도 하지 않고 턴을 넘겼습니다.` });
         } else if (ev.type === 'expand') {
           newLines.push({ team: null, text: '더 신나게!! 도토리 폭탄이 등장합니다.' });
@@ -810,7 +810,7 @@ export function useAnimationQueue(
         cursor = animal === 'tiger'
           ? at + TIGER_RECOIL_DUR + TIGER_HIT_DUR + 80
           : at + EFFECT_DUR;
-      } else if (passEv) {
+      } else if (passEv && !passEv.auto) {
         const at = cursor;
         addCaption('아무것도 하지 않음', 'effect', at, { team: passEv.team });
         cursor = at + 700;

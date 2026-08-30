@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
-import { previewSkill, levelOf } from '@/lib/skills';
+import { previewSkill } from '@/lib/skills';
 import { SKILL_TITLE, SKILL_COLOR, describeSkill } from '@/lib/skillInfo';
 import { TurnTimer } from './TurnTimer';
 
 const ANIMAL_ORDER: Animal[] = ['sheep', 'rabbit', 'mermaid', 'tiger'];
 
+// 서버는 이 팀에게 고를 수 있는 스킬이 하나도 없으면 애초에 pendingChoice를 세우지 않고
+// 조용히 자동으로 턴을 넘긴다 — 그래서 이 모달은 항상 최소 하나 이상 고를 수 있는
+// 스킬이 있을 때만 뜨고, "레벨 부족으로 자동 패스" 같은 화면은 따로 없다.
 export function SkillChoiceModal({
   gameState,
   team,
@@ -19,29 +21,6 @@ export function SkillChoiceModal({
   onChoose: (animal: Animal) => void;
   onPass: () => void;
 }) {
-  const eligibleAnimals = ANIMAL_ORDER.filter(a => levelOf(gameState, team, a) > 0);
-  const hasAnyEligible = eligibleAnimals.length > 0;
-
-  // 고를 수 있는 동물이 아예 없으면 선택창을 띄울 필요 없이 바로 패스 처리한다.
-  useEffect(() => {
-    if (!hasAnyEligible) onPass();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasAnyEligible]);
-
-  if (!hasAnyEligible) {
-    return (
-      <div className="fixed inset-0 bg-black/75 z-[200] flex items-center justify-center p-4">
-        <div className="bg-jungle-950 rounded-2xl shadow-2xl px-8 py-10 max-w-md text-center">
-          <p className="text-white text-lg font-bold leading-relaxed">
-            스킬을 사용하기엔 레벨이 부족합니다.
-            <br />
-            동물의 경험치를 모아주세요!
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 bg-black/75 z-[200] flex items-center justify-center p-4">
       <div className="bg-jungle-950 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden">
