@@ -82,7 +82,7 @@ export function SkillChoiceModal({
           >
             <div className="relative z-10 flex flex-col gap-2 p-4">
               <span className="text-4xl mb-1">🌱</span>
-              <h3 className="skill-outline-text text-xl font-extrabold text-jungle-300">&lt;다음 기회를 노리기&gt;</h3>
+              <h3 className="skill-outline-text text-xl font-extrabold text-jungle-300">&lt;다음을 노리기&gt;</h3>
               <p className="skill-outline-text text-sm text-white leading-relaxed">
                 레벨을 높이고, 더 큰 효과로 한번에 몰아칩니다. 이번 턴에는 스킬을 사용하지 않습니다.
               </p>
