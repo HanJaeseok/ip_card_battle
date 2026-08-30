@@ -78,6 +78,7 @@ export function GameBoard({
           collectingIds={collectingCardIds}
           newCardId={newCardId}
           revealedCardIds={revealedCardIds}
+          isMyTurn={isMyTurn}
         />
       </div>
 

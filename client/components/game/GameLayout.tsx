@@ -53,7 +53,7 @@ export function GameLayout({
 
       {/* 3열 레이아웃 */}
       <main className="flex-1 flex gap-2 p-2 overflow-hidden min-h-0">
-        <TeamPanel team="A" gameState={gameState} animState={animState} />
+        <TeamPanel team="A" myTeam={myTeam} gameState={gameState} animState={animState} />
         <div className="flex-1 flex flex-col gap-2 min-h-0">
           <GameBoard
             gameState={gameState}
@@ -72,7 +72,7 @@ export function GameLayout({
           />
           <CommentaryBoard lines={animState.commentary} />
         </div>
-        <TeamPanel team="B" gameState={gameState} animState={animState} />
+        <TeamPanel team="B" myTeam={myTeam} gameState={gameState} animState={animState} />
       </main>
 
       {/* 화면 오버레이 이펙트 (나뭇잎, 플로팅 텍스트) */}
@@ -84,7 +84,7 @@ export function GameLayout({
       {/* 상표토끼 보너스 — 카드 → 점수판 플라이트 (fixed, 화면 전역) */}
       <RabbitFlightLayer flights={animState.rabbitFlights} />
 
-      {/* 실용신양 발동 예고 — "N마리 장전!" */}
+      {/* 실용신양 발동 예고 — "실용신양의 N번째 힘!" */}
       <SheepLoadedBanner loaded={animState.sheepLoaded} />
 
       {/* 실용신양 추가 오픈 콤보 텍스트 (fixed, 화면 전역) */}

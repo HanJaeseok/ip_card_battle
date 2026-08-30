@@ -6,10 +6,12 @@ import { ScorePanel } from './ScorePanel';
 
 export function TeamPanel({
   team,
+  myTeam,
   gameState,
   animState,
 }: {
   team: Team;
+  myTeam: Team | null;
   gameState: ClientGameState;
   animState: AnimationState;
 }) {
@@ -24,6 +26,11 @@ export function TeamPanel({
       ? 'ring-2 ring-team-a shadow-lg'
       : 'ring-2 ring-team-b shadow-lg'
     : '';
+
+  // 지금이 내 차례인지 상대 차례인지를 양쪽 팀 영역 배경색으로 동일하게 표시한다
+  // (연두 = 내 차례, 연핑크 = 상대 차례) — A/B팀 색과는 별개의 전역 신호.
+  const isMyTurn = myTeam !== null && gameState.activeTeam === myTeam;
+  const turnBgClass = myTeam === null ? 'bg-white' : isMyTurn ? 'bg-lime-100' : 'bg-rose-100';
 
   const label = team === 'A' ? '🟢 A팀' : '🔵 B팀';
 
@@ -48,7 +55,7 @@ export function TeamPanel({
 
   return (
     <div
-      className={`w-56 shrink-0 bg-white rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} transition-shadow ${recoilClass} ${hitShakeClass} ${rabbitPressureClass}`}
+      className={`w-56 shrink-0 ${turnBgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} transition-colors transition-shadow ${recoilClass} ${hitShakeClass} ${rabbitPressureClass}`}
     >
       <div className={`text-base font-bold ${teamColor}`}>{label}</div>
 

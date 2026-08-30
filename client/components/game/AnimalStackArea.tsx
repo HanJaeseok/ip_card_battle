@@ -9,11 +9,13 @@ export function AnimalStackArea({
   collectingIds,
   newCardId,
   revealedCardIds,
+  isMyTurn,
 }: {
   stacks: Record<Animal, StackedCard[]>;
   collectingIds: ReadonlySet<number>;
   newCardId: number | null;
   revealedCardIds: ReadonlySet<number>;
+  isMyTurn: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 w-full h-full">
@@ -25,6 +27,7 @@ export function AnimalStackArea({
           collectingIds={collectingIds}
           newCardId={newCardId}
           revealedCardIds={revealedCardIds}
+          isMyTurn={isMyTurn}
         />
       ))}
     </div>
@@ -37,12 +40,14 @@ function AnimalStackRow({
   collectingIds,
   newCardId,
   revealedCardIds,
+  isMyTurn,
 }: {
   animal: Animal;
   cards: StackedCard[];
   collectingIds: ReadonlySet<number>;
   newCardId: number | null;
   revealedCardIds: ReadonlySet<number>;
+  isMyTurn: boolean;
 }) {
   // 슬롯머신 연출이 아직 끝나지 않은 카드는 실제로 스택에 도착하기 전이므로 숨긴다.
   // (서버 상태는 액션이 끝나는 즉시 전부 반영되지만, 화면에는 연출이 끝난 카드만 순서대로 노출한다.)
@@ -60,7 +65,10 @@ function AnimalStackRow({
     >
       <div
         className="absolute inset-0 bg-no-repeat bg-center opacity-15 pointer-events-none"
-        style={{ backgroundImage: `url(/emoticon/${animal}_focus.png)`, backgroundSize: '55%' }}
+        style={{
+          backgroundImage: `url(/emoticon/${animal}_${isMyTurn ? 'happy' : 'focus'}.png)`,
+          backgroundSize: '33%',
+        }}
       />
       <div className="relative flex items-center justify-center shrink-0 w-16">
         {total > 0 && (
