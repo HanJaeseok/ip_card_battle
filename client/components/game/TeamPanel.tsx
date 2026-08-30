@@ -47,6 +47,7 @@ export function TeamPanel({
       <div className={`text-base font-bold ${teamColor}`}>{label}</div>
 
       <PlayerList
+        team={team}
         members={teamState.members}
         activePlayerIndex={gameState.activePlayerIndex}
         isActiveTeam={isActiveTeam}

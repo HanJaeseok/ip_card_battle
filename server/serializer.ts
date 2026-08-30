@@ -37,11 +37,13 @@ export function serializeState(
       members: state.teams.A.members,
       scores: { ...state.teams.A.scores },
       lastLevel: { ...state.teams.A.lastLevel },
+      playerIndex: state.teams.A.playerIndex,
     },
     B: {
       members: state.teams.B.members,
       scores: { ...state.teams.B.scores },
       lastLevel: { ...state.teams.B.lastLevel },
+      playerIndex: state.teams.B.playerIndex,
     },
   };
 

@@ -5,6 +5,7 @@ import { EffectLayer } from '@/components/effects/EffectLayer';
 import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
 import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
 import { MainComboBanner } from '@/components/effects/MainComboBanner';
+import { PlayerEmoticonLayer } from '@/components/effects/PlayerEmoticonLayer';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { BoardPanel } from './BoardPanel';
@@ -66,6 +67,7 @@ export function GameLayout({
             expandQuake={animState.expandQuake}
             expandBurst={animState.expandBurst}
             mermaidPopup={animState.mermaidPopup}
+            captions={animState.captions}
           />
           <CommentaryBoard lines={animState.commentary} gameState={gameState} />
         </div>
@@ -89,6 +91,9 @@ export function GameLayout({
 
       {/* 특허랑이 강탈 순간 — 화면 전체 비네트 */}
       {animState.tigerImpact && <div className="tiger-vignette" />}
+
+      {/* 플레이어 프로필 옆 반응 이모티콘 (fixed, 화면 전역) */}
+      <PlayerEmoticonLayer items={animState.emoticons} />
     </div>
   );
 }

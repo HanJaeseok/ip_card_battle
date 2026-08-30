@@ -1,8 +1,12 @@
+import type { Team } from 'shared';
+
 export function PlayerList({
+  team,
   members,
   activePlayerIndex,
   isActiveTeam,
 }: {
+  team: Team;
   members: string[];
   activePlayerIndex: number;
   isActiveTeam: boolean;
@@ -14,6 +18,7 @@ export function PlayerList({
         return (
           <div
             key={name}
+            data-player-anchor={`${team}:${i}`}
             className={`text-xs px-3 py-1 rounded-full truncate transition-all ${
               isActive
                 ? 'glow-pulse bg-jungle-700 text-white font-bold'

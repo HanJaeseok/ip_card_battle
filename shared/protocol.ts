@@ -53,6 +53,7 @@ export interface ClientTeamState {
   members: string[];
   scores: Record<Animal, number>;
   lastLevel: Record<Animal, number>;
+  playerIndex: number; // 팀 내 다음 차례 플레이어 인덱스 (이모티콘 등 UI 앵커링용)
 }
 
 export interface ClientGameState {

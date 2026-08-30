@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Animal, ClientGameEvent, ClientGameState, Team } from 'shared';
+import { THRESHOLDS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
 import { playRandomSound, playRandomSoundSequence } from '@/lib/sounds';
 
@@ -45,6 +46,126 @@ export interface RabbitPressure {
   targetTeam: Team; // 압박을 느껴야 할 상대 팀
 }
 
+export interface CaptionItem {
+  id: number;
+  text: string;
+  tier: 'flip' | 'pair' | 'effect'; // 무엇을 뒤집었는지 / 페어 성사 / 효과 발동
+}
+
+export interface PlayerEmoticon {
+  id: number;
+  team: Team;
+  playerIndex: number; // 팀 내 이 플레이어의 인덱스 (프로필 목록 앵커용)
+  file: string;         // /emoticon/{file}.png
+  stackIndex: number;   // 같은 앵커에 몇 번째로 겹쳐 쌓였는지 (크기/z-index 산출용)
+}
+
+type EmoticonMood = 'happy' | 'burn' | 'cry' | 'stone' | 'focus';
+
+function emoticonFile(animal: Animal, mood: EmoticonMood): string {
+  return `${animal}_${mood}`;
+}
+
+function sumScores(scores: Record<Animal, number>): number {
+  return scores.sheep + scores.rabbit + scores.mermaid + scores.tiger;
+}
+
+interface EmoticonPlanItem {
+  team: Team;
+  animal: Animal;
+  mood: EmoticonMood;
+}
+
+/**
+ * 이번 액션(카드 오픈 1회 ~ 실용신양 연쇄 포함)의 이벤트와 전/후 점수를 보고
+ * "턴인 사람"과 "상대(피해자)" 이모티콘을 어떤 걸 띄울지 판정한다.
+ *
+ * 우선순위 규칙:
+ * - 각 동물별로 "실제 효과 발동" > "카드만 뒤집혔지만 페어 실패" 순으로 더 구체적인
+ *   상황을 우선한다(둘 다 해당될 순 없으므로 else-if로 충분).
+ * - 실용신양은 "레벨 상승(강화)"을 그 외의 "여러 장 뒤집었지만 무소득"보다 우선한다.
+ * - 네 동물은 서로 배타적이지 않으므로(같은 액션에서 여러 동물이 동시에 관여 가능)
+ *   해당하는 것을 전부 큐에 쌓는다 — 여러 개면 화면에서 겹쳐 쌓이며 표시된다.
+ */
+function buildEmoticonPlan(
+  events: ClientGameEvent[],
+  before: Record<Team, Record<Animal, number>>,
+  after: Record<Team, Record<Animal, number>>,
+  actingTeam: Team,
+): EmoticonPlanItem[] {
+  const opp: Team = actingTeam === 'A' ? 'B' : 'A';
+  const plan: EmoticonPlanItem[] = [];
+  const coinFlip = () => Math.random() < 0.5;
+
+  const openedCount: Record<Animal, number> = { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 };
+  const collectedAnimals = new Set<Animal>();
+  events.forEach(ev => {
+    if (ev.type === 'open') openedCount[ev.card.animal]++;
+    else if (ev.type === 'collect') collectedAnimals.add(ev.animal);
+  });
+
+  const rabbitBonus = events.find(e => e.type === 'rabbitBonus');
+  const tigerAttack = events.find(e => e.type === 'tigerAttack');
+  const mermaidBonus = events.find(e => e.type === 'mermaidBonus');
+  const mermaidCatchup = events.find(e => e.type === 'mermaidCatchup');
+  const sheepChains = events.filter(e => e.type === 'sheepChain');
+
+  const totalAfterAct = sumScores(after[actingTeam]);
+  const totalAfterOpp = sumScores(after[opp]);
+  const isAhead = totalAfterAct > totalAfterOpp;
+
+  // ── 턴인 사람 ──────────────────────────────────────────────────────────
+  if (rabbitBonus) {
+    plan.push({ team: actingTeam, animal: 'rabbit', mood: isAhead ? 'happy' : 'burn' });
+  } else if (openedCount.rabbit === 1 && !collectedAnimals.has('rabbit')) {
+    plan.push({ team: actingTeam, animal: 'rabbit', mood: coinFlip() ? 'cry' : 'stone' });
+  }
+
+  const sheepLevelBefore = Math.floor(before[actingTeam].sheep / THRESHOLDS.sheep);
+  const sheepLevelAfter = Math.floor(after[actingTeam].sheep / THRESHOLDS.sheep);
+  if (sheepChains.length > 0 && sheepLevelAfter > sheepLevelBefore) {
+    plan.push({ team: actingTeam, animal: 'sheep', mood: 'focus' });
+  } else if (openedCount.sheep >= 2 && !collectedAnimals.has('sheep')) {
+    plan.push({ team: actingTeam, animal: 'sheep', mood: 'happy' });
+  } else if (openedCount.sheep === 1 && !collectedAnimals.has('sheep')) {
+    plan.push({ team: actingTeam, animal: 'sheep', mood: coinFlip() ? 'cry' : 'stone' });
+  }
+
+  if (mermaidBonus) {
+    plan.push({ team: actingTeam, animal: 'mermaid', mood: 'happy' });
+  } else if (mermaidCatchup) {
+    plan.push({ team: actingTeam, animal: 'mermaid', mood: isAhead ? 'happy' : (coinFlip() ? 'burn' : 'focus') });
+  } else if (openedCount.mermaid === 1 && !collectedAnimals.has('mermaid')) {
+    plan.push({ team: actingTeam, animal: 'mermaid', mood: coinFlip() ? 'cry' : 'stone' });
+  }
+
+  if (tigerAttack) {
+    plan.push({ team: actingTeam, animal: 'tiger', mood: isAhead ? 'happy' : (coinFlip() ? 'burn' : 'focus') });
+  } else if (openedCount.tiger === 1 && !collectedAnimals.has('tiger')) {
+    plan.push({ team: actingTeam, animal: 'tiger', mood: coinFlip() ? 'cry' : 'stone' });
+  }
+
+  // ── 상대(피해자) ──────────────────────────────────────────────────────
+  if (tigerAttack) {
+    const sheepDrop = before[opp].sheep - after[opp].sheep;
+    const rabbitDrop = before[opp].rabbit - after[opp].rabbit;
+    if (rabbitDrop > sheepDrop) plan.push({ team: opp, animal: 'rabbit', mood: 'cry' });
+    else if (sheepDrop > rabbitDrop) plan.push({ team: opp, animal: 'sheep', mood: 'cry' });
+    else if (sheepDrop > 0) {
+      plan.push({ team: opp, animal: 'rabbit', mood: 'cry' });
+      plan.push({ team: opp, animal: 'sheep', mood: 'cry' });
+    }
+  }
+  if (mermaidCatchup) {
+    const sheepDrop = before[opp].sheep - after[opp].sheep;
+    const rabbitDrop = before[opp].rabbit - after[opp].rabbit;
+    if (rabbitDrop > 0) plan.push({ team: opp, animal: 'rabbit', mood: 'cry' });
+    if (sheepDrop > 0) plan.push({ team: opp, animal: 'sheep', mood: 'cry' });
+  }
+
+  return plan;
+}
+
 export interface AnimationState {
   suppressedKeys: ReadonlySet<string>;
   recentlyOpenedKeys: ReadonlySet<string>; // 이번 액션에서 새로 뒤집힌 카드 — 이전 턴 정보는 노출하지 않는다
@@ -68,6 +189,8 @@ export interface AnimationState {
   expandQuake: boolean;
   expandBurst: number; // 0 = 없음, 그 외엔 먼지 파티클 seed
   commentary: CommentaryLine[];
+  captions: CaptionItem[];
+  emoticons: PlayerEmoticon[];
 }
 
 const EMPTY_SET = new Set<string>() as ReadonlySet<string>;
@@ -79,13 +202,14 @@ const FLIP_HALF = 125;     // ms — flip-out half
 const FLIP_IN_DUR = 180;   // ms — flip-in + 펀치 바운스
 const FLIP_FULL = FLIP_HALF + FLIP_IN_DUR; // ms — flip 전체 완료 시점
 const REACTION_DUR = 700;  // ms — wink/gold reaction
-const CHAIN_STAGGER_START = 480; // ms — 연쇄 첫 카드 간격 ("닥!")
-const CHAIN_STAGGER_MIN = 150;   // ms — 연쇄가 가속되며 도달하는 최소 간격 ("따다다닥!")
-const CHAIN_STAGGER_DECAY = 0.82; // 카드 순번마다 간격에 곱해지는 감쇠율
-const CHAIN_MAX_VIS = 15;  // max cards with stagger; rest are instant
-// i번째(0-based) 카드가 열린 뒤 다음 카드까지의 간격 — 갈수록 몰아치도록 지수 감쇠시킨다.
-const sheepStaggerGap = (i: number) =>
-  Math.max(CHAIN_STAGGER_MIN, CHAIN_STAGGER_START * Math.pow(CHAIN_STAGGER_DECAY, i));
+const EMPTY_GAP = 80;          // ms — 효과 없는 일반 오픈 뒤 다음 이벤트까지 여백
+const CHAIN_EMPTY_GAP = 320;   // ms — 연쇄 중 효과 없는 카드는 "그냥 넘어가되" 눈에는 보이게
+const EFFECT_SETTLE_GAP = 150; // ms — 카드의 효과 정산이 끝난 뒤 다음 카드로 넘어가기 전 여백
+const CARD_FLIP_BASE_VOLUME = 0.6; // 실용신양 연쇄 첫 카드의 뒤집기 음량
+const CARD_FLIP_VOLUME_STEP = 0.05; // 연쇄 카드 한 장마다 음량 증가폭 (5%)
+// 즉시발동 효과 이벤트 타입 — 서버가 카드를 연 직후 그 카드의 매치 판정 결과로 곧바로
+// 이어붙여 생성하므로, 'open' 뒤에 연속으로 나오는 이 타입들은 "그 카드의 정산 내용"이다.
+const GROUPED_EFFECT_TYPES = new Set(['collect', 'tigerAttack', 'mermaidCatchup', 'mermaidBonus']);
 const SCORE_FLASH_DUR = 500;
 const EFFECT_DUR = 1400;
 const PAIR_GLOW_DUR = 500; // 페어 매칭 글로우 지속 시간
@@ -132,8 +256,12 @@ export function useAnimationQueue(
   const [expandQuake, setExpandQuake] = useState(false);
   const [expandBurst, setExpandBurst] = useState(0);
   const [commentary, setCommentary] = useState<CommentaryLine[]>([]);
+  const [captions, setCaptions] = useState<CaptionItem[]>([]);
+  const [emoticons, setEmoticons] = useState<PlayerEmoticon[]>([]);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // 직전 액션 종료 시점의 팀별 점수 스냅샷 — 이번 액션의 전/후 비교(이모티콘 판정용)에 쓴다.
+  const prevScoresRef = useRef<Record<Team, Record<Animal, number>> | null>(null);
 
   // gameState는 애니메이션 스케줄링(Pass 0의 델타 역산, rabbitBonus 소스 카드 탐색)에
   // 필요하지만, 아래 effect의 의존성으로 넣으면 안 된다 — actionResult 없이 gameState만
@@ -152,6 +280,24 @@ export function useAnimationQueue(
     const id = ++floatIdCounter;
     setFloatingTexts(prev => [...prev, { id, text, team, type }]);
     sched(() => setFloatingTexts(prev => prev.filter(f => f.id !== id)), 1200);
+  };
+
+  const CAPTION_DUR: Record<CaptionItem['tier'], number> = { flip: 550, pair: 800, effect: 950 };
+  const addCaption = (text: string, tier: CaptionItem['tier'], atMs: number) => {
+    const id = ++floatIdCounter;
+    sched(() => {
+      setCaptions(prev => [...prev, { id, text, tier }]);
+      sched(() => setCaptions(prev => prev.filter(c => c.id !== id)), CAPTION_DUR[tier]);
+    }, atMs);
+  };
+
+  const EMOTICON_DUR = 2200;
+  const addEmoticon = (team: Team, playerIndex: number, file: string, stackIndex: number, atMs: number) => {
+    const id = ++floatIdCounter;
+    sched(() => {
+      setEmoticons(prev => [...prev, { id, team, playerIndex, file, stackIndex }]);
+      sched(() => setEmoticons(prev => prev.filter(e => e.id !== id)), EMOTICON_DUR);
+    }, atMs);
   };
 
   useEffect(() => {
@@ -273,36 +419,38 @@ export function useAnimationQueue(
     }
 
     // ── Pass 2: schedule animations ──────────────────────────────────────
+    // 한 액션 안에서 여러 장이 열릴 수 있다(실용신양 연쇄). 카드 하나가 열릴 때마다
+    // 그 카드의 매치/타이거/인어 효과가 있으면 "다 정산될 때까지" 기다린 뒤에야
+    // 다음 카드를 연다 — 효과가 없으면 곧바로 다음 카드로 넘어간다.
     let cursor = 0;          // ms absolute time for sequential events
     let chainRemaining = 0;  // how many upcoming 'open' events are part of current chain
-    let chainStaggerIdx = 0; // index within current chain (for stagger)
-    let chainCursor = 0;     // time when current chain started
-    let chainOffset = 0;     // 체인 시작 시점부터의 누적 간격 (가속 스태거용)
+    let chainIdx = 0;        // index within current chain (for pitch/combo escalation)
     let comboCounter = 0;    // 이번 턴 누적 실용신양 추가 오픈 콤보 번호 (1부터)
 
-    for (const ev of lastEvents) {
+    let idx = 0;
+    while (idx < lastEvents.length) {
+      const ev = lastEvents[idx];
+
       if (ev.type === 'open') {
         const key = ev.key;
         const num = ev.card.num;
+        const revealAt = cursor;
+        const inChain = chainRemaining > 0;
 
-        let revealAt: number;
-        if (chainRemaining > 0) {
-          // part of a sheep chain → 갈수록 빨라지는 스태거("닥! 다다닥! 따다다닥!").
-          // cursor는 매 카드마다 실제 리빌 시점으로 갱신해, 연쇄 도중 끼어드는
-          // collect/tiger/mermaid 이벤트가 (아직 다 안 열린 시점의) 낡은 cursor가
-          // 아니라 "지금까지 열린 카드"의 시점을 기준으로 재생되게 한다.
-          const staggerIdx = Math.min(chainStaggerIdx, CHAIN_MAX_VIS);
-          revealAt = chainCursor + chainOffset;
-          chainOffset += sheepStaggerGap(staggerIdx);
-          chainStaggerIdx++;
+        // 이 카드에 곧바로 딸린 효과 그룹(collect → tiger?/mermaid?)을 미리 훑어둔다.
+        let j = idx + 1;
+        const group: ClientGameEvent[] = [];
+        while (j < lastEvents.length && GROUPED_EFFECT_TYPES.has(lastEvents[j].type)) {
+          group.push(lastEvents[j]);
+          j++;
+        }
+
+        if (inChain) {
           chainRemaining--;
-          const isLastInChain = chainRemaining === 0;
-          cursor = isLastInChain ? revealAt + FLIP_FULL + 80 : revealAt;
-
-          comboCounter++;
-          const combo = comboCounter;
-          // 진행될수록 피치를 살짝 올려 몰아치는 고조감을 준다 (최대 1.35배속)
-          const pitch = Math.min(1.35, 1 + staggerIdx * 0.035);
+          chainIdx++;
+          const combo = ++comboCounter;
+          // 진행될수록 피치를 살짝 올려 고조감을 준다 (속도 자체는 올리지 않는다)
+          const pitch = Math.min(1.35, 1 + (chainIdx - 1) * 0.035);
           sched(() => playRandomSound('sheep', pitch), revealAt);
 
           const comboId = ++floatIdCounter;
@@ -317,19 +465,21 @@ export function useAnimationQueue(
             sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
           }, revealAt);
 
-          if (isLastInChain) {
+          if (chainRemaining === 0) {
             const finalId = ++floatIdCounter;
             sched(() => {
               setMainCombo({ id: finalId, combo });
               sched(() => setMainCombo(null), MAIN_COMBO_DUR);
             }, revealAt + FLIP_FULL);
           }
-        } else {
-          revealAt = cursor;
-          cursor += FLIP_FULL + 80; // single flip + small gap
         }
 
-        // Reveal card (triggers CardCell flip animation)
+        // 카드 뒤집는 효과음 — 매번 랜덤 재생. 실용신양 연쇄로 계속 더 뒤집을수록
+        // 몰아치는 느낌을 주기 위해 카드마다 음량을 5%씩 키운다(최대 100%).
+        const cardVolume = inChain ? Math.min(1, CARD_FLIP_BASE_VOLUME + (chainIdx - 1) * CARD_FLIP_VOLUME_STEP) : 1;
+        sched(() => playRandomSound('card', 1, cardVolume), revealAt);
+
+        // 카드 뒤집기
         sched(() => {
           setSuppressedKeys(prev => {
             const next = new Set(prev);
@@ -338,7 +488,7 @@ export function useAnimationQueue(
           });
         }, revealAt);
 
-        // Add reaction after flip completes
+        // 뒤집기 완료 후 숫자별 리액션
         const reactionAt = revealAt + FLIP_FULL;
         sched(() => {
           setReactionMap(prev => new Map([...prev, [key, num]]));
@@ -351,11 +501,110 @@ export function useAnimationQueue(
           });
         }, reactionAt + REACTION_DUR);
 
+        // 무엇을 뒤집었는지 큰 자막으로 강조
+        addCaption(`${ANIMAL_INFO[ev.card.animal].short}!`, 'flip', reactionAt);
+
+        // 이 카드에 딸린 효과를 순서대로("정산") 재생 — 하나씩 끝나야 다음 단계로 넘어간다
+        let t = reactionAt;
+        for (const gev of group) {
+          if (gev.type === 'collect') {
+            const { team, animal, keys } = gev;
+            const flashKey = `${team}:${animal}`;
+            const flashId = ++floatIdCounter;
+            const glowColor = PAIR_COLORS[Math.floor(Math.random() * PAIR_COLORS.length)];
+            const at = t;
+
+            addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at);
+
+            sched(() => {
+              setCollectGlowKeys(prev => {
+                const next = new Map(prev);
+                keys.forEach(k => next.set(k, glowColor));
+                return next;
+              });
+            }, at);
+
+            sched(() => {
+              setCollectGlowKeys(prev => {
+                const next = new Map(prev);
+                keys.forEach(k => next.delete(k));
+                return next;
+              });
+              setScoreFlash(prev => new Map([...prev, [flashKey, flashId]]));
+              sched(() => {
+                setScoreFlash(prev => {
+                  const next = new Map(prev);
+                  if (next.get(flashKey) === flashId) next.delete(flashKey);
+                  return next;
+                });
+              }, SCORE_FLASH_DUR);
+            }, at + PAIR_GLOW_DUR);
+
+            t += PAIR_GLOW_DUR + 80;
+
+          } else if (gev.type === 'tigerAttack') {
+            const onTeam: Team = gev.team === 'A' ? 'B' : 'A';
+            const at = t;
+
+            addCaption('특허랑이 발동!', 'effect', at + 150);
+
+            sched(() => {
+              setTigerRecoil({ attackerTeam: gev.team });
+              sched(() => setTigerRecoil(null), TIGER_RECOIL_DUR);
+            }, at);
+            sched(() => {
+              // "-dmg" 플로팅은 실용신양·상표토끼 표(ScorePanel의 table-hit-float)에서
+              // 직접 표시하므로, 여기서 위치가 부정확한 범용 addFloat는 사용하지 않는다.
+              setTigerSlash({ onTeam, dmg: gev.dmg });
+              setTigerImpact(true);
+              playRandomSound('tiger');
+              sched(() => setTigerSlash(null), TIGER_HIT_DUR);
+              sched(() => setTigerImpact(false), 600);
+            }, at + 150);
+
+            t += 150 + TIGER_HIT_DUR;
+
+          } else if (gev.type === 'mermaidCatchup') {
+            const at = t;
+            addCaption('디자인어 발동!', 'effect', at);
+            sched(() => {
+              setMermaidEffect({ team: gev.team, type: 'catchup' });
+              setMermaidPopup({ team: gev.team });
+              playRandomSound('mermaid');
+              addFloat(`+${gev.absorb}`, gev.team, 'bonus');
+              addFloat(`-${gev.absorb}`, gev.team === 'A' ? 'B' : 'A', 'penalty');
+              sched(() => setMermaidEffect(null), EFFECT_DUR);
+              sched(() => setMermaidPopup(null), MERMAID_POPUP_DUR);
+            }, at);
+            t += EFFECT_DUR;
+
+          } else if (gev.type === 'mermaidBonus') {
+            const at = t;
+            addCaption('디자인어 발동!', 'effect', at);
+            sched(() => {
+              setMermaidEffect({ team: gev.team, type: 'bonus' });
+              setMermaidPopup({ team: gev.team });
+              playRandomSound('mermaid');
+              addFloat(`+${gev.bonus}`, gev.team, 'bonus');
+              sched(() => setMermaidEffect(null), EFFECT_DUR);
+              sched(() => setMermaidPopup(null), MERMAID_POPUP_DUR);
+            }, at);
+            t += EFFECT_DUR;
+          }
+        }
+
+        // 다음 카드까지의 여백 — 효과가 있었으면 정산이 끝난 뒤 짧게, 없으면("없으면 넘어가고")
+        // 연쇄 중엔 눈에 보일 정도로, 일반 오픈이면 거의 곧바로.
+        const gap = group.length > 0 ? EFFECT_SETTLE_GAP : (inChain ? CHAIN_EMPTY_GAP : EMPTY_GAP);
+        cursor = t + gap;
+        idx = j;
+        continue;
+
       } else if (ev.type === 'sheepChain') {
         chainRemaining = ev.count;
-        chainStaggerIdx = 0;
-        chainCursor = cursor; // chain starts at current cursor
-        chainOffset = 0;
+        chainIdx = 0;
+
+        addCaption('실용신양 강화!', 'effect', cursor);
 
         const level = ev.level;
         sched(() => {
@@ -368,40 +617,6 @@ export function useAnimationQueue(
             sched(() => setJoltAllFaceDown(false), 450);
           }
         }, cursor);
-
-      } else if (ev.type === 'collect') {
-        const { team, animal, keys } = ev;
-        const flashKey = `${team}:${animal}`;
-        const flashId = ++floatIdCounter;
-        const glowColor = PAIR_COLORS[Math.floor(Math.random() * PAIR_COLORS.length)];
-
-        // 페어 매칭 글로우 — 글로우가 끝나면 카드는 팀 색으로 비활성화된 채 계속 보인다
-        sched(() => {
-          setCollectGlowKeys(prev => {
-            const next = new Map(prev);
-            keys.forEach(k => next.set(k, glowColor));
-            return next;
-          });
-        }, cursor);
-
-        sched(() => {
-          setCollectGlowKeys(prev => {
-            const next = new Map(prev);
-            keys.forEach(k => next.delete(k));
-            return next;
-          });
-
-          setScoreFlash(prev => new Map([...prev, [flashKey, flashId]]));
-          sched(() => {
-            setScoreFlash(prev => {
-              const next = new Map(prev);
-              if (next.get(flashKey) === flashId) next.delete(flashKey);
-              return next;
-            });
-          }, SCORE_FLASH_DUR);
-        }, cursor + PAIR_GLOW_DUR);
-
-        cursor += PAIR_GLOW_DUR + 80;
 
       } else if (ev.type === 'rabbitBonus') {
         const team = ev.team;
@@ -417,6 +632,8 @@ export function useAnimationQueue(
               })
               .map(e => e.key)
           : [];
+
+        addCaption('상표토끼 발동!', 'effect', cursor);
 
         sched(() => {
           if (sourceKeys.length > 0) {
@@ -440,43 +657,6 @@ export function useAnimationQueue(
           }, RABBIT_PRESSURE_DUR);
         }, cursor);
 
-      } else if (ev.type === 'tigerAttack') {
-        const onTeam: Team = ev.team === 'A' ? 'B' : 'A';
-        sched(() => {
-          setTigerRecoil({ attackerTeam: ev.team });
-          sched(() => setTigerRecoil(null), TIGER_RECOIL_DUR);
-        }, cursor);
-        sched(() => {
-          // "-dmg" 플로팅은 실용신양·상표토끼 표(ScorePanel의 table-hit-float)에서
-          // 직접 표시하므로, 여기서 위치가 부정확한 범용 addFloat는 사용하지 않는다.
-          setTigerSlash({ onTeam, dmg: ev.dmg });
-          setTigerImpact(true);
-          playRandomSound('tiger');
-          sched(() => setTigerSlash(null), TIGER_HIT_DUR);
-          sched(() => setTigerImpact(false), 600);
-        }, cursor + 150);
-
-      } else if (ev.type === 'mermaidCatchup') {
-        sched(() => {
-          setMermaidEffect({ team: ev.team, type: 'catchup' });
-          setMermaidPopup({ team: ev.team });
-          playRandomSound('mermaid');
-          addFloat(`+${ev.absorb}`, ev.team, 'bonus');
-          addFloat(`-${ev.absorb}`, ev.team === 'A' ? 'B' : 'A', 'penalty');
-          sched(() => setMermaidEffect(null), EFFECT_DUR);
-          sched(() => setMermaidPopup(null), MERMAID_POPUP_DUR);
-        }, cursor);
-
-      } else if (ev.type === 'mermaidBonus') {
-        sched(() => {
-          setMermaidEffect({ team: ev.team, type: 'bonus' });
-          setMermaidPopup({ team: ev.team });
-          playRandomSound('mermaid');
-          addFloat(`+${ev.bonus}`, ev.team, 'bonus');
-          sched(() => setMermaidEffect(null), EFFECT_DUR);
-          sched(() => setMermaidPopup(null), MERMAID_POPUP_DUR);
-        }, cursor);
-
       } else if (ev.type === 'expand') {
         const burstId = ++floatIdCounter;
         sched(() => {
@@ -488,6 +668,49 @@ export function useAnimationQueue(
           sched(() => setExpandBurst(0), 1100);
         }, cursor);
       }
+      // 'collect'/'tigerAttack'/'mermaidCatchup'/'mermaidBonus'는 항상 직전 'open'의
+      // 효과 그룹으로 이미 소비되므로 여기까지 단독으로 도달하지 않는다.
+      idx++;
+    }
+
+    // ── Pass 3: 플레이어 이모티콘 판정 (턴인 사람 / 상대) ───────────────────
+    // 게임이 끝나는 액션은 턴 로테이션이 갱신되지 않아 앵커 역산이 어긋날 수 있으므로 건너뛴다.
+    if (gameState && gameState.phase !== 'ended') {
+      const beforeScores = prevScoresRef.current;
+      const afterScores: Record<Team, Record<Animal, number>> = {
+        A: { ...gameState.teams.A.scores },
+        B: { ...gameState.teams.B.scores },
+      };
+
+      if (beforeScores) {
+        const anyTeamEvent = lastEvents.find(
+          (e): e is Extract<ClientGameEvent, { team: Team }> => 'team' in e,
+        );
+        const actingTeam: Team = anyTeamEvent?.team ?? (gameState.activeTeam === 'A' ? 'B' : 'A');
+        const plan = buildEmoticonPlan(lastEvents, beforeScores, afterScores, actingTeam);
+
+        if (plan.length > 0) {
+          // 방금 플레이한 팀은 turnManager가 이미 playerIndex를 다음 차례로 돌려놨으므로 역산한다.
+          const actingMembers = gameState.teams[actingTeam].members.length;
+          const actingJustPlayedIdx =
+            (gameState.teams[actingTeam].playerIndex - 1 + actingMembers) % actingMembers;
+
+          const stackCounter = new Map<string, number>(); // 앵커(팀:인덱스)별 스택 카운트
+          let emoticonCursor = cursor + 200; // 카드/효과 연출이 끝난 뒤 이어서 순차 등장
+          plan.forEach(item => {
+            const playerIndex =
+              item.team === actingTeam ? actingJustPlayedIdx : gameState.teams[item.team].playerIndex;
+            const anchorKey = `${item.team}:${playerIndex}`;
+            const stackIndex = stackCounter.get(anchorKey) ?? 0;
+            stackCounter.set(anchorKey, stackIndex + 1);
+
+            addEmoticon(item.team, playerIndex, emoticonFile(item.animal, item.mood), stackIndex, emoticonCursor);
+            emoticonCursor += 280;
+          });
+        }
+      }
+
+      prevScoresRef.current = afterScores;
     }
 
     return () => {
@@ -520,5 +743,7 @@ export function useAnimationQueue(
     expandQuake,
     expandBurst,
     commentary,
+    captions,
+    emoticons,
   };
 }

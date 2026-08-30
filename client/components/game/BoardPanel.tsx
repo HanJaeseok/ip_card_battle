@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClientGameState, Team } from 'shared';
 import { CardGrid } from './CardGrid';
 import { MermaidPopup } from './MermaidPopup';
+import { CardCaptionLayer } from '@/components/effects/CardCaptionLayer';
+import type { CaptionItem } from '@/hooks/useAnimationQueue';
 
 interface DustParticle {
   id: number;
@@ -49,6 +51,7 @@ export function BoardPanel({
   expandQuake,
   expandBurst,
   mermaidPopup,
+  captions,
 }: {
   gameState: ClientGameState;
   myTeam: Team | null;
@@ -62,6 +65,7 @@ export function BoardPanel({
   expandQuake: boolean;
   expandBurst: number;
   mermaidPopup: { team: Team } | null;
+  captions: CaptionItem[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -222,6 +226,9 @@ export function BoardPanel({
 
       {/* 디자인어 효과 — 발동한 팀 쪽에서 큰 인어가 나와 음표를 흩뿌린다 */}
       {mermaidPopup && <MermaidPopup team={mermaidPopup.team} />}
+
+      {/* 무엇을 뒤집었는지 / 페어 / 효과 발동 자막 — 팬·줌과 무관하게 보드 중앙에 고정 */}
+      <CardCaptionLayer captions={captions} />
 
       {/* 줌 힌트 */}
       <div className="absolute bottom-2 right-2 text-xs text-jungle-400 bg-white/70 px-2 py-1 rounded-md pointer-events-none select-none">

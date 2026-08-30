@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-const PREFIXES = ['sheep', 'mermaid', 'tiger', 'rabbit'] as const;
+const PREFIXES = ['sheep', 'mermaid', 'tiger', 'rabbit', 'card'] as const;
 type Prefix = (typeof PREFIXES)[number];
 
 export async function GET() {
@@ -12,6 +12,7 @@ export async function GET() {
     mermaid: [],
     tiger: [],
     rabbit: [],
+    card: [],
   };
 
   let files: string[] = [];

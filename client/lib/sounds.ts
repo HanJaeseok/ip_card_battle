@@ -1,10 +1,10 @@
 'use client';
 
-type SoundAnimal = 'sheep' | 'mermaid' | 'tiger' | 'rabbit';
+type SoundAnimal = 'sheep' | 'mermaid' | 'tiger' | 'rabbit' | 'card';
 
 type Manifest = Record<SoundAnimal, string[]>;
 
-const EMPTY_MANIFEST: Manifest = { sheep: [], mermaid: [], tiger: [], rabbit: [] };
+const EMPTY_MANIFEST: Manifest = { sheep: [], mermaid: [], tiger: [], rabbit: [], card: [] };
 
 let manifest: Manifest = EMPTY_MANIFEST;
 const audioCache = new Map<string, HTMLAudioElement>();
@@ -30,27 +30,23 @@ if (typeof window !== 'undefined') {
   loadManifest();
 }
 
-function playSrc(src: string, rate = 1) {
+function playSrc(src: string, rate = 1, volume = 1) {
   const base = audioCache.get(src);
   const audio = base ? (base.cloneNode(true) as HTMLAudioElement) : new Audio(src);
   audio.playbackRate = rate;
+  audio.volume = Math.min(1, Math.max(0, volume));
   audio.play().catch(() => {});
 }
 
-export function playRandomSound(animal: SoundAnimal, rate = 1) {
+export function playRandomSound(animal: SoundAnimal, rate = 1, volume = 1) {
   const files = manifest[animal];
   if (!files || files.length === 0) return;
   const src = files[Math.floor(Math.random() * files.length)];
-  playSrc(src, rate);
+  playSrc(src, rate, volume);
 }
 
 export function playRandomSoundSequence(animal: SoundAnimal, count: number, intervalMs = 150) {
   for (let i = 0; i < count; i++) {
     setTimeout(() => playRandomSound(animal), i * intervalMs);
   }
-}
-
-export function playFixedSound(src: string) {
-  const audio = new Audio(src);
-  audio.play().catch(() => {});
 }
