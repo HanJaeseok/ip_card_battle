@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { Animal, ClientGameEvent, ClientGameState, Place, StackedCard, Team } from 'shared';
 import { ANIMALS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
@@ -213,6 +214,12 @@ export function useAnimationQueue(
   const [displayedActiveTeam, setDisplayedActiveTeam] = useState<Team>(gameState?.activeTeam ?? 'A');
   const [displayedActivePlayerIndex, setDisplayedActivePlayerIndex] = useState<number>(gameState?.activePlayerIndex ?? 0);
   const [isSettling, setIsSettling] = useState(false);
+  // 이번 액션의 정산이 끝나면 화면 턴을 어디로 넘겨야 하는지 미리 기록해둔다. 싱글 모드처럼
+  // 상대(컴퓨터)가 아주 빠르게 다음 수를 두면, 이 턴 전환이 실행되기도 전에 다음 액션이
+  // 도착해 타이머가 통째로 취소될 수 있다 — 그러면 상대 턴 배경색이 한 번도 안 보이고
+  // 곧바로 내 턴으로 되돌아온 것처럼 보인다. 아래에서 이 값을 이용해 최소 한 프레임은
+  // 반드시 반영되도록 강제한다.
+  const pendingFlipRef = useRef<{ team: Team; playerIndex: number } | null>(null);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // 다음 액션이 들어올 때 timersRef를 통째로 비우기 때문에, 그보다 오래 지속되는
@@ -299,6 +306,18 @@ export function useAnimationQueue(
 
   useEffect(() => {
     if (lastEvents.length === 0) return;
+
+    // 이전 액션의 턴 전환이 아직 실행되지 못한 채 이번 액션이 도착했다면, 아래에서
+    // 타이머를 통째로 취소하기 전에 그 전환을 먼저 강제로(동기적으로) 반영해
+    // 최소 한 프레임은 화면에 나타나게 한다.
+    if (pendingFlipRef.current) {
+      const { team, playerIndex } = pendingFlipRef.current;
+      pendingFlipRef.current = null;
+      flushSync(() => {
+        setDisplayedActiveTeam(team);
+        setDisplayedActivePlayerIndex(playerIndex);
+      });
+    }
 
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
@@ -839,6 +858,9 @@ export function useAnimationQueue(
     }
 
     // ── 정산 연출이 여기서 끝난다 — 이 시점에야 비로소 화면상의 턴을 실제 서버 상태로 넘긴다. ──
+    if (gameState) {
+      pendingFlipRef.current = { team: gameState.activeTeam, playerIndex: gameState.activePlayerIndex };
+    }
     sched(() => {
       setIsSettling(false);
       const latest = gameStateRef.current;
@@ -846,6 +868,7 @@ export function useAnimationQueue(
         setDisplayedActiveTeam(latest.activeTeam);
         setDisplayedActivePlayerIndex(latest.activePlayerIndex);
       }
+      pendingFlipRef.current = null;
     }, cursor);
 
     return () => {
@@ -864,6 +887,7 @@ export function useAnimationQueue(
       timersRef.current = [];
       persistentTimersRef.current.forEach(clearTimeout);
       persistentTimersRef.current = [];
+      pendingFlipRef.current = null;
       setIsSettling(false);
     }
   }, [gameState?.phase]);

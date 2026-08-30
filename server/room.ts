@@ -11,8 +11,11 @@ import { serializeEvents, serializeState } from './serializer';
 const CPU_PLAYER_ID = 'CPU';
 const CPU_NICKNAME = '컴퓨터';
 const CPU_TEAM_NAME = '컴퓨터';
-const CPU_THINK_MIN_MS = 1500;
-const CPU_THINK_MAX_MS = 2500;
+// 클라이언트의 스킬 발동 연출(디자인어 팝업 2000ms 등)이 끝나기 전에 컴퓨터가 다음 수를
+// 두면, 그 사이 상대 턴 배경색이 거의 안 보이고 곧바로 내 턴으로 돌아온 것처럼 보인다.
+// 가장 긴 연출보다 여유 있게 최소 대기 시간을 잡아 그런 일이 최대한 드물게 한다.
+const CPU_THINK_MIN_MS = 2200;
+const CPU_THINK_MAX_MS = 3200;
 
 interface PlayerConnection {
   ws: WebSocket;
