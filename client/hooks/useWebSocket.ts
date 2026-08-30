@@ -35,6 +35,7 @@ export interface UseWebSocketReturn {
   error: string | null;
   createRoom: (nickname: string, team: Team) => void;
   joinRoom: (roomId: string, nickname: string, team: Team) => void;
+  createSoloRoom: (nickname: string) => void;
   sendReady: () => void;
   drawCard: (place: Place) => void;
 }
@@ -131,6 +132,11 @@ export function useWebSocket(): UseWebSocketReturn {
     send({ type: 'joinRoom', roomId: rid, nickname, team });
   }, [send]);
 
+  const createSoloRoom = useCallback((nickname: string) => {
+    setError(null);
+    send({ type: 'createSoloRoom', nickname });
+  }, [send]);
+
   const sendReady = useCallback(() => send({ type: 'ready' }), [send]);
 
   const drawCard = useCallback((place: Place) => {
@@ -140,6 +146,6 @@ export function useWebSocket(): UseWebSocketReturn {
   return {
     connected, roomId, playerId,
     lobbyPlayers, gameState, lastEvents, error,
-    createRoom, joinRoom, sendReady, drawCard,
+    createRoom, joinRoom, createSoloRoom, sendReady, drawCard,
   };
 }

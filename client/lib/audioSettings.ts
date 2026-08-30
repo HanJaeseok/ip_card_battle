@@ -6,10 +6,20 @@ export interface AudioSettings {
   muteAll: boolean;
   muteSfx: boolean;
   muteBgm: boolean;
+  volumeAll: number; // 0~1
+  volumeSfx: number; // 0~1
+  volumeBgm: number; // 0~1
 }
 
 const STORAGE_KEY = 'cardBattle_audioSettings';
-const DEFAULTS: AudioSettings = { muteAll: false, muteSfx: false, muteBgm: false };
+const DEFAULTS: AudioSettings = {
+  muteAll: false,
+  muteSfx: false,
+  muteBgm: false,
+  volumeAll: 1,
+  volumeSfx: 1,
+  volumeBgm: 1,
+};
 
 let settings: AudioSettings = { ...DEFAULTS };
 const listeners = new Set<() => void>();
@@ -48,4 +58,14 @@ export function isSfxMuted(): boolean {
 
 export function isBgmMuted(): boolean {
   return settings.muteAll || settings.muteBgm;
+}
+
+/** 전체×효과음 음량을 곱한 실제 배수(0~1). 꺼져 있으면 0. */
+export function getSfxVolume(): number {
+  return isSfxMuted() ? 0 : settings.volumeAll * settings.volumeSfx;
+}
+
+/** 전체×BGM 음량을 곱한 실제 배수(0~1). 꺼져 있으면 0. */
+export function getBgmVolume(): number {
+  return isBgmMuted() ? 0 : settings.volumeAll * settings.volumeBgm;
 }

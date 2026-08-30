@@ -13,13 +13,13 @@ export default function LobbyPage() {
 
   // 로비/대기실 BGM — 입장 즉시부터 게임 시작 전까지 계속 재생
   useEffect(() => {
-    playBgm('/sounds/bgm_main.mp3', 1);
+    playBgm('/sounds/bgm_main.mp3', 0.6);
   }, []);
 
   const [nickname, setNickname] = useState('');
   const [team, setTeam] = useState<Team>('A');
   const [joinRoomId, setJoinRoomId] = useState('');
-  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'waiting'>('home');
+  const [mode, setMode] = useState<'home' | 'create' | 'join' | 'solo' | 'waiting'>('home');
   const [isReady, setIsReady] = useState(false);
   const [showHowTo, setShowHowTo] = useState(false);
 
@@ -45,6 +45,12 @@ export default function LobbyPage() {
     if (!nickname.trim() || !joinRoomId.trim()) return;
     sessionStorage.setItem('cardBattle_team', team);
     ws.joinRoom(joinRoomId.trim().toUpperCase(), nickname.trim(), team);
+  };
+
+  const handleStartSolo = () => {
+    if (!nickname.trim()) return;
+    sessionStorage.setItem('cardBattle_team', 'A');
+    ws.createSoloRoom(nickname.trim());
   };
 
   const handleReady = () => {
@@ -93,6 +99,45 @@ export default function LobbyPage() {
             className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition"
           >
             방 참가하기
+          </button>
+          <button
+            onClick={() => setMode('solo')}
+            disabled={!ws.connected}
+            className="bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition"
+          >
+            🤖 싱글 모드 (컴퓨터와 대전)
+          </button>
+        </div>
+      )}
+
+      {mode === 'solo' && (
+        <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm flex flex-col gap-4">
+          <h3 className="font-semibold text-gray-700">싱글 모드</h3>
+          <p className="text-xs text-gray-400 -mt-2">
+            상대는 컴퓨터예요. 컴퓨터는 자기 차례마다 무작위 장소를 클릭합니다.
+          </p>
+
+          <Field label="닉네임">
+            <input
+              type="text"
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              placeholder="닉네임 입력"
+              maxLength={12}
+              className="input-base"
+            />
+          </Field>
+
+          <button
+            onClick={handleStartSolo}
+            disabled={!ws.connected || !nickname.trim()}
+            className="bg-amber-500 hover:bg-amber-600 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition"
+          >
+            컴퓨터와 대전 시작
+          </button>
+
+          <button onClick={() => setMode('home')} className="text-sm text-gray-400 hover:text-gray-600">
+            ← 뒤로
           </button>
         </div>
       )}

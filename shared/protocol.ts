@@ -5,6 +5,7 @@ import type { GameEvent, GameState, Place, Team } from './types';
 export type ClientMessage =
   | { type: 'createRoom'; nickname: string; team: Team }
   | { type: 'joinRoom'; roomId: string; nickname: string; team: Team }
+  | { type: 'createSoloRoom'; nickname: string } // 싱글 모드 — 컴퓨터(랜덤 클릭)와 즉시 대전
   | { type: 'ready' }
   | { type: 'drawCard'; place: Place }
   | { type: 'reconnect'; roomId: string; playerId: string };

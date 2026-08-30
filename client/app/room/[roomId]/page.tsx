@@ -28,7 +28,7 @@ export default function GamePage() {
   useEffect(() => {
     if (!gameState) return;
     if (gameState.phase === 'ended') {
-      playBgm('/sounds/bgm_opening.mp3', 1);
+      playBgm('/sounds/bgm_opening.mp3', 0.6);
     } else if (gameState.expanded) {
       playBgm('/sounds/bgm_game2.mp3', GAME_BGM_VOLUME);
     } else {

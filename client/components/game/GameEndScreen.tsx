@@ -101,7 +101,7 @@ export function GameEndScreen({
           <img
             src={`/skills/${flavorAnimal}_skill.png`}
             alt={ANIMAL_INFO[flavorAnimal].name}
-            className="w-40 h-40 rounded-full object-cover shadow-xl"
+            className="w-[40vw] h-[40vw] max-w-[440px] max-h-[440px] min-w-[200px] min-h-[200px] rounded-full object-cover shadow-xl"
             style={{
               border: `5px solid ${winner === 'A' ? '#22c55e' : '#3b82f6'}`,
             }}

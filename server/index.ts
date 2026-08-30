@@ -36,6 +36,16 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'createSoloRoom': {
+        const { roomId, room } = roomManager.createRoom();
+        const playerId = randomUUID();
+        room.addSoloPlayer(ws, playerId, msg.nickname);
+        currentRoomId = roomId;
+        currentPlayerId = playerId;
+        ws.send(JSON.stringify({ type: 'roomCreated', roomId, playerId }));
+        break;
+      }
+
       case 'joinRoom': {
         const room = roomManager.getRoom(msg.roomId);
         if (!room) {

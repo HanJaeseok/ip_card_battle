@@ -1,6 +1,6 @@
 'use client';
 
-import { isSfxMuted } from './audioSettings';
+import { getSfxVolume } from './audioSettings';
 
 type SoundAnimal = 'sheep' | 'mermaid' | 'tiger' | 'rabbit' | 'card';
 
@@ -33,11 +33,12 @@ if (typeof window !== 'undefined') {
 }
 
 function playSrc(src: string, rate = 1, volume = 1) {
-  if (isSfxMuted()) return;
+  const effectiveVolume = Math.min(1, Math.max(0, volume)) * getSfxVolume();
+  if (effectiveVolume <= 0) return;
   const base = audioCache.get(src);
   const audio = base ? (base.cloneNode(true) as HTMLAudioElement) : new Audio(src);
   audio.playbackRate = rate;
-  audio.volume = Math.min(1, Math.max(0, volume));
+  audio.volume = effectiveVolume;
   audio.play().catch(() => {});
 }
 

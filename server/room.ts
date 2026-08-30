@@ -3,8 +3,14 @@ import type { Place, Team } from 'shared';
 import type { ServerMessage } from 'shared';
 import { processPlayerAction, processTimeout, initGame } from './engine/gameEngine';
 import type { GameState } from 'shared';
-import { TURN_TIME_SEC } from 'shared';
+import { TURN_TIME_SEC, PLACES } from 'shared';
 import { serializeEvents, serializeState } from './serializer';
+
+// 싱글 모드 컴퓨터 플레이어는 실제 WebSocket 연결이 없으므로 고정 ID로 취급한다.
+const CPU_PLAYER_ID = 'CPU';
+const CPU_NICKNAME = '컴퓨터';
+const CPU_THINK_MIN_MS = 700;
+const CPU_THINK_MAX_MS = 1600;
 
 interface PlayerConnection {
   ws: WebSocket;
@@ -21,6 +27,8 @@ export class Room {
   private state: GameState | null = null;
   private turnDeadline = 0;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
+  private vsComputer = false;
+  private computerTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     readonly roomId: string,
@@ -42,6 +50,15 @@ export class Room {
     return 'ok';
   }
 
+  /** 싱글 모드 — 사람은 A팀에 즉시 참가시키고, B팀은 컴퓨터(랜덤 클릭)로 채워 곧바로 게임을 시작한다. */
+  addSoloPlayer(ws: WebSocket, playerId: string, nickname: string): void {
+    this.vsComputer = true;
+    this.players.set(playerId, { ws, playerId, nickname, team: 'A', ready: true, connected: true });
+    this.teamPlayerIds.A.push(playerId);
+    this.teamPlayerIds.B.push(CPU_PLAYER_ID);
+    this.tryStartGame();
+  }
+
   setReady(playerId: string): void {
     const p = this.players.get(playerId);
     if (!p) return;
@@ -52,17 +69,19 @@ export class Room {
 
   private tryStartGame(): void {
     const all = [...this.players.values()];
-    if (all.length < 2) return;
+    const minPlayers = this.vsComputer ? 1 : 2;
+    if (all.length < minPlayers) return;
     if (!all.every(p => p.ready)) return;
     if (this.teamPlayerIds.A.length === 0 || this.teamPlayerIds.B.length === 0) return;
 
-    const nickA = this.teamPlayerIds.A.map(id => this.players.get(id)!.nickname);
-    const nickB = this.teamPlayerIds.B.map(id => this.players.get(id)!.nickname);
+    const nickA = this.teamPlayerIds.A.map(id => this.players.get(id)?.nickname ?? CPU_NICKNAME);
+    const nickB = this.teamPlayerIds.B.map(id => this.players.get(id)?.nickname ?? CPU_NICKNAME);
     this.state = initGame(nickA, nickB);
 
     this.resetTimer();
     const clientState = serializeState(this.state, this.turnDeadline);
     this.broadcast({ type: 'gameStart', state: clientState });
+    this.scheduleComputerMoveIfNeeded();
   }
 
   // ─── 게임 진행 ───────────────────────────────────────────────────────────
@@ -88,6 +107,36 @@ export class Room {
     this.broadcast({ type: 'actionResult', events: clientEvents, state: clientState });
 
     if (this.state.phase === 'ended') this.clearTimer();
+    else this.scheduleComputerMoveIfNeeded();
+  }
+
+  /** 싱글 모드 — 컴퓨터(B팀) 차례가 되면 잠시 "생각하는" 척한 뒤 무작위 장소를 클릭한다. */
+  private scheduleComputerMoveIfNeeded(): void {
+    if (!this.vsComputer || !this.state || this.state.phase !== 'playing') return;
+    if (this.state.activeTeam !== 'B') return;
+    if (this.computerTimer !== null) return;
+
+    const delay = CPU_THINK_MIN_MS + Math.floor(Math.random() * (CPU_THINK_MAX_MS - CPU_THINK_MIN_MS));
+    this.computerTimer = setTimeout(() => {
+      this.computerTimer = null;
+      this.performComputerMove();
+    }, delay);
+  }
+
+  private performComputerMove(): void {
+    if (!this.state || this.state.phase !== 'playing' || this.state.activeTeam !== 'B') return;
+
+    const place = PLACES[Math.floor(Math.random() * PLACES.length)];
+    const { state, events } = processPlayerAction(this.state, place);
+    this.state = state;
+    this.resetTimer();
+
+    const clientEvents = serializeEvents(events);
+    const clientState = serializeState(this.state, this.turnDeadline);
+    this.broadcast({ type: 'actionResult', events: clientEvents, state: clientState });
+
+    if (this.state.phase === 'ended') this.clearTimer();
+    else this.scheduleComputerMoveIfNeeded();
   }
 
   handleTimeout(): void {
@@ -113,6 +162,8 @@ export class Room {
 
     const clientState = serializeState(this.state, this.turnDeadline);
     this.broadcast({ type: 'actionResult', events: clientEvents, state: clientState });
+
+    if (this.state.phase === 'playing') this.scheduleComputerMoveIfNeeded();
   }
 
   // ─── 타이머 ──────────────────────────────────────────────────────────────
@@ -127,6 +178,10 @@ export class Room {
     if (this.timerHandle !== null) {
       clearTimeout(this.timerHandle);
       this.timerHandle = null;
+    }
+    if (this.computerTimer !== null) {
+      clearTimeout(this.computerTimer);
+      this.computerTimer = null;
     }
   }
 
