@@ -1017,8 +1017,7 @@ body {
   .draw-slot-spin { animation: none; }
 }
 
-/* ── 도토리 폭탄 — 미획득 스택 전체 초기화 ──────────────────────────────────── */
-/* 카드가 부르르 떨리다 옆으로 샤르륵 흘러내리며 사라진다 */
+/* ── 도토리 폭탄 — 스택의 실제 카드가 직접 흔들리다 떨어지며 사라진다 ──────────── */
 @keyframes bombCardShakeFall {
   0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
   10%  { transform: translateY(0) rotate(-7deg); opacity: 1; }
@@ -1029,24 +1028,9 @@ body {
   60%  { transform: translateY(2px) rotate(0deg); opacity: 1; }
   100% { transform: translateY(70px) rotate(14deg); opacity: 0; }
 }
-.bomb-card-rack {
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-}
-.bomb-card-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 94px;
-  height: 122px;
-  border-radius: 14px;
-  background: #fff;
-  border: 2px solid #d1d5db;
-  font-size: 1.4rem;
-  font-weight: 900;
-  color: #14532d;
+.stack-card-bomb-fall {
   animation: bombCardShakeFall 800ms ease-in both;
+  z-index: 30 !important;
 }
 /* 중심에서 사방으로 튀어나갔다 사라지는 도토리 폭죽 */
 @keyframes acornBurst {
@@ -1063,7 +1047,26 @@ body {
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .bomb-card-ghost, .bomb-acorn { animation: none; opacity: 0; }
+  .stack-card-bomb-fall, .bomb-acorn { animation: none; opacity: 0; }
+}
+
+/* ── 짝 맞음 확인 흔들기 — 홀수/짝수 번째 카드가 서로 반대 방향으로 흔들린다 ─────── */
+@keyframes stackCardShakeA {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-9px); }
+  50%      { transform: translateX(0); }
+  75%      { transform: translateX(9px); }
+}
+@keyframes stackCardShakeB {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(9px); }
+  50%      { transform: translateX(0); }
+  75%      { transform: translateX(-9px); }
+}
+.stack-card-shake-a { animation: stackCardShakeA 550ms ease-in-out; }
+.stack-card-shake-b { animation: stackCardShakeB 550ms ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .stack-card-shake-a, .stack-card-shake-b { animation: none; }
 }
 
 /* ── 실용신양 울 볼 — 더 크고 눈에 띄게, 은은한 빛나는 궤적 포함 ───────────── */

@@ -3,18 +3,21 @@
 import type { Animal, StackedCard } from 'shared';
 import { ANIMALS } from 'shared';
 import { StackCardView } from './StackCardView';
+import type { ShakingPile } from '@/hooks/useAnimationQueue';
 
 export function AnimalStackArea({
-  stacks,
+  stackCards,
   collectingIds,
+  bombFallingIds,
+  shakingPile,
   newCardId,
-  revealedCardIds,
   isMyTurn,
 }: {
-  stacks: Record<Animal, StackedCard[]>;
+  stackCards: Record<Animal, StackedCard[]>;
   collectingIds: ReadonlySet<number>;
+  bombFallingIds: ReadonlySet<number>;
+  shakingPile: ShakingPile | null;
   newCardId: number | null;
-  revealedCardIds: ReadonlySet<number>;
   isMyTurn: boolean;
 }) {
   return (
@@ -23,10 +26,11 @@ export function AnimalStackArea({
         <AnimalStackRow
           key={animal}
           animal={animal}
-          cards={stacks[animal]}
+          cards={stackCards[animal]}
           collectingIds={collectingIds}
+          bombFallingIds={bombFallingIds}
+          isShaking={shakingPile?.animal === animal}
           newCardId={newCardId}
-          revealedCardIds={revealedCardIds}
           isMyTurn={isMyTurn}
         />
       ))}
@@ -38,24 +42,23 @@ function AnimalStackRow({
   animal,
   cards,
   collectingIds,
+  bombFallingIds,
+  isShaking,
   newCardId,
-  revealedCardIds,
   isMyTurn,
 }: {
   animal: Animal;
   cards: StackedCard[];
   collectingIds: ReadonlySet<number>;
+  bombFallingIds: ReadonlySet<number>;
+  isShaking: boolean;
   newCardId: number | null;
-  revealedCardIds: ReadonlySet<number>;
   isMyTurn: boolean;
 }) {
-  // 슬롯머신 연출이 아직 끝나지 않은 카드는 실제로 스택에 도착하기 전이므로 숨긴다.
-  // (서버 상태는 액션이 끝나는 즉시 전부 반영되지만, 화면에는 연출이 끝난 카드만 순서대로 노출한다.)
-  const visible = cards.filter(
-    c => (c.collectedBy === null && revealedCardIds.has(c.id)) || (c.collectedBy !== null && collectingIds.has(c.id)),
-  );
+  // cards는 이미 "지금 화면에 그려야 하는" 카드만 들어있다(useAnimationQueue의 stackCards).
+  // 총합 배지는 실제로 아직 미획득이고 폭탄으로 떨어지는 중도 아닌 카드만 센다.
   const total = cards
-    .filter(c => c.collectedBy === null && revealedCardIds.has(c.id))
+    .filter(c => c.collectedBy === null && !bombFallingIds.has(c.id))
     .reduce((s, c) => s + c.num, 0);
 
   return (
@@ -76,11 +79,21 @@ function AnimalStackRow({
         )}
       </div>
       <div className="relative flex items-center flex-1 min-w-0 h-full overflow-hidden">
-        {visible.length === 0 ? (
+        {cards.length === 0 ? (
           <span className="text-xs text-jungle-300">비어 있음</span>
         ) : (
-          visible.map((c, i) => (
-            <StackCardView key={c.id} card={c} index={i} isNew={c.id === newCardId} />
+          cards.map((c, i) => (
+            <StackCardView
+              key={c.id}
+              card={c}
+              index={i}
+              isNew={c.id === newCardId}
+              flingDirection={
+                collectingIds.has(c.id) ? (c.collectedBy === 'A' ? 'left' : 'right') : null
+              }
+              isBombFalling={bombFallingIds.has(c.id)}
+              shakeVariant={isShaking ? (i % 2 === 0 ? 'a' : 'b') : null}
+            />
           ))
         )}
       </div>

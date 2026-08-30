@@ -5,8 +5,10 @@ import type { CSSProperties } from 'react';
 import type { BombBurstItem } from '@/hooks/useAnimationQueue';
 
 const ACORN_COUNT = 10;
-const MAX_SHOWN_CARDS = 8;
 
+// 도토리 폭죽만 담당한다 — 실제로 터지는 카드는 StackCardView가 직접
+// 흔들리며 떨어지는 연출(.stack-card-bomb-fall)을 재생하므로 여기서는
+// 그 위에 겹쳐 보일 도토리 파편만 그린다.
 export function BombBurstLayer({ items }: { items: BombBurstItem[] }) {
   return (
     <>
@@ -30,55 +32,30 @@ function BombBurst({ item }: { item: BombBurstItem }) {
 
   if (!pos) return null;
 
-  const shownCards = item.cardNums.slice(0, MAX_SHOWN_CARDS);
-
   return (
-    <>
-      {/* 미획득 카드들이 흔들리다 샤르륵 흘러내리며 사라진다 */}
-      <div
-        className="bomb-card-rack"
-        style={{ position: 'fixed', left: pos.x, top: pos.y, transform: 'translate(-50%, -50%)', zIndex: 58 }}
-      >
-        {shownCards.map((num, i) => (
+    <div style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 60, pointerEvents: 'none' }}>
+      {Array.from({ length: ACORN_COUNT }, (_, i) => {
+        const angle = (360 / ACORN_COUNT) * i;
+        const dist = 55 + (i % 3) * 22;
+        const rad = (angle * Math.PI) / 180;
+        const dx = Math.cos(rad) * dist;
+        const dy = Math.sin(rad) * dist;
+        return (
           <span
             key={i}
-            className="bomb-card-ghost"
-            style={{
-              marginLeft: i === 0 ? 0 : -46,
-              zIndex: shownCards.length - i,
-              animationDelay: `${i * 45}ms`,
-            }}
+            className="bomb-acorn"
+            style={
+              {
+                '--acorn-dx': `${dx}px`,
+                '--acorn-dy': `${dy}px`,
+                animationDelay: `${(i % 4) * 30}ms`,
+              } as CSSProperties
+            }
           >
-            {num}
+            🌰
           </span>
-        ))}
-      </div>
-
-      {/* 도토리 폭죽 — 여러 방향으로 튀어나갔다 사라진다 */}
-      <div style={{ position: 'fixed', left: pos.x, top: pos.y, zIndex: 60, pointerEvents: 'none' }}>
-        {Array.from({ length: ACORN_COUNT }, (_, i) => {
-          const angle = (360 / ACORN_COUNT) * i;
-          const dist = 55 + (i % 3) * 22;
-          const rad = (angle * Math.PI) / 180;
-          const dx = Math.cos(rad) * dist;
-          const dy = Math.sin(rad) * dist;
-          return (
-            <span
-              key={i}
-              className="bomb-acorn"
-              style={
-                {
-                  '--acorn-dx': `${dx}px`,
-                  '--acorn-dy': `${dy}px`,
-                  animationDelay: `${(i % 4) * 30}ms`,
-                } as CSSProperties
-              }
-            >
-              🌰
-            </span>
-          );
-        })}
-      </div>
-    </>
+        );
+      })}
+    </div>
   );
 }

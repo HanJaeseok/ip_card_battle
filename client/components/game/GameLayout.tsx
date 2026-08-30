@@ -70,8 +70,10 @@ export function GameLayout({
             woolBalls={animState.woolBalls}
             bombBursts={animState.bombBursts}
             collectingCardIds={animState.collectingCardIds}
+            bombFallingIds={animState.bombFallingIds}
+            shakingPile={animState.shakingPile}
             newCardId={animState.newCardId}
-            revealedCardIds={animState.revealedCardIds}
+            stackCards={animState.stackCards}
             displayedActiveTeam={animState.displayedActiveTeam}
             mermaidPopup={animState.mermaidPopup}
             expandFlash={animState.expandFlash}

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ClientGameState, Place, Team } from 'shared';
+import type { Animal, ClientGameState, Place, StackedCard, Team } from 'shared';
 import { PLACES } from 'shared';
 import { PlaceTile } from './PlaceTile';
 import { AnimalStackArea } from './AnimalStackArea';
@@ -10,7 +10,14 @@ import { CardFocusLayer } from '@/components/effects/CardFocusLayer';
 import { DrawSlotLayer } from '@/components/effects/DrawSlotLayer';
 import { WoolBallLayer } from '@/components/effects/WoolBallLayer';
 import { BombBurstLayer } from '@/components/effects/BombBurstLayer';
-import type { BombBurstItem, CaptionItem, DrawSlotItem, PlaceFocusItem, WoolBallItem } from '@/hooks/useAnimationQueue';
+import type {
+  BombBurstItem,
+  CaptionItem,
+  DrawSlotItem,
+  PlaceFocusItem,
+  ShakingPile,
+  WoolBallItem,
+} from '@/hooks/useAnimationQueue';
 
 const GRID_AREA: Record<Place, string> = {
   house: 'house',
@@ -29,8 +36,10 @@ export function GameBoard({
   woolBalls,
   bombBursts,
   collectingCardIds,
+  bombFallingIds,
+  shakingPile,
   newCardId,
-  revealedCardIds,
+  stackCards,
   displayedActiveTeam,
   mermaidPopup,
   expandFlash,
@@ -44,8 +53,10 @@ export function GameBoard({
   woolBalls: WoolBallItem[];
   bombBursts: BombBurstItem[];
   collectingCardIds: ReadonlySet<number>;
+  bombFallingIds: ReadonlySet<number>;
+  shakingPile: ShakingPile | null;
   newCardId: number | null;
-  revealedCardIds: ReadonlySet<number>;
+  stackCards: Record<Animal, StackedCard[]>;
   displayedActiveTeam: Team;
   mermaidPopup: { team: Team } | null;
   expandFlash: boolean;
@@ -81,10 +92,11 @@ export function GameBoard({
 
       <div style={{ gridArea: 'center' }}>
         <AnimalStackArea
-          stacks={gameState.stacks}
+          stackCards={stackCards}
           collectingIds={collectingCardIds}
+          bombFallingIds={bombFallingIds}
+          shakingPile={shakingPile}
           newCardId={newCardId}
-          revealedCardIds={revealedCardIds}
           isMyTurn={isMyTurnDisplayed}
         />
       </div>

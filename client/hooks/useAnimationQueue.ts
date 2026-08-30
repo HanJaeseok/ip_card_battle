@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import type { Animal, ClientGameEvent, ClientGameState, Place, Team } from 'shared';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Animal, ClientGameEvent, ClientGameState, Place, StackedCard, Team } from 'shared';
 import { ANIMALS, THRESHOLDS } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
 import { playRandomSound, playRandomSoundSequence } from '@/lib/sounds';
@@ -90,8 +90,12 @@ export interface WoolBallItem {
 
 export interface BombBurstItem {
   id: number;
-  animal: Animal;
-  cardNums: number[]; // 날아간 카드들의 숫자 (흔들리며 흘러내리는 카드 껍데기 연출용)
+  animal: Animal; // 도토리 폭죽이 터질 위치(그 동물 스택) — 실제 카드는 스택에서 직접 흔들리다 사라진다
+}
+
+export interface ShakingPile {
+  id: number;
+  animal: Animal; // 짝이 맞아 정산되기 직전, 그 동물 스택 전체가 "확인하듯" 흔들리는 연출
 }
 
 type EmoticonMood = 'happy' | 'burn' | 'cry' | 'stone';
@@ -220,8 +224,10 @@ export interface AnimationState {
   woolBalls: WoolBallItem[];
   bombBursts: BombBurstItem[];
   collectingCardIds: ReadonlySet<number>; // 수집되어 날아가는 중이라 아직 화면에 남겨야 하는 카드
+  bombFallingIds: ReadonlySet<number>; // 도토리 폭탄으로 흔들리며 떨어지는 중인 카드
+  shakingPile: ShakingPile | null; // 정산 직전 "확인" 흔들림이 재생 중인 동물 스택
   newCardId: number | null; // 방금 스택에 추가된 카드 (팝인 강조용)
-  revealedCardIds: ReadonlySet<number>; // 슬롯머신 연출이 끝나 실제 스택에 그려도 되는 카드
+  stackCards: Record<Animal, StackedCard[]>; // 화면에 실제로 그려야 하는 카드 목록(연출 타이밍 반영, id 오름차순)
   sheepReserve: Record<Team, number>;
   displayedActiveTeam: Team; // 정산 연출이 끝나야 실제 activeTeam으로 갱신되는 "화면상" 활성 팀
   displayedActivePlayerIndex: number;
@@ -245,7 +251,8 @@ const SHAKE_PULSE_DUR = 300;
 const MAIN_COMBO_DUR = 1300;
 const RABBIT_PRESSURE_DUR = 700;
 const COLLECT_FLING_DUR = 750; // .stack-card-fling-* CSS 지속시간과 일치해야 함
-const BOMB_BURST_DUR = 850;
+const BOMB_FALL_DUR = 800; // .stack-card-bomb-fall CSS 지속시간과 일치해야 함
+const SHAKE_CHECK_DUR = 550; // .stack-card-shake-* CSS 지속시간과 일치해야 함
 const SHEEP_LOADED_DUR = 1100;
 
 let floatIdCounter = 0;
@@ -277,8 +284,17 @@ export function useAnimationQueue(
   const [woolBalls, setWoolBalls] = useState<WoolBallItem[]>([]);
   const [bombBursts, setBombBursts] = useState<BombBurstItem[]>([]);
   const [collectingCardIds, setCollectingCardIds] = useState<ReadonlySet<number>>(EMPTY_ID_SET);
+  const [bombFallingIds, setBombFallingIds] = useState<ReadonlySet<number>>(EMPTY_ID_SET);
+  const [shakingPile, setShakingPile] = useState<ShakingPile | null>(null);
   const [newCardId, setNewCardId] = useState<number | null>(null);
+  // "화면에 지금 그려야 하는 카드"를 실제 서버 진실(gameState.stacks)과 분리해서 관리한다.
+  // 서버는 액션이 끝나는 즉시 최종 상태(수집/폭탄으로 카드가 사라진 상태)를 보내오지만,
+  // 화면에는 "등장 → (짝 맞으면) 흔들기 → 날아가기" 또는 "(폭탄이면) 흔들며 떨어지기"
+  // 연출이 끝난 뒤에야 사라지도록, id를 여기서 직접 관리한다.
   const [revealedCardIds, setRevealedCardIds] = useState<ReadonlySet<number>>(EMPTY_ID_SET);
+  // 카드 원본 데이터 캐시 — 폭탄으로 서버 배열에서 완전히 사라진 카드도 떨어지는
+  // 연출이 끝날 때까지는 계속 그려야 하므로, 사라지기 전 마지막 모습을 여기 보관한다.
+  const cardCacheRef = useRef<Map<number, StackedCard>>(new Map());
   const [sheepReserve, setSheepReserve] = useState<Record<Team, number>>({ A: 0, B: 0 });
 
   // 실제 서버 상태(gameState.activeTeam)는 액션 처리 즉시 다음 팀으로 넘어가지만,
@@ -306,12 +322,16 @@ export function useAnimationQueue(
   // (actionResult로 들어오는 갱신은 항상 최소 1개 이상의 이벤트를 동반하므로 여기 걸리지 않는다.)
   useEffect(() => {
     if (!gameState || lastEvents.length > 0) return;
+    ANIMALS.forEach(a => {
+      gameState.stacks[a].forEach(c => cardCacheRef.current.set(c.id, c));
+    });
     setRevealedCardIds(prev => {
       let changed = false;
       const next = new Set(prev);
       ANIMALS.forEach(a => {
         gameState.stacks[a].forEach(c => {
-          if (!next.has(c.id)) {
+          // 이미 수집이 끝난(획득 기록으로만 남은) 카드는 다시 노출시키지 않는다.
+          if (c.collectedBy === null && !next.has(c.id)) {
             next.add(c.id);
             changed = true;
           }
@@ -404,7 +424,7 @@ export function useAnimationQueue(
     setDrawSlots([]);
     setWoolBalls([]);
     setBombBursts([]);
-    setCollectingCardIds(EMPTY_ID_SET);
+    setShakingPile(null);
     setNewCardId(null);
 
     // 이번 액션의 정산 연출이 끝날 때까지는 화면상 "행동한 팀"의 턴으로 유지한다.
@@ -413,30 +433,67 @@ export function useAnimationQueue(
     const gameState = gameStateRef.current;
     const beforeScores = prevScoresRef.current;
 
-    // ── 이전 액션에서 아직 "등장" 애니메이션이 끝나지 않은 채로 남아있던 카드를
-    // 여기서 즉시 노출시킨다. 위에서 방금 이전 타이머를 전부 취소했기 때문에,
-    // 만약 이전 액션의 뽑기 애니메이션(특히 긴 실용신양 연쇄)이 채 끝나기도 전에
-    // 이번 액션(다음 팀의 차례, 특히 빠르게 두는 컴퓨터 상대)이 도착하면 그 카드들의
-    // "등장" 예약이 취소되어 영원히 투명한 채로 남는 버그가 있었다 — 이번 액션 자신이
-    // 새로 뽑은 카드만 제외하고, 나머지는 지금 화면에 즉시 반영한다.
+    // ── 카드 원본 캐시 갱신 + 정산/취소 잔재 정리 ───────────────────────────
+    // 서버는 액션이 끝나는 즉시 최종 상태(수집·폭탄으로 카드가 사라진 상태)를
+    // 보내오지만, 화면에는 "등장 → 흔들기 → 날아가기/떨어지기" 연출이 끝난
+    // 뒤에야 반영되어야 한다. 그런데 바로 위에서 이전 액션의 타이머를 전부
+    // 취소했기 때문에, 이전 액션의 연출(특히 긴 실용신양 연쇄, 또는 빠르게
+    // 다음 수를 두는 컴퓨터 상대)이 채 끝나기 전에 새 액션이 도착하면 두 방향의
+    // 문제가 생길 수 있었다: (1) 아직 등장 못한 카드가 영원히 투명한 채로 남거나,
+    // (2) 이미 수집/폭탄으로 사라졌어야 할 카드가 날아가기 연출이 취소된 채
+    // 정지 화면으로 계속 남는 것. 여기서 캐시를 최신화하고 두 경우를 모두
+    // 즉시 바로잡은 뒤 이번 액션을 시작한다.
     if (gameState) {
-      const thisActionCardIds = new Set(
+      ANIMALS.forEach(a => {
+        gameState.stacks[a].forEach(c => cardCacheRef.current.set(c.id, c));
+      });
+
+      const thisActionDrawIds = new Set(
         lastEvents.filter((e): e is Extract<ClientGameEvent, { type: 'draw' }> => e.type === 'draw')
           .map(e => e.card.id),
       );
+      const thisActionCollectIds = new Set(
+        lastEvents
+          .filter((e): e is Extract<ClientGameEvent, { type: 'collect' }> => e.type === 'collect')
+          .flatMap(e => e.cardIds),
+      );
+      const thisActionBombIds = new Set(
+        lastEvents
+          .filter((e): e is Extract<ClientGameEvent, { type: 'bomb' }> => e.type === 'bomb')
+          .flatMap(e => e.clearedCards.map(c => c.id)),
+      );
+
       setRevealedCardIds(prev => {
         let changed = false;
         const next = new Set(prev);
+
+        // (1) 아직 못 보여준 채로 남아있던 미획득 카드를 즉시 노출한다.
         ANIMALS.forEach(a => {
           gameState.stacks[a].forEach(c => {
-            if (c.collectedBy === null && !next.has(c.id) && !thisActionCardIds.has(c.id)) {
+            if (c.collectedBy === null && !next.has(c.id) && !thisActionDrawIds.has(c.id)) {
               next.add(c.id);
               changed = true;
             }
           });
         });
+
+        // (2) 이미 수집/폭탄으로 사라졌어야 하는데 취소되어 계속 보이던 카드를 즉시 치운다.
+        next.forEach(id => {
+          if (thisActionDrawIds.has(id) || thisActionCollectIds.has(id) || thisActionBombIds.has(id)) return;
+          const cached = cardCacheRef.current.get(id);
+          if (!cached) return;
+          const stillOnBoard = gameState.stacks[cached.animal].some(c => c.id === id);
+          if (cached.collectedBy !== null || !stillOnBoard) {
+            next.delete(id);
+            changed = true;
+          }
+        });
+
         return changed ? next : prev;
       });
+
+      setCollectingCardIds(prev => (prev.size === 0 ? prev : EMPTY_ID_SET));
+      setBombFallingIds(prev => (prev.size === 0 ? prev : EMPTY_ID_SET));
     }
 
     // ── Pass 0: 해설판 커멘터리 생성 (즉시 반영, 통합 로그) ─────────────────
@@ -632,20 +689,39 @@ export function useAnimationQueue(
         }
 
         const revealAt = inRoll ? triggerAt + WOOL_BALL_DUR : triggerAt;
-        const drawEndsAt = revealAt + BOMB_BURST_DUR;
+        const drawEndsAt = revealAt + BOMB_FALL_DUR;
         const place = ev.place;
         const animal = ev.animal;
         const burstId = ++floatIdCounter;
+        const clearedCardIds = ev.clearedCards.map(c => c.id);
+
+        // 서버 배열에서는 이미 사라졌지만, 캐시에는 남겨둬서 떨어지는 연출이
+        // 끝날 때까지 계속 그릴 수 있게 한다(이미 revealedCardIds엔 들어있는 카드들).
+        ev.clearedCards.forEach(c => cardCacheRef.current.set(c.id, c));
 
         addPlaceFocus(place, revealAt);
         addCaption(`🌰 ${ANIMAL_INFO[animal].short} 카드 전부 폭발!`, 'pair', revealAt, { stackAnimal: animal });
 
         sched(() => {
-          setBombBursts(prev => [...prev, { id: burstId, animal, cardNums: ev.clearedCards.map(c => c.num) }]);
+          // 도토리 폭죽과 카드가 흔들리며 떨어지는 연출을 동시에 보여준 다음에만 사라지게 한다.
+          setBombBursts(prev => [...prev, { id: burstId, animal }]);
+          setBombFallingIds(prev => new Set([...prev, ...clearedCardIds]));
           playRandomSound('tiger'); // 도토리 폭탄 전용 효과음 자원이 없어 가장 타격감 있는 사운드로 대체
           setScreenShakeLevel(prevLvl => Math.max(prevLvl, 2));
           sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
-          sched(() => setBombBursts(prev => prev.filter(b => b.id !== burstId)), BOMB_BURST_DUR);
+          sched(() => setBombBursts(prev => prev.filter(b => b.id !== burstId)), BOMB_FALL_DUR);
+          sched(() => {
+            setBombFallingIds(prev => {
+              const next = new Set(prev);
+              clearedCardIds.forEach(id => next.delete(id));
+              return next;
+            });
+            setRevealedCardIds(prev => {
+              const next = new Set(prev);
+              clearedCardIds.forEach(id => next.delete(id));
+              return next;
+            });
+          }, BOMB_FALL_DUR);
         }, revealAt);
 
         lastDrawEndCursor = Math.max(lastDrawEndCursor, drawEndsAt);
@@ -742,9 +818,18 @@ export function useAnimationQueue(
             const flashKey = `${team}:${animal}`;
             const flashId = ++floatIdCounter;
             const at = cursor;
+            const shakeId = ++floatIdCounter;
 
             addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at, { stackAnimal: animal });
 
+            // 1) 카드가 스택에 다 모인 뒤, 짝이 맞았는지 "확인하듯" 스택 전체가 흔들린다.
+            sched(() => {
+              setShakingPile({ id: shakeId, animal });
+              sched(() => setShakingPile(prev => (prev?.id === shakeId ? null : prev)), SHAKE_CHECK_DUR);
+            }, at);
+
+            // 2) 흔들기가 끝난 뒤에야 팀 쪽으로 날아가기 시작한다.
+            const flingAt = at + SHAKE_CHECK_DUR;
             sched(() => {
               setCollectingCardIds(prev => new Set([...prev, ...cardIds]));
               setScoreFlash(prev => new Map([...prev, [flashKey, flashId]]));
@@ -755,17 +840,23 @@ export function useAnimationQueue(
                   return next;
                 });
               }, SCORE_FLASH_DUR);
-            }, at);
+            }, flingAt);
 
+            // 3) 날아가기까지 완전히 끝난 뒤에야 스택에서 완전히 제거하고 다음 단계로 넘어간다.
             sched(() => {
               setCollectingCardIds(prev => {
                 const next = new Set(prev);
                 cardIds.forEach(id => next.delete(id));
                 return next;
               });
-            }, at + COLLECT_FLING_DUR);
+              setRevealedCardIds(prev => {
+                const next = new Set(prev);
+                cardIds.forEach(id => next.delete(id));
+                return next;
+              });
+            }, flingAt + COLLECT_FLING_DUR);
 
-            cursor = at + COLLECT_FLING_DUR + 80;
+            cursor = flingAt + COLLECT_FLING_DUR + 80;
 
           } else if (ev.type === 'tigerAttack') {
             const onTeam: Team = ev.team === 'A' ? 'B' : 'A';
@@ -931,6 +1022,21 @@ export function useAnimationQueue(
     }
   }, [gameState?.phase]);
 
+  // 실제로 화면에 그릴 카드 목록 — revealedCardIds에 있는 카드만, id(=뽑힌 순서)
+  // 오름차순으로 정렬해 동물별로 묶는다. 원본 데이터는 gameState가 아니라
+  // cardCacheRef에서 가져오므로, 서버 배열에서 이미 사라진(폭탄) 카드도 떨어지는
+  // 연출이 끝날 때까지는 계속 그릴 수 있다.
+  const stackCards = useMemo(() => {
+    const result: Record<Animal, StackedCard[]> = { sheep: [], rabbit: [], mermaid: [], tiger: [] };
+    const ids = [...revealedCardIds].sort((a, b) => a - b);
+    for (const id of ids) {
+      const c = cardCacheRef.current.get(id);
+      if (c) result[c.animal].push(c);
+    }
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealedCardIds]);
+
   return {
     screenShakeLevel,
     leafParticleCount,
@@ -955,8 +1061,10 @@ export function useAnimationQueue(
     woolBalls,
     bombBursts,
     collectingCardIds,
+    bombFallingIds,
+    shakingPile,
     newCardId,
-    revealedCardIds,
+    stackCards,
     displayedActiveTeam,
     displayedActivePlayerIndex,
     isSettling,
