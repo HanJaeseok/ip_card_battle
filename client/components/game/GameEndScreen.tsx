@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
-import { ANIMALS, WIN_HP, LOSE_HP } from 'shared';
+import { ANIMALS, INITIAL_HP, LOSE_HP } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
 
 const FLAVOR_TEXT: Record<Animal, string> = {
@@ -65,7 +65,8 @@ export function GameEndScreen({
   const { winner } = gameState;
   const hpA = gameState.teams.A.hp;
   const hpB = gameState.teams.B.hp;
-  const isKnockout = hpA >= WIN_HP || hpB >= WIN_HP || hpA <= LOSE_HP || hpB <= LOSE_HP;
+  const winHp = INITIAL_HP + gameState.settings.targetScore;
+  const isKnockout = hpA >= winHp || hpB >= winHp || hpA <= LOSE_HP || hpB <= LOSE_HP;
   const reasonText = isKnockout ? '체력 즉시 승부 — 결정타!' : '제한 턴 종료 — 체력 비교';
 
   const confetti = useMemo(

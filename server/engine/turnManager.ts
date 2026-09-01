@@ -1,7 +1,12 @@
-import { FESTIVAL_TURN, MAX_TURN, INITIAL_HP, WIN_HP, LOSE_HP } from 'shared';
-import type { GameEvent, GameState, Team } from 'shared';
+import { MAX_TURN, INITIAL_HP, LOSE_HP, clampSettings } from 'shared';
+import type { GameEvent, GameSettings, GameState, Team } from 'shared';
 import { initStacks } from './places';
 import type { RNG } from './places';
+
+/** 목표 점수(방장이 정한 settings.targetScore)로부터 실제 승리 체력 문턱을 구한다. */
+function winHpOf(state: GameState): number {
+  return INITIAL_HP + state.settings.targetScore;
+}
 
 function determineWinnerByHp(state: GameState): Team | 'draw' {
   const a = state.teams.A.hp;
@@ -27,8 +32,9 @@ function endGame(state: GameState, winner: Team | 'draw', reason: 'knockout' | '
 export function checkKnockout(state: GameState): GameEvent[] {
   if (state.phase !== 'playing') return [];
 
-  const aWins = state.teams.A.hp >= WIN_HP || state.teams.B.hp <= LOSE_HP;
-  const bWins = state.teams.B.hp >= WIN_HP || state.teams.A.hp <= LOSE_HP;
+  const winHp = winHpOf(state);
+  const aWins = state.teams.A.hp >= winHp || state.teams.B.hp <= LOSE_HP;
+  const bWins = state.teams.B.hp >= winHp || state.teams.A.hp <= LOSE_HP;
   if (!aWins && !bWins) return [];
   if (aWins && bWins) return endGame(state, 'draw', 'knockout');
   return endGame(state, aWins ? 'A' : 'B', 'knockout');
@@ -66,8 +72,8 @@ export function advanceTurn(state: GameState): GameEvent[] {
   if (currentTeam === 'B') {
     state.turn++;
 
-    // FESTIVAL_TURN 도달 시점부터 축제가 시작된다
-    if (!state.festival && state.turn >= FESTIVAL_TURN) {
+    // settings.festivalTurn 도달 시점부터 축제가 시작된다
+    if (!state.festival && state.turn >= state.settings.festivalTurn) {
       state.festival = true;
       events.push({ type: 'festival' });
     }
@@ -90,11 +96,12 @@ export function advanceTurn(state: GameState): GameEvent[] {
   return events;
 }
 
-/** 새 게임 상태 초기화 */
+/** 새 게임 상태 초기화 — settings를 생략하면 기본 규칙(shared/constants.ts DEFAULT_*)으로 시작한다. */
 export function initGame(
   teamAMembers: string[],
   teamBMembers: string[],
   rng: RNG = Math.random,
+  settings?: Partial<GameSettings>,
 ): GameState {
   const makeTeam = (members: string[]) => ({
     members,
@@ -124,5 +131,6 @@ export function initGame(
       B: makeTeam(teamBMembers),
     },
     winner: null,
+    settings: clampSettings(settings),
   };
 }

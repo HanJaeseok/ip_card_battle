@@ -82,7 +82,7 @@ export function GameBoard({
       }`}
       style={{
         gridTemplateAreas: '"house center center dock" "forest center center river"',
-        gridTemplateColumns: '1fr 1.6fr 1.6fr 1fr',
+        gridTemplateColumns: '1fr 1.15fr 1.15fr 1fr',
         gridTemplateRows: '1fr 1fr',
       }}
     >

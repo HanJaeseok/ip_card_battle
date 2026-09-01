@@ -1,6 +1,6 @@
 'use client';
 
-import type { Team } from 'shared';
+import type { GameSettings, Team } from 'shared';
 import { TurnTimer } from './TurnTimer';
 
 // 해설판 가운데에 얹히는 흰 배경(테두리 없음) 안내 오버레이 — 해설 텍스트와 겹치면
@@ -20,6 +20,7 @@ export function ActionPrompt({
   interactive,
   noEligible,
   turnDeadline,
+  settings,
 }: {
   myTeam: Team | null;
   playerId: string | null;
@@ -30,6 +31,7 @@ export function ActionPrompt({
   interactive: boolean; // 정산이 끝난 상태에서 내가 행동을 고를 차례인지
   noEligible: boolean;
   turnDeadline: number;
+  settings: GameSettings;
 }) {
   const isMyTeamTurn = myTeam !== null && displayedActiveTeam === myTeam;
   const isMyPlayerTurn =
@@ -59,7 +61,11 @@ export function ActionPrompt({
       <div className="bg-white rounded-xl px-5 py-2 flex items-center gap-3 shadow-sm">
         {showTimer && (
           <div className="w-56 shrink-0">
-            <TurnTimer deadline={turnDeadline} paused={false} maxSeconds={urgent ? 5 : 30} />
+            <TurnTimer
+              deadline={turnDeadline}
+              paused={false}
+              maxSeconds={urgent ? settings.noActionTimeSec : interactive ? settings.actionTimeSec : settings.drawTimeSec}
+            />
           </div>
         )}
         <p className={`font-bold whitespace-nowrap ${urgent ? 'text-amber-600' : 'text-jungle-700'}`}>{text}</p>

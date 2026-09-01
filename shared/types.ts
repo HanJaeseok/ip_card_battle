@@ -12,7 +12,7 @@ export const PLACE_ANIMALS: Record<Place, Animal[]> = {
   house: ['rabbit', 'sheep'],               // 오두막 — 토끼, 양
   forest_road: ['rabbit', 'sheep', 'tiger'], // 숲길 — 토끼, 양, 호랑이
   dock: ['mermaid', 'tiger'],                // 부둣가 — 인어, 호랑이
-  river_road: ['mermaid', 'rabbit', 'tiger'], // 강가 — 인어, 토끼, 호랑이
+  river_road: ['mermaid', 'rabbit', 'sheep'], // 강가 — 인어, 토끼, 양 (호랑이는 나오지 않는다)
 };
 
 // 중앙 동물 스택에 쌓이는 카드 한 장. 뽑히는 즉시 공개되므로 숨김 상태가 없다.
@@ -41,16 +41,26 @@ export interface TeamState {
   skillStats: Record<Animal, SkillUsageStat>; // 결과 화면에 표시할 스킬 사용 통계
 }
 
+// 방장이 방 생성 시 정하는 게임 규칙 — 기본값은 shared/constants.ts의 DEFAULT_* 참조.
+export interface GameSettings {
+  targetScore: number;    // 목표 점수 — 승리에 필요한 체력 격차(winHp = INITIAL_HP + targetScore)
+  festivalTurn: number;   // 도토리 축제 시작 턴
+  drawTimeSec: number;    // 동물 뽑기(장소 클릭) 제한시간
+  actionTimeSec: number;  // 행동 선택 제한시간 — 고를 수 있는 행동이 있을 때
+  noActionTimeSec: number; // 행동 선택 제한시간 — 고를 수 있는 행동이 하나도 없을 때
+}
+
 export interface GameState {
   phase: GamePhase;
   turn: number;
   activeTeam: Team;
   activePlayerIndex: number;
   stacks: Record<Animal, StackedCard[]>;      // 동물별 중앙 카드 스택 (수집된 카드도 기록으로 남음)
-  festival: boolean;                          // FESTIVAL_TURN 이후 여부 — 이때부터 페어 경험치가 2배
+  festival: boolean;                          // settings.festivalTurn 이후 여부 — 이때부터 페어 경험치가 2배
   pendingChoice: Team | null;                 // 턴을 마친 팀이 5가지 선택지(행동 4종 + 패스) 중 하나를 고르길 기다리는 중
   teams: Record<Team, TeamState>;
   winner: Team | 'draw' | null;
+  settings: GameSettings;                     // 방장이 정한(또는 기본값) 게임 규칙 — 방 생성 시 확정되어 게임 중 불변
 }
 
 // 게임 이벤트 (클라이언트 연출 및 시뮬레이션 로그용)

@@ -11,23 +11,17 @@ import { SLOT_SPIN_DUR, SLOT_TOTAL_DUR, WOOL_BALL_DUR, SHEEP_DRAW_STEP } from '@
 type DeltaKey = `${Team}:${Animal}`;
 const deltaKeyOf = (t: Team, a: Animal): DeltaKey => `${t}:${a}`;
 
-// 해설판/자막에 쓰는 "OOO권의 위력!" 같은 문구용 동물별 권리명.
-const RIGHT_NAME: Record<Animal, string> = {
-  sheep: '실용신안권',
-  rabbit: '상표권',
-  mermaid: '디자인권',
-  tiger: '특허권',
-};
-
-// "상표토끼 스킬 발동!" 같은 딱딱한 문구 대신, 매번 무작위로 하나를 골라 보여준다.
+// 해설판/자막에 쓰는 행동 발동 문구 — 동물이 아니라 그 동물이 상징하는 권리에 맞게 고른다
+// ("토끼 지식재산의 힘!"처럼 아무 동물에나 같은 문구가 붙던 것을 동물별 전용 문구로 교체).
 // "스킬"이라는 단어는 쓰지 않는다(사용자 요청 — "행동"으로 대체).
+const ACTION_PHRASES: Record<Animal, string[]> = {
+  sheep: ['빠르게 적용하는 실용신안의 힘!'],
+  rabbit: ['영향력 개시', '상표의 힘!'],
+  mermaid: ['보기좋은 떡이 먹기도 좋다', '디자인의 힘!'],
+  tiger: ['특허권의 독점력!'],
+};
 function randomActionPhrase(animal: Animal): string {
-  const phrases = [
-    `${RIGHT_NAME[animal]}의 위력!`,
-    '지식재산의 힘!',
-    `${RIGHT_NAME[animal]}, 발동!`,
-    `${ANIMAL_INFO[animal].name}의 행동 개시!`,
-  ];
+  const phrases = ACTION_PHRASES[animal];
   return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
@@ -84,7 +78,8 @@ export interface CaptionItem {
   text: string;
   tier: 'pair' | 'effect'; // 페어 성사 / 행동 발동
   placeKey?: Place;
-  stackAnimal?: Animal; // pair는 그 동물 스택 위에 앵커링
+  stackAnimal?: Animal; // pair인데 앵커링할 카드를 못 찾았을 때의 대체 앵커(그 동물 스택 전체)
+  anchorCardId?: number; // pair는 짝을 이룬 카드 중 가장 마지막(가장 오른쪽) 카드 바로 위에 앵커링
   team?: Team; // effect 자막 색상(우리팀 초록 / 상대팀 빨강 / 중립 금색) 판정용
 }
 
@@ -148,6 +143,7 @@ export interface AnimationState {
   tigerImpact: boolean;
   mermaidPopup: { team: Team } | null;
   scoreFlash: ReadonlyMap<string, number>; // "team:animal" → flash id (for CSS re-trigger)
+  displayedExp: Record<Team, Record<Animal, number>>; // 팀 패널에 실제로 보여주는 경험치 — 페어 카드가 팀으로 날아가 도착한 뒤에야 반영된다
   hpPulse: ReadonlyMap<Team, HpPulse>; // 체력 오브가 지금 상승/감소 연출 중인지
   festivalFlash: boolean; // 축제 진입 순간 보드 전체 섬광
   festivalBurst: boolean; // 축제 진입 순간 보드 여기저기 도토리 폭죽(15발)
@@ -231,6 +227,21 @@ export function useAnimationQueue(
   const [shakingPile, setShakingPile] = useState<ShakingPile | null>(null);
   const [newCardId, setNewCardId] = useState<number | null>(null);
   const [decisiveHit, setDecisiveHit] = useState<{ winner: Team } | null>(null);
+  // 실제 서버 경험치(gameState.teams[t].exp)는 페어가 맞는 즉시 반영되지만, 화면에는 그
+  // 페어 카드가 팀 쪽으로 날아가 도착하는 순간에야 숫자가 오르는 게 더 직관적이다.
+  //
+  // "표시값을 따로 누적해서 매 이벤트마다 +/-로 갱신"하는 방식은 한 번 시도했다가
+  // 실전 버그로 이어졌다: 상대(특히 컴퓨터)가 애니메이션 타임라인이 끝나기 전에 다음
+  // 액션을 연달아 두면, 매 액션 처음에 이전 타이머를 통째로 취소하는 로직 때문에 아직
+  // 반영되지 않은 "+경험치" 예약이 통째로 사라져버렸다. 그 뒤 다른 행동(예: 양을 두 번
+  // 씀)으로 경험치를 깎으면, 반영된 적 없는 +를 깎게 되어 표시 경험치가 실제로는 있을 수
+  // 없는 음수(-10 등)까지 내려가는 버그가 났다.
+  //
+  // 그래서 지금은 델타를 누적하지 않는다 — 서버가 보내주는 gameState.exp(항상 정답)에서
+  // "아직 도착 연출이 끝나지 않은 페어의 exp만큼" 그때그때 가려서 보여주는 스냅샷 방식을
+  // 쓴다. 다음 액션이 도착하면 무조건 먼저 그 가림을 전부 걷어(=최신 진실 그대로 노출)
+  // 시작하므로, 타이머가 취소되어도 절대 실제보다 낮아지거나 음수가 될 수 없다.
+  const [pendingExpCredit, setPendingExpCredit] = useState<Record<string, number>>({});
   // "화면에 지금 그려야 하는 카드"를 실제 서버 진실(gameState.stacks)과 분리해서 관리한다.
   // 서버는 액션이 끝나는 즉시 최종 상태(수집으로 카드가 사라진 상태)를 보내오지만,
   // 화면에는 "등장 → (짝 맞으면) 흔들기 → 날아가기" 연출이 끝난 뒤에야 사라지도록,
@@ -285,6 +296,7 @@ export function useAnimationQueue(
     setDisplayedActiveTeam(gameState.activeTeam);
     setDisplayedActivePlayerIndex(gameState.activePlayerIndex);
     setIsSettling(false);
+    setPendingExpCredit({});
   }, [gameState, lastEvents]);
 
   const sched = (fn: () => void, delayMs: number) => {
@@ -320,7 +332,7 @@ export function useAnimationQueue(
     text: string,
     tier: CaptionItem['tier'],
     atMs: number,
-    opts?: { placeKey?: Place; stackAnimal?: Animal; team?: Team; durationOverride?: number },
+    opts?: { placeKey?: Place; stackAnimal?: Animal; anchorCardId?: number; team?: Team; durationOverride?: number },
   ) => {
     const id = ++floatIdCounter;
     const { durationOverride, ...rest } = opts ?? {};
@@ -396,6 +408,9 @@ export function useAnimationQueue(
     setShakingPile(null);
     setNewCardId(null);
     setDecisiveHit(null);
+    // 이전 액션이 아직 다 못 보여준 "도착 전 가림"이 있었다면 여기서 전부 걷는다 —
+    // 서버 상태는 이미 그 값을 포함해 최신이므로 실제 값보다 낮아지는 일은 없다.
+    setPendingExpCredit({});
 
     // 이번 액션의 정산 연출이 끝날 때까지는 화면상 "행동한 팀"의 턴으로 유지한다.
     setIsSettling(true);
@@ -655,13 +670,21 @@ export function useAnimationQueue(
         hasPlayedGroup = true;
 
         for (const ev of group.events) {
-          const { team, animal, cardIds, doubled } = ev;
+          const { team, animal, exp, cardIds, doubled } = ev;
           const flashKey = `${team}:${animal}`;
           const flashId = ++floatIdCounter;
           const at = cursor;
           const shakeId = ++floatIdCounter;
 
-          addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at, { stackAnimal: animal });
+          addCaption(`${ANIMAL_INFO[animal].short} 페어!`, 'pair', at, {
+            stackAnimal: animal,
+            anchorCardId: cardIds[cardIds.length - 1],
+          });
+
+          // 서버 exp에는 이 페어의 exp가 이미 반영돼 있다 — 카드가 실제로 도착할 때까지는
+          // 그만큼을 화면에서 가려서 보여준다(진짜 값은 항상 gameState 그대로이므로, 이
+          // 가림이 중간에 취소돼도 표시값이 실제보다 낮아지거나 음수가 되는 일은 없다).
+          setPendingExpCredit(prev => ({ ...prev, [flashKey]: exp }));
 
           // 1) 카드가 스택에 다 모인 뒤, 짝이 맞았는지 "확인하듯" 스택 전체가 흔들린다.
           sched(() => {
@@ -681,17 +704,11 @@ export function useAnimationQueue(
           const flingAt = at + SHAKE_CHECK_DUR;
           sched(() => {
             setCollectingCardIds(prev => new Set([...prev, ...cardIds]));
-            setScoreFlash(prev => new Map([...prev, [flashKey, flashId]]));
-            sched(() => {
-              setScoreFlash(prev => {
-                const next = new Map(prev);
-                if (next.get(flashKey) === flashId) next.delete(flashKey);
-                return next;
-              });
-            }, SCORE_FLASH_DUR);
           }, flingAt);
 
-          // 3) 날아가기까지 완전히 끝난 뒤에야 스택에서 완전히 제거하고 다음 단계로 넘어간다.
+          // 3) 날아가기까지 완전히 끝나 카드가 팀 칸에 도착한 뒤에야 — 스택에서 완전히
+          // 제거하고, 팀 패널 숫자도 이제서야 올리고(경험치 반영이 카드가 실제로 도착하는
+          // 순간과 맞아떨어지도록), 팝 강조도 이때 함께 재생한다.
           sched(() => {
             setCollectingCardIds(prev => {
               const next = new Set(prev);
@@ -703,6 +720,20 @@ export function useAnimationQueue(
               cardIds.forEach(id => next.delete(id));
               return next;
             });
+            setPendingExpCredit(prev => {
+              if (!(flashKey in prev)) return prev;
+              const next = { ...prev };
+              delete next[flashKey];
+              return next;
+            });
+            setScoreFlash(prev => new Map([...prev, [flashKey, flashId]]));
+            sched(() => {
+              setScoreFlash(prev => {
+                const next = new Map(prev);
+                if (next.get(flashKey) === flashId) next.delete(flashKey);
+                return next;
+              });
+            }, SCORE_FLASH_DUR);
           }, flingAt + COLLECT_FLING_DUR);
 
           cursor = flingAt + COLLECT_FLING_DUR + 80;
@@ -721,7 +752,7 @@ export function useAnimationQueue(
         const opp: Team = team === 'A' ? 'B' : 'A';
         const at = cursor;
 
-        addCaption(`${ANIMAL_INFO[animal].short} ${randomActionPhrase(animal)}`, 'effect', at, { team });
+        addCaption(randomActionPhrase(animal), 'effect', at, { team });
 
         sched(() => {
           const gs = gameStateRef.current;
@@ -835,20 +866,16 @@ export function useAnimationQueue(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastEvents]);
 
-  // 게임이 끝나면, 이번 액션에 결정타 연출이 없는 한(=이미 끝난 상태에서 재접속 등) 아직
-  // 재생 대기 중인 예약된 효과음/애니메이션을 전부 취소한다. 결정타가 있는 경우는 위
-  // 타임라인이 스스로 끝까지 재생한 뒤 isSettling을 내리므로 여기서 건드리지 않는다 —
-  // 그래야 체력 즉시 승패를 만든 행동의 연출이 화면 전환에 잘리지 않는다.
-  useEffect(() => {
-    if (gameState?.phase === 'ended' && !isSettling) {
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current = [];
-      persistentTimersRef.current.forEach(clearTimeout);
-      persistentTimersRef.current = [];
-      pendingFlipRef.current = null;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState?.phase]);
+  // (이전에는 여기서 "게임이 phase:'ended'로 바뀌면 isSettling이 이미 false일 때 남은
+  // 타이머를 정리"하는 이펙트가 있었다. 하지만 gameState와 lastEvents는 같은 커밋에서
+  // 함께 갱신되므로, 그 이펙트가 읽는 isSettling은 "이번 커밋에서 위 메인 이펙트가 막
+  // setIsSettling(true)로 바꾸려는 값"이 아니라 "그 전 렌더의(대개 false인) 값"이었다 —
+  // 즉 knockout으로 게임이 끝나는 바로 그 순간 이 이펙트가 방금 예약된 결정타 타임라인의
+  // 타이머까지 통째로 지워버려, isSettling이 다시는 false로 내려가지 않고 화면이
+  // GameLayout에 멈춰버리는 레이스 컨디션이 있었다(사운드만 바뀌고 결과 화면이 안 뜨는
+  // 버그의 원인). 재접속으로 이미 끝난 게임에 들어오는 경우는 위쪽의 "lastEvents가 빈
+  // 상태 갱신" 이펙트가 isSettling(false)을 직접 세팅해 처리하므로, 이 별도 정리
+  // 이펙트는 애초에 불필요했다 — 제거한다.
 
   // 실제로 화면에 그릴 카드 목록 — revealedCardIds에 있는 카드만, id(=뽑힌 순서)
   // 오름차순으로 정렬해 동물별로 묶는다. 원본 데이터는 gameState가 아니라
@@ -863,6 +890,21 @@ export function useAnimationQueue(
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revealedCardIds]);
+
+  // 팀 패널에 실제로 보여줄 경험치 — 항상 서버 진실(gameState.exp)에서 "아직 도착 연출이
+  // 끝나지 않은 페어"만큼만 빼서 보여준다(위 pendingExpCredit 설명 참조).
+  const displayedExp = useMemo(() => {
+    const zero: Record<Animal, number> = { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 };
+    const result: Record<Team, Record<Animal, number>> = { A: { ...zero }, B: { ...zero } };
+    if (!gameState) return result;
+    (['A', 'B'] as const).forEach(team => {
+      ANIMALS.forEach(animal => {
+        const credit = pendingExpCredit[`${team}:${animal}`] ?? 0;
+        result[team][animal] = gameState.teams[team].exp[animal] - credit;
+      });
+    });
+    return result;
+  }, [gameState, pendingExpCredit]);
 
   return {
     screenShakeLevel,
@@ -879,6 +921,7 @@ export function useAnimationQueue(
     tigerImpact,
     mermaidPopup,
     scoreFlash,
+    displayedExp,
     hpPulse,
     festivalFlash,
     festivalBurst,

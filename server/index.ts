@@ -25,7 +25,7 @@ wss.on('connection', (ws) => {
       case 'createRoom': {
         const { roomId, room } = roomManager.createRoom();
         const playerId = randomUUID();
-        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team, msg.teamName);
+        const result = room.addPlayer(ws, playerId, msg.nickname, msg.team, msg.teamName, msg.settings);
         if (result !== 'ok') {
           ws.send(JSON.stringify({ type: 'error', code: 'ROOM_FULL', message: '방을 만들 수 없습니다.' }));
           return;
@@ -39,7 +39,7 @@ wss.on('connection', (ws) => {
       case 'createSoloRoom': {
         const { roomId, room } = roomManager.createRoom();
         const playerId = randomUUID();
-        room.addSoloPlayer(ws, playerId, msg.nickname, msg.teamName);
+        room.addSoloPlayer(ws, playerId, msg.nickname, msg.teamName, msg.settings);
         currentRoomId = roomId;
         currentPlayerId = playerId;
         ws.send(JSON.stringify({ type: 'roomCreated', roomId, playerId }));

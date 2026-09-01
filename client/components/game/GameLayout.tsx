@@ -100,7 +100,7 @@ export function GameLayout({
       <main
         className="flex-1 grid gap-2 p-2 min-h-0 overflow-hidden"
         style={{
-          gridTemplateColumns: '14rem 1fr 14rem',
+          gridTemplateColumns: '19rem 1fr 19rem',
           gridTemplateRows: 'minmax(0, 1.25fr) auto minmax(0, 1fr)',
         }}
       >
@@ -149,6 +149,7 @@ export function GameLayout({
                 interactive={isMyChoiceTurn}
                 noEligible={noEligible}
                 turnDeadline={gameState.turnDeadline}
+                settings={gameState.settings}
               />
             }
           />

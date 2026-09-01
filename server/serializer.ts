@@ -63,6 +63,7 @@ export function serializeState(
       },
     },
     winner: state.winner,
+    settings: state.settings,
   };
 }
 

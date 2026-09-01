@@ -105,12 +105,13 @@ body {
   transform-origin: bottom center;
 }
 
-.leaf-sway:hover {
+.leaf-sway:hover,
+.leaf-sway-active {
   animation: var(--animate-leaf-sway);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .leaf-sway:hover { animation: none; }
+  .leaf-sway:hover, .leaf-sway-active { animation: none; }
 }
 
 /* ── 카드 공통 그림자 (순서와 무관하게 항상 약하게) ────────────────────────── */
@@ -406,6 +407,20 @@ body {
   border-radius: 50%;
   animation: hpOrbWave 2.4s ease-in-out infinite;
 }
+.hp-orb-segments {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.hp-orb-segment-line {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
 .hp-orb-value {
   position: relative;
   z-index: 2;
@@ -518,17 +533,33 @@ body {
   .decisive-hit-banner { animation: none; opacity: 0; }
 }
 
-/* ── 디자인어 대기 배율 배지 ─────────────────────────────────────────────── */
-.mermaid-multiplier-badge {
+/* ── 디자인어 대기 배율 스티커 — 인어 칸 모서리에 크게 붙는 배지 ─────────────── */
+.mermaid-multiplier-sticker {
+  position: absolute;
+  top: -0.4rem;
+  left: -0.4rem;
+  z-index: 20;
   display: inline-flex;
   align-items: center;
-  padding: 0.1rem 0.5rem;
+  justify-content: center;
+  min-width: 2.6rem;
+  padding: 0.3rem 0.55rem;
   border-radius: 9999px;
-  font-size: 0.65rem;
-  font-weight: 800;
+  border: 2.5px solid #fff;
+  font-size: 1.15rem;
+  font-weight: 900;
   color: #fff;
   background: linear-gradient(155deg, #60a5fa 0%, #2563eb 100%);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  transform: rotate(-12deg);
+  animation: mermaidStickerPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes mermaidStickerPop {
+  0% { transform: rotate(-12deg) scale(0.4); opacity: 0; }
+  100% { transform: rotate(-12deg) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mermaid-multiplier-sticker { animation: none; }
 }
 
 /* ── 헤더 진행 단계 도식(장소 선택 → 행동 선택) — 그림자로 입체감을 준다 ────────── */
@@ -1201,8 +1232,14 @@ body {
 .skill-choice-pass:focus-visible {
   filter: brightness(1.08);
 }
+/* 다른 스킬 패널처럼 배경에 "턴 종료(모래시계)" 그림을 깔아준다 — 별도 이미지 파일
+   없이 인라인 SVG로 커다란 모래시계 실루엣을 그려 짙은 초록 그라데이션 위에 얹는다. */
 .pass-panel-bg {
-  background: linear-gradient(165deg, #1f7a45 0%, #0f3d24 100%);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23a3e635' stroke-width='6' stroke-linejoin='round' opacity='0.55'%3E%3Cpath d='M60 30 H140 V50 Q140 90 100 100 Q60 110 60 150 V170 H140 V150 Q140 110 100 100 Q60 90 60 50 Z'/%3E%3Cpath d='M50 30 H150 M50 170 H150' stroke-linecap='round'/%3E%3C/g%3E%3Cg fill='%23fde68a' opacity='0.45'%3E%3Cpath d='M75 45 Q100 75 125 45 Z'/%3E%3Cpath d='M100 100 L88 140 H112 Z'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(165deg, #1f7a45 0%, #0f3d24 100%);
+  background-repeat: no-repeat;
+  background-position: center 35%, center;
+  background-size: 55% auto, cover;
 }
 .skill-choice-dim {
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.1) 100%);
@@ -1254,23 +1291,19 @@ body {
 }
 /* 장소 타일 절반쯤을 지나는 지점까지만 이동한 뒤, 자연스럽게 페이드아웃되며 사라진다
    (합계 점수판이 화면 아래쪽으로 옮겨졌으므로 아래쪽으로 더 크게 이동한다). */
-@keyframes stackCardFlingLeft {
+/* 카드가 실제로 획득한 팀의 그 동물 칸(--fling-dx/dy, StackCardView가 계산)까지
+   정확히 날아간다 — 대상 칸을 못 찾으면 팀 방향으로만 대략 날아가는 폴백값이 대신 들어온다. */
+@keyframes stackCardFling {
   0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
   35%  { opacity: 1; }
-  100% { transform: translate(-42vw, 38vh) scale(0.4) rotate(-22deg); opacity: 0; }
+  100% { transform: translate(var(--fling-dx), var(--fling-dy)) scale(0.4) rotate(var(--fling-rot)); opacity: 0; }
 }
-@keyframes stackCardFlingRight {
-  0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
-  35%  { opacity: 1; }
-  100% { transform: translate(42vw, 38vh) scale(0.4) rotate(22deg); opacity: 0; }
-}
-.stack-card-fling-left { animation: stackCardFlingLeft 750ms ease-in forwards; z-index: 20 !important; }
-.stack-card-fling-right { animation: stackCardFlingRight 750ms ease-in forwards; z-index: 20 !important; }
+.stack-card-fling { animation: stackCardFling 750ms ease-in forwards; z-index: 20 !important; }
 .stack-total-badge {
   line-height: 1;
 }
 @media (prefers-reduced-motion: reduce) {
-  .stack-card-new, .stack-card-fling-left, .stack-card-fling-right { animation: none; }
+  .stack-card-new, .stack-card-fling { animation: none; }
 }
 
 /* ── 슬롯머신 뽑기 연출 ──────────────────────────────────────────────────── */

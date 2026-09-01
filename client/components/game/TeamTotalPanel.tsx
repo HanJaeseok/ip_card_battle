@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { ClientGameState, Team } from 'shared';
-import { WIN_HP } from 'shared';
+import { INITIAL_HP } from 'shared';
+import { LeafDecoration } from '@/components/ui/LeafDecoration';
 
 // 팀 체력(=점수) — 아래가 0, 위가 WIN_HP인 유리구슬. 중간(시작값)부터 차오르거나
 // 줄어든다. 상표토끼로 오르면 연두색 기운이 샤라락 훑고, 특허랑이에게 뺏기면
@@ -19,8 +20,9 @@ export function TeamTotalPanel({
   pulse?: { id: number; direction: 'gain' | 'loss' } | null;
 }) {
   const hp = gameState.teams[team].hp;
+  const winHp = INITIAL_HP + gameState.settings.targetScore;
   const toneClass = isMine ? 'hp-orb-mine' : 'hp-orb-enemy';
-  const fillPct = Math.max(0, Math.min(100, (hp / WIN_HP) * 100));
+  const fillPct = Math.max(0, Math.min(100, (hp / winHp) * 100));
 
   const [activePulse, setActivePulse] = useState<{ id: number; direction: 'gain' | 'loss' } | null>(null);
   const [shards, setShards] = useState<{ dx: number; dy: number }[]>([]);
@@ -44,10 +46,21 @@ export function TeamTotalPanel({
     return () => clearTimeout(t);
   }, [pulse]);
 
+  // 체력 1점 = 눈금 한 칸 — 목표 체력(winHp)만큼 칸을 나눠, 지금 몇 칸째인지 한눈에
+  // 보이도록 반투명한 눈금선을 긋는다(예: 목표 5점 → INITIAL_HP 5 + 5 = 10칸).
+  const segmentLines = Array.from({ length: winHp - 1 }, (_, i) => ((i + 1) / winHp) * 100);
+
   return (
-    <div className={`hp-orb w-56 shrink-0 h-full ${toneClass}`}>
+    <div className={`hp-orb w-full shrink-0 h-full ${toneClass}`}>
+      <LeafDecoration position="tl" size={30} swaying={activePulse !== null} />
+      <LeafDecoration position="br" size={30} swaying={activePulse !== null} />
       <div className="hp-orb-liquid" style={{ height: `${fillPct}%` }}>
         <div className="hp-orb-wave" />
+      </div>
+      <div className="hp-orb-segments" aria-hidden>
+        {segmentLines.map(pct => (
+          <span key={pct} className="hp-orb-segment-line" style={{ bottom: `${pct}%` }} />
+        ))}
       </div>
       <div className="hp-orb-sheen" />
       {activePulse?.direction === 'gain' && <div className="hp-orb-surge" />}

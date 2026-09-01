@@ -2,6 +2,7 @@ import type { ClientGameState, Team } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
 import { PlayerList } from './PlayerList';
 import { ScorePanel } from './ScorePanel';
+import { LeafDecoration } from '@/components/ui/LeafDecoration';
 
 export function TeamPanel({
   team,
@@ -39,35 +40,40 @@ export function TeamPanel({
   const hitShakeClass = animState.tigerSlash?.onTeam === team ? 'panel-hit-shake' : '';
   // 상표토끼 스킬 연출 — 날아온 토끼가 부딪히는 압박 효과
   const rabbitPressureClass = animState.rabbitPressure?.targetTeam === team ? 'panel-rabbit-pressure' : '';
+  // 이 팀이 방금 행동을 발동했으면(해설 자막이 뜨는 그 순간) 모서리 잎사귀가 살랑살랑
+  // 흔들려 "지금 이 팀에 효과가 생겼다"는 걸 은은하게 강조한다.
+  const justActed = animState.captions.some(c => c.tier === 'effect' && c.team === team);
 
   return (
     <div
       data-rabbit-target={team}
-      className={`w-56 h-full min-h-0 shrink-0 ${bgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} ${recoilClass} ${hitShakeClass} ${rabbitPressureClass} transition-colors transition-shadow`}
+      className={`relative w-full h-full min-h-0 shrink-0 ${bgClass} rounded-2xl border border-jungle-200 ${teamRing} ${recoilClass} ${hitShakeClass} ${rabbitPressureClass} transition-colors transition-shadow`}
     >
-      <div className={`text-base font-bold ${teamColor} flex items-center gap-1.5 flex-wrap`}>
-        {label}
-        {isMine && <span className="text-rose-500">우리팀♥</span>}
-        {/* 디자인어로 쌓아둔 대기 배율 — 상대도 볼 수 있어야 견제 판단이 가능하다 */}
-        {teamState.pendingMultiplier > 1 && (
-          <span className="mermaid-multiplier-badge">다음 행동 ×{teamState.pendingMultiplier}</span>
-        )}
+      <LeafDecoration position="tr" size={40} swaying={justActed} />
+      <LeafDecoration position="bl" size={32} swaying={justActed} />
+
+      <div className="relative z-[1] h-full min-h-0 p-4 flex flex-col gap-3 overflow-y-auto">
+        <div className={`text-base font-bold ${teamColor} flex items-center gap-1.5 flex-wrap`}>
+          {label}
+          {isMine && <span className="text-rose-500">우리팀♥</span>}
+        </div>
+
+        <PlayerList
+          team={team}
+          members={teamState.members}
+          activePlayerIndex={animState.displayedActivePlayerIndex}
+          isActiveTeam={isActiveTeam}
+        />
+
+        <hr className="border-jungle-100" />
+
+        <ScorePanel
+          team={team}
+          gameState={gameState}
+          scoreFlash={animState.scoreFlash}
+          displayedExp={animState.displayedExp[team]}
+        />
       </div>
-
-      <PlayerList
-        team={team}
-        members={teamState.members}
-        activePlayerIndex={animState.displayedActivePlayerIndex}
-        isActiveTeam={isActiveTeam}
-      />
-
-      <hr className="border-jungle-100" />
-
-      <ScorePanel
-        team={team}
-        gameState={gameState}
-        scoreFlash={animState.scoreFlash}
-      />
     </div>
   );
 }

@@ -6,9 +6,54 @@ export const INITIAL_HP = 5;
 export const WIN_HP = 10;
 export const LOSE_HP = 0;
 
-// 8턴 진입 시 축제 시작 — 이후 모든 페어 수집 경험치가 이 배수만큼 커진다.
-export const FESTIVAL_TURN = 8; // "축제가 시작되는 첫 턴"이라 turn >= FESTIVAL_TURN으로 판정한다
+// 축제 시작 턴(기본값) — 이후 모든 페어 수집 경험치가 이 배수만큼 커진다.
+// 방장이 방 생성 시 바꿀 수 있다(GameSettings.festivalTurn) — "축제가 시작되는 첫 턴"이라
+// turn >= festivalTurn으로 판정한다.
+export const FESTIVAL_TURN = 10;
 export const FESTIVAL_EXP_MULTIPLIER = 2;
+
+// 방장이 방 생성 시 정할 수 있는 게임 규칙의 기본값 — GameSettings 참조.
+// targetScore(목표 점수)의 기본값 5는 "체력 5에서 시작해 10 이상이면 즉시 승리"라는
+// 기존 규칙과 정확히 일치한다(winHp = INITIAL_HP + targetScore).
+export const DEFAULT_TARGET_SCORE = 5;
+export const DEFAULT_FESTIVAL_TURN = FESTIVAL_TURN;
+export const DEFAULT_DRAW_TIME_SEC = 30;
+export const DEFAULT_ACTION_TIME_SEC = 15;
+export const DEFAULT_NO_ACTION_TIME_SEC = 5;
+
+// 방 생성 화면에서 입력값을 이 범위로 잘라낸다(서버도 방어적으로 다시 clamp한다).
+export const SETTINGS_LIMITS = {
+  targetScore: { min: 1, max: 30 },
+  festivalTurn: { min: 1, max: 20 }, // MAX_TURN(20)을 넘기면 축제가 아예 시작되지 않는다
+  drawTimeSec: { min: 5, max: 120 },
+  actionTimeSec: { min: 5, max: 60 },
+  noActionTimeSec: { min: 2, max: 30 },
+} as const;
+
+export const DEFAULT_SETTINGS = {
+  targetScore: DEFAULT_TARGET_SCORE,
+  festivalTurn: DEFAULT_FESTIVAL_TURN,
+  drawTimeSec: DEFAULT_DRAW_TIME_SEC,
+  actionTimeSec: DEFAULT_ACTION_TIME_SEC,
+  noActionTimeSec: DEFAULT_NO_ACTION_TIME_SEC,
+};
+
+/** 방장 입력값을 SETTINGS_LIMITS 범위로 잘라내고, 정수가 아니면 반올림한다. */
+export function clampSettings(input: Partial<typeof DEFAULT_SETTINGS> | undefined): typeof DEFAULT_SETTINGS {
+  const merged = { ...DEFAULT_SETTINGS, ...input };
+  const clamp = (key: keyof typeof SETTINGS_LIMITS) => {
+    const { min, max } = SETTINGS_LIMITS[key];
+    const v = Math.round(Number(merged[key]));
+    return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : DEFAULT_SETTINGS[key];
+  };
+  return {
+    targetScore: clamp('targetScore'),
+    festivalTurn: clamp('festivalTurn'),
+    drawTimeSec: clamp('drawTimeSec'),
+    actionTimeSec: clamp('actionTimeSec'),
+    noActionTimeSec: clamp('noActionTimeSec'),
+  };
+}
 
 // 디자인어(인어) 스킬 — 대기 배율에 곱연산으로 누적된다: pendingMultiplier *= BASE ** level
 export const MERMAID_MULTIPLIER_BASE = 2;

@@ -47,17 +47,17 @@ export function SkillChoiceBar({
           >
             <div className="skill-choice-dim absolute inset-0" />
             {(hasEffect || (animal === 'mermaid' && eligible)) && (
-              <span className="skill-outline-text absolute top-2 left-3 z-10 text-base font-bold text-amber-300">
+              <span className="skill-outline-text absolute top-2 left-3 z-10 text-lg font-bold text-amber-300">
                 {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
-                {preview.myHpDelta > 0 && animal !== 'tiger' && `체력 +${preview.myHpDelta}`}
+                {preview.myHpDelta > 0 && `체력 +${preview.myHpDelta}`}
                 {preview.oppHpDelta < 0 && `상대 체력 ${preview.oppHpDelta}`}
                 {animal === 'mermaid' && `다음 행동 ×${preview.multiplierAfter}`}
               </span>
             )}
-            <span className="skill-outline-text absolute top-2 right-3 z-10 text-base font-bold text-white">
+            <span className="skill-outline-text absolute top-2 right-3 z-10 text-lg font-bold text-white">
               {eligible ? `레벨 ${preview.level} 소모` : '레벨 부족'}
             </span>
-            <div className="relative z-10 flex flex-col gap-1.5 p-3 min-h-[8rem]">
+            <div className="relative z-10 flex flex-col gap-1.5 p-3 min-h-[9rem]">
               <h3
                 className="skill-outline-text text-xl font-extrabold"
                 style={{ color: SKILL_COLOR[animal] }}
@@ -79,7 +79,8 @@ export function SkillChoiceBar({
           interactive ? 'skill-choice-glow' : ''
         }`}
       >
-        <div className="relative z-10 flex flex-col gap-1.5 p-3 min-h-[8rem]">
+        <div className="skill-choice-dim absolute inset-0" />
+        <div className="relative z-10 flex flex-col gap-1.5 p-3 min-h-[9rem]">
           <h3 className="skill-outline-text text-xl font-extrabold text-jungle-200">&lt;다음을 노리기&gt;</h3>
           <p className="skill-outline-text text-base text-white leading-snug">
             레벨을 높이고, 더 큰 효과로 한번에 몰아칩니다. 이번 턴에는 행동을 사용하지 않습니다.

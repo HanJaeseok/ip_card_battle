@@ -41,13 +41,26 @@ export function CardCaptionLayer({
   );
 }
 
-// tier별 오프셋(px)
+// tier별 오프셋(px) — 카드 한 장 바로 위(anchorCardId)는 살짝만, 스택 영역 전체
+// 기준(대체 앵커)일 때는 더 크게 띄운다.
 const TIER_OFFSET: Record<string, number> = { pair: 62 };
+const CARD_ANCHOR_OFFSET = 30;
 
 function AnchoredCaption({ caption }: { caption: CaptionItem }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
   useLayoutEffect(() => {
+    // pair는 짝을 이룬 카드 중 가장 마지막(가장 오른쪽) 카드 바로 위에 앵커링한다 —
+    // 그 카드를 못 찾으면(연출 타이밍 어긋남 등) 동물 스택 영역 전체를 대체 앵커로 쓴다.
+    const cardEl = caption.anchorCardId != null
+      ? document.querySelector(`[data-stack-card-id="${caption.anchorCardId}"]`)
+      : null;
+    if (cardEl) {
+      const r = cardEl.getBoundingClientRect();
+      setPos({ x: r.left + r.width / 2, y: r.top - CARD_ANCHOR_OFFSET + TIER_OFFSET[caption.tier] });
+      return;
+    }
+
     const selector = caption.placeKey
       ? `[data-place-key="${caption.placeKey}"]`
       : caption.stackAnimal

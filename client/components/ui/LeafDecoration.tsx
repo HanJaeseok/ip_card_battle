@@ -14,16 +14,27 @@ const POSITIONS: Record<Position, string> = {
   br: 'bottom-0 right-0',
 };
 
-export function LeafDecoration({ position }: { position: Position }) {
+export function LeafDecoration({
+  position,
+  size = 80,
+  swaying = false,
+}: {
+  position: Position;
+  size?: number; // px — 기본 80(화면 모서리), 팀 패널처럼 작은 자리엔 더 작게 쓴다
+  swaying?: boolean; // true인 동안 호버 없이도 살랑살랑 흔들린다(행동 발동 등 효과 강조용)
+}) {
   return (
-    <div className={`absolute ${POSITIONS[position]} z-10 pointer-events-none w-20 h-20`}>
+    <div
+      className={`absolute ${POSITIONS[position]} z-10 pointer-events-none`}
+      style={{ width: size, height: size }}
+    >
       <svg
-        width="80"
-        height="80"
+        width={size}
+        height={size}
         viewBox="0 0 80 80"
         fill="none"
         style={{ transform: TRANSFORMS[position] }}
-        className="leaf-sway pointer-events-auto"
+        className={`leaf-sway pointer-events-auto ${swaying ? 'leaf-sway-active' : ''}`}
       >
         {/* 메인 잎사귀 */}
         <path

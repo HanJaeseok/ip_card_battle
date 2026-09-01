@@ -1,11 +1,12 @@
-import type { Animal, GameEvent, GameState, Place, Team } from './types';
+import type { Animal, GameEvent, GameSettings, GameState, Place, Team } from './types';
 
 // ─── 클라이언트 → 서버 ───────────────────────────────────────────────────────
 
 export type ClientMessage =
-  | { type: 'createRoom'; nickname: string; team: Team; teamName?: string }
+  // settings는 방장(방을 만드는 쪽)만 보낸다 — 값을 정하지 않은 항목은 기본값으로 채워진다.
+  | { type: 'createRoom'; nickname: string; team: Team; teamName?: string; settings?: Partial<GameSettings> }
   | { type: 'joinRoom'; roomId: string; nickname: string; team: Team; teamName?: string }
-  | { type: 'createSoloRoom'; nickname: string; teamName?: string } // 싱글 모드 — 컴퓨터(랜덤 클릭)와 즉시 대전
+  | { type: 'createSoloRoom'; nickname: string; teamName?: string; settings?: Partial<GameSettings> } // 싱글 모드 — 컴퓨터(랜덤 클릭)와 즉시 대전
   | { type: 'ready' }
   | { type: 'drawCard'; place: Place }
   | { type: 'chooseSkill'; animal: Animal } // 턴 종료 시 4가지 스킬 중 하나 선택
@@ -18,7 +19,7 @@ export type ServerMessage =
   // 로비
   | { type: 'roomCreated'; roomId: string; playerId: string }
   | { type: 'roomJoined'; roomId: string; playerId: string }
-  | { type: 'lobbyState'; players: LobbyPlayer[]; teamNames: Record<Team, string | null> }
+  | { type: 'lobbyState'; players: LobbyPlayer[]; teamNames: Record<Team, string | null>; settings: GameSettings }
   | { type: 'error'; code: ErrorCode; message: string }
   // 게임
   | { type: 'gameStart'; state: ClientGameState }

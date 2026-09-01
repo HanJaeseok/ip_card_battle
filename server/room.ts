@@ -3,14 +3,15 @@ import type { Animal, Place, Team } from 'shared';
 import type { ServerMessage } from 'shared';
 import { processPlayerAction, processSkillChoice, processPass, processTimeout, initGame } from './engine/gameEngine';
 import { eligibleAnimals, levelOf } from './engine/skills';
-import type { GameState } from 'shared';
+import type { GameSettings, GameState } from 'shared';
 import {
-  TURN_TIME_SEC,
   SHEEP_EXTRA_TIME_PER_DRAW_SEC,
   SHEEP_TIMER_EXTRA_DRAW_CAP,
-  WIN_HP,
+  INITIAL_HP,
   PLACES,
   TEAM_NAME_POOL,
+  DEFAULT_SETTINGS,
+  clampSettings,
 } from 'shared';
 import { serializeEvents, serializeState } from './serializer';
 
@@ -24,8 +25,8 @@ const CPU_TEAM_NAME = '컴퓨터';
 const CPU_THINK_MIN_MS = 2200;
 const CPU_THINK_MAX_MS = 3200;
 // 게임 템포가 늘어지지 않도록, 고를 수 있는 스킬이 하나도 없는 선택 대기 상태는
-// 30초를 다 기다리지 않고 5초 뒤 자동으로 "아무것도 하지 않음"이 눌리도록 짧게 준다.
-const NO_ELIGIBLE_CHOICE_TIMEOUT_MS = 5000;
+// settings.actionTimeSec을 다 기다리지 않고 settings.noActionTimeSec 뒤 자동으로
+// "아무것도 하지 않음"이 눌리도록 짧게 준다.
 // 페어를 맞춘 직후처럼, 짧은 선택 타이머가 시작되기 전 클라이언트가 아직 정산(카드 수집·
 // 이펙트) 애니메이션을 재생 중일 수 있다. 그 사이 서버가 먼저 타임아웃을 처리해버리면
 // 플레이어는 "행동을 선택하세요" 화면을 보지도 못한 채 턴이 그냥 넘어간 것처럼 느낀다.
@@ -48,11 +49,12 @@ function pickComputerSkill(state: GameState, team: Team): Animal | null {
   const opponent: Team = team === 'A' ? 'B' : 'A';
   const me = state.teams[team];
   const foe = state.teams[opponent];
+  const winHp = INITIAL_HP + state.settings.targetScore;
 
   for (const animal of options) {
     if (animal === 'sheep' || animal === 'mermaid') continue;
     const amount = levelOf(state, team, animal) * me.pendingMultiplier;
-    if (animal === 'rabbit' && me.hp + amount >= WIN_HP) return animal;
+    if (animal === 'rabbit' && me.hp + amount >= winHp) return animal;
     if (animal === 'tiger' && amount >= foe.hp) return animal;
   }
 
@@ -72,6 +74,8 @@ export class Room {
   private players = new Map<string, PlayerConnection>();  // playerId → PlayerConnection
   private teamPlayerIds: Record<Team, string[]> = { A: [], B: [] };
   private teamNames: Record<Team, string | null> = { A: null, B: null };
+  // 방장(방을 만든 쪽)이 정한 게임 규칙 — 방 생성 시 한 번만 설정되고 게임 중 불변이다.
+  private settings: GameSettings = DEFAULT_SETTINGS;
   private state: GameState | null = null;
   private turnDeadline = 0;
   private timerHandle: ReturnType<typeof setTimeout> | null = null;
@@ -105,11 +109,17 @@ export class Room {
     nickname: string,
     team: Team,
     teamName?: string,
+    settings?: Partial<GameSettings>,
   ): 'ok' | 'game_started' | 'nickname_taken' {
     if (this.state !== null) return 'game_started';
 
     for (const p of this.players.values()) {
       if (p.nickname === nickname) return 'nickname_taken';
+    }
+
+    // 방을 처음 만드는 쪽(=이 방에 아직 아무도 없을 때)만 규칙을 정할 수 있다.
+    if (this.players.size === 0 && settings) {
+      this.settings = clampSettings(settings);
     }
 
     this.players.set(playerId, { ws, playerId, nickname, team, ready: false, connected: true });
@@ -120,8 +130,9 @@ export class Room {
   }
 
   /** 싱글 모드 — 사람은 A팀에 즉시 참가시키고, B팀은 컴퓨터(랜덤 클릭)로 채워 곧바로 게임을 시작한다. */
-  addSoloPlayer(ws: WebSocket, playerId: string, nickname: string, teamName?: string): void {
+  addSoloPlayer(ws: WebSocket, playerId: string, nickname: string, teamName?: string, settings?: Partial<GameSettings>): void {
     this.vsComputer = true;
+    if (settings) this.settings = clampSettings(settings);
     this.players.set(playerId, { ws, playerId, nickname, team: 'A', ready: true, connected: true });
     this.teamPlayerIds.A.push(playerId);
     this.teamPlayerIds.B.push(CPU_PLAYER_ID);
@@ -147,7 +158,7 @@ export class Room {
 
     const nickA = this.teamPlayerIds.A.map(id => this.players.get(id)?.nickname ?? CPU_NICKNAME);
     const nickB = this.teamPlayerIds.B.map(id => this.players.get(id)?.nickname ?? CPU_NICKNAME);
-    this.state = initGame(nickA, nickB);
+    this.state = initGame(nickA, nickB, Math.random, this.settings);
     this.assignTeamName('A');
     this.assignTeamName('B');
 
@@ -311,27 +322,31 @@ export class Room {
   // ─── 타이머 ──────────────────────────────────────────────────────────────
 
   /**
-   * 30초가 기본이지만, 지금 막 시작된 턴에 실용신양 스킬로 예약해둔 추가 뽑기가 있다면
-   * 그만큼(뽑기 1회당 10초) 시간을 더 준다. 카드 선택/스킬 선택 여부와 무관하게 항상
-   * "이번에 결정해야 할 팀"의 예약된 추가 뽑기 수를 기준으로 계산한다 — 스킬 선택
-   * 대기 중에는 그 팀이 이미 이번 액션에서 예약분을 소모했으므로 자연히 0이 되어
-   * 순수 30초로 돌아간다.
+   * 카드 선택(장소 클릭) 대기 중이면 settings.drawTimeSec을, 행동 선택 대기 중이면
+   * settings.actionTimeSec을 기본으로 쓴다. 지금 막 시작된 턴에 실용신양 스킬로
+   * 예약해둔 추가 뽑기가 있다면 그만큼(뽑기 1회당 10초) 시간을 더 준다 — "이번에
+   * 결정해야 할 팀"의 예약된 추가 뽑기 수를 기준으로 계산하며, 행동 선택 대기 중에는
+   * 그 팀이 이미 이번 액션에서 예약분을 소모했으므로 자연히 0이 되어 순수
+   * actionTimeSec으로 돌아간다.
    */
   private resetTimer(): void {
     this.clearTimer();
-    const waitingTeam = this.state?.pendingChoice ?? this.state?.activeTeam;
-    const pendingDraws = waitingTeam && this.state ? this.state.teams[waitingTeam].pendingExtraDraws : 0;
+    if (!this.state) return;
+    const settings = this.state.settings;
+    const waitingTeam = this.state.pendingChoice ?? this.state.activeTeam;
+    const pendingDraws = this.state.teams[waitingTeam].pendingExtraDraws;
     // 배율이 실린 예약 뽑기가 턴 제한시간을 무한정 늘리지 않도록, 시간 연장 계산에는
     // 상한을 둔다(실제 뽑기 횟수 자체는 이 상한과 무관하게 그대로 진행된다).
     const timerDraws = Math.min(pendingDraws, SHEEP_TIMER_EXTRA_DRAW_CAP);
 
     const noEligibleChoice =
-      this.state?.pendingChoice != null &&
+      this.state.pendingChoice != null &&
       eligibleAnimals(this.state, this.state.pendingChoice).length === 0;
 
+    const baseSec = this.state.pendingChoice != null ? settings.actionTimeSec : settings.drawTimeSec;
     const durationMs = noEligibleChoice
-      ? NO_ELIGIBLE_CHOICE_TIMEOUT_MS + NO_ELIGIBLE_SETTLE_GRACE_MS
-      : (TURN_TIME_SEC + SHEEP_EXTRA_TIME_PER_DRAW_SEC * timerDraws) * 1000;
+      ? settings.noActionTimeSec * 1000 + NO_ELIGIBLE_SETTLE_GRACE_MS
+      : (baseSec + SHEEP_EXTRA_TIME_PER_DRAW_SEC * timerDraws) * 1000;
     this.turnDeadline = Date.now() + durationMs;
     this.timerHandle = setTimeout(() => this.handleTimeout(), durationMs);
   }
@@ -378,7 +393,7 @@ export class Room {
     p.connected = true;
 
     if (this.state === null) {
-      this.sendTo(playerId, { type: 'lobbyState', players: this.buildLobbyPlayers(), teamNames: this.teamNames });
+      this.sendTo(playerId, { type: 'lobbyState', players: this.buildLobbyPlayers(), teamNames: this.teamNames, settings: this.settings });
     } else {
       const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames(), this.teamPlayerIds);
       this.sendTo(playerId, { type: 'gameSnapshot', state: clientState });
@@ -405,7 +420,7 @@ export class Room {
   }
 
   private broadcastLobbyState(): void {
-    this.broadcast({ type: 'lobbyState', players: this.buildLobbyPlayers(), teamNames: this.teamNames });
+    this.broadcast({ type: 'lobbyState', players: this.buildLobbyPlayers(), teamNames: this.teamNames, settings: this.settings });
   }
 
   private buildLobbyPlayers() {

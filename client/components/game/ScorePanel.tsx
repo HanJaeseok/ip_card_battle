@@ -54,12 +54,18 @@ function AnimalTable({
 
   return (
     <div
+      data-team-score-row={`${team}:${animal}`}
       className={`relative flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col ${
         isLevelUp ? 'level-up-shake' : ''
       }`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setTooltipPos(null)}
     >
+      {/* 디자인어(인어)가 쌓아둔 대기 배율 — 스티커처럼 인어 칸 모서리에 크게 붙인다.
+          상대도 볼 수 있어야 견제 판단이 가능해 팀 여부와 무관하게 보인다. */}
+      {animal === 'mermaid' && multiplier > 1 && (
+        <span className="mermaid-multiplier-sticker">×{multiplier}</span>
+      )}
       <div className="flex items-stretch flex-1 min-h-0">
         <div className="flex items-center justify-center px-2 py-1 flex-1 min-w-0">
           <img
@@ -112,7 +118,7 @@ function AnimalTable({
             <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level, multiplier)}</p>
             <p className={`mt-1 font-bold ${hasEffect ? 'text-amber-300' : 'text-gray-400'}`}>
               {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
-              {preview.myHpDelta > 0 && animal !== 'tiger' && `체력 +${preview.myHpDelta}`}
+              {preview.myHpDelta > 0 && `체력 +${preview.myHpDelta}`}
               {preview.oppHpDelta < 0 && `상대 체력 ${preview.oppHpDelta}`}
               {animal === 'mermaid' && preview.level > 0 && `다음 행동 ×${preview.multiplierAfter}`}
               {!hasEffect && animal !== 'mermaid' && '아직 레벨 0 (효과 없음)'}
@@ -128,12 +134,17 @@ export function ScorePanel({
   team,
   gameState,
   scoreFlash,
+  displayedExp,
 }: {
   team: Team;
   gameState: ClientGameState;
   scoreFlash: ReadonlyMap<string, number>;
+  // 서버 진실(gameState.teams[team].exp)은 페어가 맞는 즉시 반영되지만, 화면 숫자는
+  // 그 페어 카드가 팀 칸에 실제로 도착한 뒤에야 올라가는 게 더 직관적이라 애니메이션
+  // 큐가 별도로 지연시켜 넘겨주는 값을 대신 쓴다.
+  displayedExp: Record<Animal, number>;
 }) {
-  const exp = gameState.teams[team].exp;
+  const exp = displayedExp;
 
   // 경험치 팝 — flashKey 변경 시 re-trigger
   const [popKeys, setPopKeys] = useState<Set<Animal>>(new Set());

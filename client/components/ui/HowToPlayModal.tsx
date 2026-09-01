@@ -217,6 +217,11 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
             승리합니다(동점이면 무승부). 카드 재고나 보충 같은 건 없어요 — 뽑기는 언제나
             무한이니, 경험치를 빠르게 모아 레벨을 올리고 결정적인 순간에 행동을 터뜨리는
             팀이 유리합니다.
+            <br />
+            <span className="text-gray-400 text-xs">
+              (여기 적힌 목표 점수·축제 시작 턴·제한시간은 모두 기본값이에요. 방장이 방을
+              만들 때 "⚙️ 게임 규칙"에서 바꿀 수 있습니다.)
+            </span>
           </Section>
         </div>
       </div>
