@@ -1,7 +1,7 @@
 import type { Animal, GameEvent, GameState, Place } from 'shared';
 import { drawCard } from './drawCard';
 import { advanceTurn, initGame } from './turnManager';
-import { applySkillChoice, applyPass, randomEligibleSkill, levelOf, eligibleAnimals } from './skills';
+import { applySkillChoice, applyPass, randomEligibleSkill, levelOf } from './skills';
 import { randomPlace } from './places';
 import type { RNG } from './places';
 
@@ -9,10 +9,9 @@ export { initGame } from './turnManager';
 
 /**
  * 장소 클릭 처리 — 엔진의 진입점 ①.
- * 뽑기+정산까지 끝난 뒤, 그 팀이 고를 수 있는 스킬이 하나라도 있으면 고를 때까지 대기한다.
- * 고를 수 있는 스킬이 아예 없다면(레벨 0) 화면에 선택창을 띄워 왕복할 필요 없이 이 안에서
- * 곧바로 패스 처리하고 턴까지 넘긴다 — 그래야 매 턴 "레벨 부족" 왕복 때문에 방금 재생 중이던
- * 뽑기 애니메이션이 다음 액션에 의해 끊기는 일이 없다.
+ * 뽑기+정산까지 끝난 뒤에는 고를 수 있는 스킬이 있든 없든 항상 그 팀의 스킬 선택 대기
+ * 상태로 들어간다 — 쓸 수 있는 스킬이 없더라도 반드시 "아무것도 하지 않음"을 직접 눌러야
+ * 턴이 넘어간다(자동 패스 없음). 30초 타이머가 끝나면 processTimeout이 대신 패스한다.
  */
 export function processPlayerAction(
   state: GameState,
@@ -25,13 +24,7 @@ export function processPlayerAction(
   events.push(...drawCard(state, place, rng));
 
   if (state.phase === 'playing') {
-    const team = state.activeTeam;
-    if (eligibleAnimals(state, team).length > 0) {
-      state.pendingChoice = team;
-    } else {
-      events.push(applyPass(team, true));
-      events.push(...advanceTurn(state));
-    }
+    state.pendingChoice = state.activeTeam;
   }
 
   return { state, events };
@@ -58,19 +51,24 @@ export function processSkillChoice(
   return { state, events };
 }
 
-/** "아무것도 하지 않음" 처리 — 엔진의 진입점 ③. */
-export function processPass(state: GameState): { state: GameState; events: GameEvent[] } {
+/**
+ * "아무것도 하지 않음" 처리 — 엔진의 진입점 ③.
+ * auto=true는 시간 초과로 서버가 대신 패스했을 때만 쓴다 — 그 경우 timeoutChoice 이벤트가
+ * 이미 "시간 초과로..." 해설을 내보내므로, 여기서 또 "다음 기회를 노리기로 했습니다"를
+ * 중복으로 보여주지 않기 위해서다(클라이언트는 auto인 skillPassed를 해설판에 표시하지 않는다).
+ */
+export function processPass(state: GameState, auto = false): { state: GameState; events: GameEvent[] } {
   if (state.phase !== 'playing' || state.pendingChoice === null) return { state, events: [] };
 
   const team = state.pendingChoice;
-  const events: GameEvent[] = [applyPass(team, false)];
+  const events: GameEvent[] = [applyPass(team, auto)];
   state.pendingChoice = null;
   events.push(...advanceTurn(state));
 
   return { state, events };
 }
 
-/** 30초 제한시간 초과 — 카드 선택 대기 중이면 무작위 장소를, 스킬 선택 대기 중이면 무작위 스킬(없으면 패스)을 대신 골라준다. */
+/** 제한시간 초과 — 카드 선택 대기 중이면 무작위 장소를, 스킬 선택 대기 중이면 무작위 스킬(없으면 패스)을 대신 골라준다. */
 export function processTimeout(
   state: GameState,
   rng: RNG = Math.random,
@@ -80,7 +78,7 @@ export function processTimeout(
   if (state.pendingChoice !== null) {
     const team = state.pendingChoice;
     const animal = randomEligibleSkill(state, team, rng);
-    const result = animal === null ? processPass(state) : processSkillChoice(state, animal);
+    const result = animal === null ? processPass(state, true) : processSkillChoice(state, animal);
     return { state: result.state, events: [{ type: 'timeoutChoice', animal }, ...result.events] };
   }
 

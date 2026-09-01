@@ -1,7 +1,7 @@
 import { initGame } from '../engine/turnManager';
 import { drawCard } from '../engine/drawCard';
 import { advanceTurn } from '../engine/turnManager';
-import { processPlayerAction, processSkillChoice } from '../engine/gameEngine';
+import { processPlayerAction, processSkillChoice, processPass } from '../engine/gameEngine';
 import { applySkillChoice, levelOf } from '../engine/skills';
 import type { Animal, CardNum, StackedCard } from 'shared';
 import { MAX_TURN, SHEEP_SAFETY_CAP, SKILL_COEFFICIENTS, THRESHOLDS } from 'shared';
@@ -215,13 +215,18 @@ describe('장소 클릭 후에는 스킬을 고를 때까지 턴이 넘어가지
     expect(s1.activeTeam).toBe('A');
   });
 
-  it('고를 수 있는 스킬이 하나도 없으면 대기하지 않고 즉시 자동 패스 후 턴이 넘어간다', () => {
+  it('고를 수 있는 스킬이 하나도 없어도 pendingChoice가 세팅되어 직접 패스해야 턴이 넘어간다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     const { state: s1, events } = processPlayerAction(state, 'house', rng0);
-    expect(s1.pendingChoice).toBeNull();
-    expect(s1.activeTeam).toBe('B');
-    const passEv = events.find(e => e.type === 'skillPassed');
-    expect(passEv).toMatchObject({ type: 'skillPassed', team: 'A', auto: true });
+    expect(s1.pendingChoice).toBe('A');
+    expect(s1.activeTeam).toBe('A');
+    expect(events.some(e => e.type === 'skillPassed')).toBe(false);
+
+    const { state: s2, events: passEvents } = processPass(s1);
+    expect(s2.pendingChoice).toBeNull();
+    expect(s2.activeTeam).toBe('B');
+    const passEv = passEvents.find(e => e.type === 'skillPassed');
+    expect(passEv).toMatchObject({ type: 'skillPassed', team: 'A', auto: false });
   });
 
   it('pendingChoice가 있는 동안 추가 장소 클릭은 무시된다', () => {

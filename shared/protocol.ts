@@ -50,6 +50,7 @@ export interface ClientGameState extends GameState {
   activePlayerNickname: string;
   turnDeadline: number; // Date.now() + (30 + 10×예약된 추가뽑기)초 (클라이언트 타이머 표시용)
   teamNames: Record<Team, string>; // 방장이 정했거나 무작위로 배정된 팀 이름("A팀"/"B팀" 대신 표시)
+  memberIds: Record<Team, string[]>; // teams[team].members와 같은 순서의 playerId — 클라이언트가 "지금 활성 플레이어가 바로 나인지"를 판별하는 데 쓴다
 }
 
 export type ClientGameEvent = GameEvent;

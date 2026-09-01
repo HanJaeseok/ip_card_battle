@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Animal, CardNum, Place } from 'shared';
 import { PLACE_ANIMALS } from 'shared';
-import { ANIMAL_INFO } from '@/lib/animals';
 import { SLOT_SPIN_DUR as SPIN_DUR, SLOT_REVEAL_HOLD as REVEAL_HOLD, SLOT_FLY_DUR as FLY_DUR } from '@/lib/drawTiming';
 import type { DrawSlotItem } from '@/hooks/useAnimationQueue';
 
@@ -69,7 +68,7 @@ function SlotDraw({ item }: { item: DrawSlotItem }) {
       className={`draw-slot ${phase === 'spin' ? 'draw-slot-spin' : ''}`}
       style={{ position: 'fixed', transform: 'translate(-50%, -50%)', zIndex: 58, ...style }}
     >
-      <span className="text-5xl leading-none">{ANIMAL_INFO[displayAnimal].emoji}</span>
+      <img src={`/emoticon/${displayAnimal}_focus.png`} alt={displayAnimal} className="w-16 h-16 object-contain" />
       <span className="text-2xl font-black text-jungle-900">{displayNum}</span>
     </span>
   );

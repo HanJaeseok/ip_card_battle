@@ -1,5 +1,8 @@
+import { useEffect } from 'react';
 import type { Animal, ClientGameState, Place, Team } from 'shared';
+import { ANIMALS } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
+import { previewSkill } from '@/lib/skills';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
 import { EffectLayer } from '@/components/effects/EffectLayer';
 import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
@@ -12,7 +15,9 @@ import { TeamPanel } from './TeamPanel';
 import { GameBoard } from './GameBoard';
 import { SheepProgressBar } from './SheepProgressBar';
 import { CommentaryBoard } from './CommentaryBoard';
-import { SkillChoiceModal } from './SkillChoiceModal';
+import { SkillChoiceBar } from './SkillChoiceBar';
+import { TeamTotalPanel } from './TeamTotalPanel';
+import { ActionPrompt } from './ActionPrompt';
 
 // 실용신양 콤보 번호 → 진동 강도 스케일. 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다.
 function shakeScale(combo: number): number {
@@ -22,6 +27,7 @@ function shakeScale(combo: number): number {
 export function GameLayout({
   gameState,
   myTeam,
+  playerId,
   onPlaceClick,
   onChooseSkill,
   onPassSkill,
@@ -30,6 +36,7 @@ export function GameLayout({
 }: {
   gameState: ClientGameState;
   myTeam: Team | null;
+  playerId: string | null;
   onPlaceClick: (place: Place) => void;
   onChooseSkill: (animal: Animal) => void;
   onPassSkill: () => void;
@@ -37,12 +44,33 @@ export function GameLayout({
   animState: AnimationState;
 }) {
   const isShaking = animState.screenShakeLevel > 0;
-  // 정산 연출이 다 끝난 뒤, 내 팀이 스킬을 고를 차례일 때만 모달을 띄운다.
-  const showSkillModal = !animState.isSettling && myTeam !== null && gameState.pendingChoice === myTeam;
+  // 정산 연출이 다 끝난 뒤, 내 팀이 행동을 고를 차례일 때만 행동 선택 영역을 활성화한다.
+  const isMyChoiceTurn = !animState.isSettling && myTeam !== null && gameState.pendingChoice === myTeam;
+  // 정산 연출이 다 끝난 뒤, 내 팀이 장소를 고를(카드를 뽑을) 차례인지.
+  const isMyDrawTurn =
+    !animState.isSettling &&
+    myTeam !== null &&
+    gameState.pendingChoice === null &&
+    animState.displayedActiveTeam === myTeam;
+  // 관전자(myTeam === null)를 포함해 행동 선택 영역은 항상 보여주되, 상세 수치는
+  // 내 팀(없으면 A팀) 기준으로 미리보기한다.
+  const skillPreviewTeam = myTeam ?? 'A';
+  const noEligible = isMyChoiceTurn && ANIMALS.every(a => previewSkill(gameState, skillPreviewTeam, a).level === 0);
+
+  // 게임 템포가 늘어지지 않도록, 고를 수 있는 행동이 하나도 없으면 3초 뒤
+  // "아무것도 하지 않음"이 자동으로 눌린 것처럼 처리한다(서버 타이머도 5초로
+  // 별도로 짧아져 있어 이중 안전장치가 된다). 이 로컬 타이머는 noEligible이 true가
+  // 되는 순간(=정산 연출이 끝나 실제로 화면에 보이는 순간)부터 세므로, 서버의
+  // 정산-유예 보정과 자연히 같은 시점에서 시작한다.
+  useEffect(() => {
+    if (!noEligible) return;
+    const t = setTimeout(() => onPassSkill(), 5000);
+    return () => clearTimeout(t);
+  }, [noEligible, onPassSkill]);
 
   return (
     <div
-      className={`min-h-screen bg-jungle-50 flex flex-col relative overflow-hidden ${isShaking ? 'shake-combo' : ''}`}
+      className={`h-screen bg-jungle-50 flex flex-col relative overflow-hidden ${isShaking ? 'shake-combo' : ''}`}
       style={isShaking ? ({ '--shake-scale': shakeScale(animState.screenShakeLevel) } as React.CSSProperties) : undefined}
     >
       {/* 모서리 잎사귀 장식 */}
@@ -53,6 +81,7 @@ export function GameLayout({
 
       <GameHeader
         gameState={gameState}
+        myTeam={myTeam}
         displayedActiveTeam={animState.displayedActiveTeam}
         displayedActivePlayerIndex={animState.displayedActivePlayerIndex}
         isSettling={animState.isSettling}
@@ -64,10 +93,21 @@ export function GameLayout({
         </div>
       )}
 
-      {/* 3열 레이아웃 */}
-      <main className="flex-1 flex gap-2 p-2 overflow-hidden min-h-0">
-        <TeamPanel team="A" myTeam={myTeam} gameState={gameState} animState={animState} />
-        <div className="flex-1 flex flex-col gap-2 min-h-0">
+      {/* 3열 × (본판 / 해설(+행동 안내 오버레이) / 합계·행동선택) 그리드 —
+          화면 높이를 넘지 않도록 board·skill 행은 남는 공간을 나눠 갖는 fr 비율로,
+          해설 행만 고정 높이(3줄)로 둔다. */}
+      <main
+        className="flex-1 grid gap-2 p-2 min-h-0 overflow-hidden"
+        style={{
+          gridTemplateColumns: '14rem 1fr 14rem',
+          gridTemplateRows: 'minmax(0, 1.25fr) auto minmax(0, 1fr)',
+        }}
+      >
+        <div style={{ gridColumn: 1, gridRow: 1 }} className="min-h-0">
+          <TeamPanel team="A" myTeam={myTeam} gameState={gameState} animState={animState} />
+        </div>
+
+        <div style={{ gridColumn: 2, gridRow: 1 }} className="min-h-0 flex flex-col">
           <GameBoard
             gameState={gameState}
             myTeam={myTeam}
@@ -87,9 +127,48 @@ export function GameLayout({
             expandFlash={animState.expandFlash}
             mermaidPopup={animState.mermaidPopup}
           />
-          <CommentaryBoard lines={animState.commentary} />
         </div>
-        <TeamPanel team="B" myTeam={myTeam} gameState={gameState} animState={animState} />
+
+        <div style={{ gridColumn: 3, gridRow: 1 }} className="min-h-0">
+          <TeamPanel team="B" myTeam={myTeam} gameState={gameState} animState={animState} />
+        </div>
+
+        {/* 해설판 — 모래시계/타이머/차례 안내는 이 안의 가운데 오버레이로 얹힌다 */}
+        <div style={{ gridColumn: '1 / -1', gridRow: 2 }}>
+          <CommentaryBoard
+            lines={animState.commentary}
+            overlay={
+              <ActionPrompt
+                myTeam={myTeam}
+                playerId={playerId}
+                displayedActiveTeam={animState.displayedActiveTeam}
+                displayedActivePlayerIndex={animState.displayedActivePlayerIndex}
+                memberIds={gameState.memberIds}
+                isMyDrawTurn={isMyDrawTurn}
+                interactive={isMyChoiceTurn}
+                noEligible={noEligible}
+                turnDeadline={gameState.turnDeadline}
+              />
+            }
+          />
+        </div>
+
+        {/* 합계(연두=우리팀/붉은=상대팀) — 사이에 턴 종료 행동 선택 영역 */}
+        <div style={{ gridColumn: 1, gridRow: 3 }} className="min-h-0">
+          <TeamTotalPanel team="A" gameState={gameState} isMine={myTeam !== null ? myTeam === 'A' : true} />
+        </div>
+        <div style={{ gridColumn: 2, gridRow: 3 }} className="min-h-0">
+          <SkillChoiceBar
+            gameState={gameState}
+            team={skillPreviewTeam}
+            interactive={isMyChoiceTurn}
+            onChoose={onChooseSkill}
+            onPass={onPassSkill}
+          />
+        </div>
+        <div style={{ gridColumn: 3, gridRow: 3 }} className="min-h-0">
+          <TeamTotalPanel team="B" gameState={gameState} isMine={myTeam !== null ? myTeam === 'B' : false} />
+        </div>
       </main>
 
       {/* 화면 오버레이 이펙트 (나뭇잎, 플로팅 텍스트) */}
@@ -113,16 +192,11 @@ export function GameLayout({
       {/* 실용신양 추가 뽑기 진행도 */}
       <SheepProgressBar progress={animState.sheepProgress} />
 
-      {/* 상표토끼 스킬 발동 — 토끼 스택에서 팀 점수판으로 날아가는 토끼들 */}
+      {/* 상표토끼 행동 발동 — 토끼 스택에서 팀 점수판으로 날아가는 토끼들 */}
       <RabbitFlightLayer flights={animState.rabbitFlights} />
 
-      {/* 특허랑이 스킬 발동 — 화면 전체가 크게 흔들리는 타격 비네트 */}
+      {/* 특허랑이 행동 발동 — 화면 전체가 크게 흔들리는 타격 비네트 */}
       {animState.tigerImpact && <div className="tiger-vignette" />}
-
-      {/* 턴 종료 — 4가지 스킬 중 하나를 고르는 모달 */}
-      {showSkillModal && myTeam !== null && (
-        <SkillChoiceModal gameState={gameState} team={myTeam} onChoose={onChooseSkill} onPass={onPassSkill} />
-      )}
     </div>
   );
 }

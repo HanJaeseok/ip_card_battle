@@ -22,18 +22,17 @@ export function TeamPanel({
   const teamColor = team === 'A' ? 'text-team-a' : 'text-team-b';
   const teamRing = isActiveTeam
     ? team === 'A'
-      ? 'ring-2 ring-team-a shadow-lg'
-      : 'ring-2 ring-team-b shadow-lg'
+      ? 'ring-[3px] ring-team-a shadow-lg'
+      : 'ring-[3px] ring-team-b shadow-lg'
     : '';
 
-  // 지금이 내 차례인지 상대 차례인지를 양쪽 팀 영역 배경색으로 동일하게 표시한다
-  // (연두 = 내 차례, 연핑크 = 상대 차례) — A/B팀 색과는 별개의 전역 신호.
-  const isMyTurn = myTeam !== null && animState.displayedActiveTeam === myTeam;
-  const turnBgClass = myTeam === null ? 'bg-white' : isMyTurn ? 'bg-lime-100' : 'bg-rose-100';
+  // 배경색은 "지금 누구 차례인지"가 아니라 "이 영역이 어느 팀인지"로 고정한다
+  // (우리팀 = 연두, 상대팀 = 연붉은) — 차례 표시는 위 teamRing(테두리)만 담당한다.
+  const isMine = myTeam === team;
+  const bgClass = myTeam === null ? 'bg-white' : isMine ? 'bg-lime-100' : 'bg-rose-100';
 
   const teamEmoji = team === 'A' ? '🟢' : '🔵';
   const label = `${teamEmoji} ${gameState.teamNames[team]}`;
-  const isMine = myTeam === team;
 
   // 타이거 스킬 연출 — 발동한 쪽은 반동(recoil), 맞는 쪽은 충격(hit shake)
   const recoilClass = animState.tigerRecoil?.attackerTeam === team ? (team === 'A' ? 'panel-recoil-a' : 'panel-recoil-b') : '';
@@ -44,7 +43,7 @@ export function TeamPanel({
   return (
     <div
       data-rabbit-target={team}
-      className={`w-56 shrink-0 ${turnBgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} ${recoilClass} ${hitShakeClass} ${rabbitPressureClass} transition-colors transition-shadow`}
+      className={`w-56 h-full min-h-0 shrink-0 ${bgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} ${recoilClass} ${hitShakeClass} ${rabbitPressureClass} transition-colors transition-shadow`}
     >
       <div className={`text-base font-bold ${teamColor} flex items-center gap-1.5`}>
         {label}

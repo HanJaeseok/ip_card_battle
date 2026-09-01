@@ -10,6 +10,7 @@ export function serializeState(
   state: GameState,
   turnDeadline: number,
   teamNames: Record<Team, string>,
+  memberIds: Record<Team, string[]>,
 ): ClientGameState {
   const activeTeam = state.teams[state.activeTeam];
   const activePlayerNickname = activeTeam.members[state.activePlayerIndex] ?? '';
@@ -22,6 +23,7 @@ export function serializeState(
     activePlayerNickname,
     turnDeadline,
     teamNames,
+    memberIds: { A: [...memberIds.A], B: [...memberIds.B] },
     stacks: {
       sheep: [...state.stacks.sheep],
       rabbit: [...state.stacks.rabbit],

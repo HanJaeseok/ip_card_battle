@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 import type { CommentaryLine } from '@/hooks/useAnimationQueue';
 
 export function CommentaryBoard({
   lines,
+  overlay,
 }: {
   lines: CommentaryLine[];
+  overlay?: ReactNode; // 모래시계·안내 문구 — 해설과 겹치면 이 오버레이가 항상 위에 보인다
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -20,16 +23,16 @@ export function CommentaryBoard({
   }, [lines]);
 
   return (
-    <div className="h-[21rem] shrink-0 bg-white rounded-2xl border border-jungle-200 px-4 py-3 flex flex-col">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+    <div className="relative h-20 shrink-0 bg-white rounded-2xl border border-jungle-200 px-4 py-2 overflow-hidden">
+      <div ref={scrollRef} className="h-full overflow-y-auto">
         {lines.length === 0 ? (
-          <p className="text-lg text-jungle-300">아직 소식이 없습니다.</p>
+          <p className="text-sm text-jungle-300">아직 소식이 없습니다.</p>
         ) : (
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col gap-0.5">
             {lines.map(line => (
               <li
                 key={line.id}
-                className={`text-lg leading-snug font-semibold ${
+                className={`text-sm leading-snug font-semibold ${
                   line.team === 'A'
                     ? 'text-emerald-700'
                     : line.team === 'B'
@@ -43,6 +46,7 @@ export function CommentaryBoard({
           </ul>
         )}
       </div>
+      {overlay}
     </div>
   );
 }

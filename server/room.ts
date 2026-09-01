@@ -2,7 +2,7 @@ import type { WebSocket } from 'ws';
 import type { Animal, Place, Team } from 'shared';
 import type { ServerMessage } from 'shared';
 import { processPlayerAction, processSkillChoice, processPass, processTimeout, initGame } from './engine/gameEngine';
-import { randomEligibleSkill } from './engine/skills';
+import { randomEligibleSkill, eligibleAnimals } from './engine/skills';
 import type { GameState } from 'shared';
 import { TURN_TIME_SEC, SHEEP_EXTRA_TIME_PER_DRAW_SEC, PLACES, TEAM_NAME_POOL } from 'shared';
 import { serializeEvents, serializeState } from './serializer';
@@ -16,6 +16,18 @@ const CPU_TEAM_NAME = '컴퓨터';
 // 가장 긴 연출보다 여유 있게 최소 대기 시간을 잡아 그런 일이 최대한 드물게 한다.
 const CPU_THINK_MIN_MS = 2200;
 const CPU_THINK_MAX_MS = 3200;
+// 게임 템포가 늘어지지 않도록, 고를 수 있는 스킬이 하나도 없는 선택 대기 상태는
+// 30초를 다 기다리지 않고 5초 뒤 자동으로 "아무것도 하지 않음"이 눌리도록 짧게 준다.
+const NO_ELIGIBLE_CHOICE_TIMEOUT_MS = 5000;
+// 페어를 맞춘 직후처럼, 짧은 선택 타이머가 시작되기 전 클라이언트가 아직 정산(카드 수집·
+// 이펙트) 애니메이션을 재생 중일 수 있다. 그 사이 서버가 먼저 타임아웃을 처리해버리면
+// 플레이어는 "행동을 선택하세요" 화면을 보지도 못한 채 턴이 그냥 넘어간 것처럼 느낀다.
+// 짧은 타이머의 실제 만료 시점에 이 유예를 더해, 클라이언트가 정산을 끝내고 화면을
+// 실제로 보여줄 즈음에야 카운트다운이 의미 있게 시작되도록 한다(다른 연출 유예값과
+// 같은 CPU_THINK_MIN_MS를 기준으로 삼는다 — 이미 "가장 긴 연출보다 여유 있게"로
+// 검증된 값이다). 유예 시간은 turnDeadline에 그대로 녹아들어 화면에 별도로 드러나지
+// 않는다 — 클라이언트는 정산이 끝나야 비로소 이 타이머를 보여주기 시작하기 때문이다.
+const NO_ELIGIBLE_SETTLE_GRACE_MS = CPU_THINK_MIN_MS;
 
 interface PlayerConnection {
   ws: WebSocket;
@@ -110,7 +122,7 @@ export class Room {
     this.assignTeamName('B');
 
     this.resetTimer();
-    const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames());
+    const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames(), this.teamPlayerIds);
     this.broadcast({ type: 'gameStart', state: clientState });
     this.scheduleComputerActionIfNeeded();
   }
@@ -254,7 +266,7 @@ export class Room {
       this.clearTimer();
     }
 
-    const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames());
+    const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames(), this.teamPlayerIds);
     this.broadcast({ type: 'actionResult', events: clientEvents, state: clientState });
 
     if (this.state.phase === 'playing') this.scheduleComputerActionIfNeeded();
@@ -263,7 +275,7 @@ export class Room {
   private broadcastResult(events: ReturnType<typeof processPlayerAction>['events']): void {
     if (!this.state) return;
     const clientEvents = serializeEvents(events);
-    const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames());
+    const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames(), this.teamPlayerIds);
     this.broadcast({ type: 'actionResult', events: clientEvents, state: clientState });
   }
 
@@ -280,7 +292,14 @@ export class Room {
     this.clearTimer();
     const waitingTeam = this.state?.pendingChoice ?? this.state?.activeTeam;
     const pendingDraws = waitingTeam && this.state ? this.state.teams[waitingTeam].pendingExtraDraws : 0;
-    const durationMs = (TURN_TIME_SEC + SHEEP_EXTRA_TIME_PER_DRAW_SEC * pendingDraws) * 1000;
+
+    const noEligibleChoice =
+      this.state?.pendingChoice != null &&
+      eligibleAnimals(this.state, this.state.pendingChoice).length === 0;
+
+    const durationMs = noEligibleChoice
+      ? NO_ELIGIBLE_CHOICE_TIMEOUT_MS + NO_ELIGIBLE_SETTLE_GRACE_MS
+      : (TURN_TIME_SEC + SHEEP_EXTRA_TIME_PER_DRAW_SEC * pendingDraws) * 1000;
     this.turnDeadline = Date.now() + durationMs;
     this.timerHandle = setTimeout(() => this.handleTimeout(), durationMs);
   }
@@ -327,7 +346,7 @@ export class Room {
     if (this.state === null) {
       this.sendTo(playerId, { type: 'lobbyState', players: this.buildLobbyPlayers(), teamNames: this.teamNames });
     } else {
-      const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames());
+      const clientState = serializeState(this.state, this.turnDeadline, this.finalTeamNames(), this.teamPlayerIds);
       this.sendTo(playerId, { type: 'gameSnapshot', state: clientState });
     }
     return true;

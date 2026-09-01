@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
 import { ANIMALS, THRESHOLDS } from 'shared';
-import { ANIMAL_INFO } from '@/lib/animals';
 import { previewSkill } from '@/lib/skills';
 import { SKILL_TITLE, describeSkill } from '@/lib/skillInfo';
 
@@ -39,27 +38,47 @@ function AnimalTable({
     setTooltipPos({ x: r.left + r.width / 2, y: r.top });
   };
 
+  // 레벨이 새로 오른 순간에만 "Lv UP!" 강조 + 흔들림을 짧게 재생한다.
+  const prevLevelRef = useRef(level);
+  const [isLevelUp, setIsLevelUp] = useState(false);
+  useEffect(() => {
+    if (level > prevLevelRef.current) {
+      setIsLevelUp(true);
+      const t = setTimeout(() => setIsLevelUp(false), 750);
+      prevLevelRef.current = level;
+      return () => clearTimeout(t);
+    }
+    prevLevelRef.current = level;
+  }, [level]);
+
   return (
     <div
-      className="relative border border-gray-200 rounded-lg overflow-hidden bg-white"
+      className={`relative flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col ${
+        isLevelUp ? 'level-up-shake' : ''
+      }`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setTooltipPos(null)}
     >
-      <div className="flex items-stretch">
-        <div className="flex items-center justify-center px-3 py-2 flex-1 min-w-0">
-          <span className="text-3xl leading-none">{ANIMAL_INFO[animal].emoji}</span>
+      <div className="flex items-stretch flex-1 min-h-0">
+        <div className="flex items-center justify-center px-2 py-1 flex-1 min-w-0">
+          <img
+            src={`/emoticon/${animal}_${level > 0 ? 'happy' : 'focus'}.png`}
+            alt={animal}
+            className="w-16 h-16 object-contain"
+          />
         </div>
-        <div className="border-l border-gray-200 px-3 py-2 flex items-center justify-center min-w-[4.5rem]">
+        <div className="border-l border-gray-200 px-3 py-1 flex items-center justify-center min-w-[4.75rem]">
           <p
-            className={`text-2xl font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
+            className={`font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
             style={isFlashing ? { color: '#22c55e' } : undefined}
           >
-            {score}
+            <span className="text-2xl">{score}</span>
+            <span className="text-[0.65rem] font-semibold text-jungle-400 ml-0.5">/{threshold}</span>
           </p>
         </div>
       </div>
-      <div className="px-2 pb-1.5 pt-1">
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+      <div className="px-2 pb-1.5 pt-1 shrink-0">
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-jungle-500 transition-[width] duration-300"
             style={{ width: `${progressPct}%` }}
@@ -67,6 +86,13 @@ function AnimalTable({
         </div>
         <p className="text-[0.65rem] text-jungle-500 text-right mt-0.5 font-bold">Lv. {level}</p>
       </div>
+
+      {/* 레벨업 강조 — 불꽃 + 위 화살표가 짧고 강렬하게 튀어오른다 */}
+      {isLevelUp && (
+        <div className="level-up-burst absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+          <span className="level-up-text">🔥⬆️ Lv UP!</span>
+        </div>
+      )}
 
       {/* 호버 툴팁 — 스킬 설명 + 지금 고르면 얻을 기댓값 */}
       {tooltipPos && (
@@ -106,7 +132,6 @@ export function ScorePanel({
   scoreFlash: ReadonlyMap<string, number>;
 }) {
   const scores = gameState.teams[team].scores;
-  const myTotal = ANIMALS.reduce((s, a) => s + scores[a], 0);
 
   // 점수 팝 — flashKey 변경 시 re-trigger
   const [popKeys, setPopKeys] = useState<Set<Animal>>(new Set());
@@ -134,7 +159,7 @@ export function ScorePanel({
   }, [scoreFlash, team]);
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
       {ANIMALS.map(a => (
         <AnimalTable
           key={a}
@@ -146,11 +171,6 @@ export function ScorePanel({
           team={team}
         />
       ))}
-
-      <div className="bg-jungle-50 border border-jungle-200 rounded-lg px-3 py-2 text-center mt-1">
-        <p className="text-xs text-jungle-500">합계</p>
-        <p className="text-2xl font-bold text-jungle-800 tabular-nums">{myTotal}</p>
-      </div>
     </div>
   );
 }

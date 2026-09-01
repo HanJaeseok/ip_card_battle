@@ -14,7 +14,7 @@ const GAME_BGM_VOLUME = 0.5; // 게임 효과음이 함께 들려야 하므로 B
 
 export default function GamePage() {
   const router = useRouter();
-  const { gameState, lastEvents, drawCard, chooseSkill, passSkill, error, connected } = useWebSocket();
+  const { gameState, lastEvents, drawCard, chooseSkill, passSkill, error, connected, playerId } = useWebSocket();
   const [myTeam, setMyTeam] = useState<Team | null>(null);
 
   const animState = useAnimationQueue(lastEvents, gameState);
@@ -79,6 +79,7 @@ export default function GamePage() {
     <GameLayout
       gameState={gameState}
       myTeam={myTeam}
+      playerId={playerId}
       onPlaceClick={handlePlaceClick}
       onChooseSkill={handleChooseSkill}
       onPassSkill={handlePassSkill}

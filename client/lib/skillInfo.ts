@@ -1,4 +1,4 @@
-// 스킬 관련 표시용 상수·문구 — SkillChoiceModal과 ScorePanel(호버 툴팁)이 함께 사용한다.
+// 스킬 관련 표시용 상수·문구 — SkillChoiceBar와 ScorePanel(호버 툴팁)이 함께 사용한다.
 import type { Animal } from 'shared';
 import { SKILL_COEFFICIENTS } from 'shared';
 

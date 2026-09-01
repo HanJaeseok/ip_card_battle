@@ -1,14 +1,41 @@
 import type { ClientGameState, Team } from 'shared';
 import { MAX_TURN, bombChanceForTurn } from 'shared';
-import { TurnTimer } from './TurnTimer';
+
+function StepPill({ label, active }: { label: string; active: boolean }) {
+  return (
+    <span
+      className={`px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+        active ? 'step-pill-active' : 'step-pill-inactive'
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
+// 두 단계 사이 화살표 — 계속 색이 바뀌며 순서대로 밝아졌다 어두워지길 반복해
+// "지금 흘러가는 중"이라는 느낌을 준다(활성화↔비활성화가 파도처럼 이어짐).
+function FlowArrow() {
+  return (
+    <span className="flex items-center" aria-hidden="true">
+      {[0, 1, 2].map(i => (
+        <span key={i} className="step-chevron" style={{ animationDelay: `${i * 0.18}s` }}>
+          &gt;
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export function GameHeader({
   gameState,
+  myTeam,
   displayedActiveTeam,
   displayedActivePlayerIndex,
   isSettling,
 }: {
   gameState: ClientGameState;
+  myTeam: Team | null;
   displayedActiveTeam: Team;
   displayedActivePlayerIndex: number;
   isSettling: boolean;
@@ -17,11 +44,11 @@ export function GameHeader({
   const nickname = gameState.teams[displayedActiveTeam].members[displayedActivePlayerIndex] ?? '';
   const bombPct = gameState.expanded ? Math.round(bombChanceForTurn(gameState.turn) * 100) : null;
 
-  // 이 상단 타이머는 "장소를 고를 차례"일 때만 보여준다 — 스킬을 고르는 동안은
-  // 선택 모달에 별도의 30초 타이머가 있고(중복 표시 방지), 정산/효과 애니메이션이
-  // 재생되는 동안은 아무것도 기다릴 게 없으므로 타이머 자체를 감춘다.
-  const showDrawTimer = !isSettling && gameState.pendingChoice === null;
-  const statusLabel = isSettling ? '정산 중...' : '스킬 선택 중...';
+  // "지금 이 차례가 나(우리팀)인지 상대인지" + "장소 선택 → 행동 선택" 중 어느 단계인지를
+  // 도식으로 보여준다. 실제 타이머는 해설판 가운데 오버레이(ActionPrompt)가 담당하므로
+  // 여기서는 중복 표시하지 않는다.
+  const relativeLabel = myTeam === null ? gameState.teamNames[displayedActiveTeam] : displayedActiveTeam === myTeam ? '우리팀' : '상대팀';
+  const isDrawPhase = !isSettling && gameState.pendingChoice === null;
 
   return (
     <header className="relative bg-jungle-800 text-white px-5 py-2.5 flex items-center shadow-md shrink-0 min-h-[3.25rem]">
@@ -29,17 +56,18 @@ export function GameHeader({
         {teamLabel} <span className="font-semibold text-white">{nickname}</span> 차례
       </div>
 
-      {/* 나뭇잎 장식이 화면 좌우 모서리를 가리므로, 턴/타이머는 항상 잘 보이도록 중앙에 고정 */}
+      {/* 나뭇잎 장식이 화면 좌우 모서리를 가리므로, 턴/단계 표시는 항상 잘 보이도록 중앙에 고정 */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold tabular-nums whitespace-nowrap">
             {gameState.turn} / {MAX_TURN}턴
           </span>
-          {showDrawTimer ? (
-            <TurnTimer deadline={gameState.turnDeadline} paused={false} />
-          ) : (
-            <span className="text-xs text-jungle-300 whitespace-nowrap">{statusLabel}</span>
-          )}
+          <div className="step-flow flex items-center gap-1.5 px-2 py-1 rounded-full">
+            <span className="text-xs font-bold text-jungle-200 whitespace-nowrap">[{relativeLabel}]</span>
+            <StepPill label="장소 선택" active={isDrawPhase} />
+            <FlowArrow />
+            <StepPill label="행동 선택" active={!isDrawPhase} />
+          </div>
         </div>
         {bombPct !== null && (
           <span className="text-xs font-semibold text-amber-300 whitespace-nowrap">

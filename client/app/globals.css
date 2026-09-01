@@ -327,6 +327,98 @@ body {
 .float-text-bonus  { color: #16a34a; }
 .float-text-penalty { color: #dc2626; }
 
+/* ── 레벨업 — 경험치 표가 짧게 흔들리고 "🔥⬆️ Lv UP!"이 튀어오른다 ─────────────── */
+@keyframes levelUpShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  15%       { transform: translate(-4px, -2px) rotate(-2deg); }
+  30%       { transform: translate(4px, 2px) rotate(2deg); }
+  45%       { transform: translate(-3px, -1px) rotate(-1.5deg); }
+  60%       { transform: translate(3px, 1px) rotate(1.5deg); }
+  75%       { transform: translate(-2px, -1px) rotate(-1deg); }
+}
+.level-up-shake {
+  animation: levelUpShake 0.5s ease-in-out;
+}
+@keyframes levelUpBurst {
+  0%   { transform: scale(0.4) translateY(6px); opacity: 0; }
+  25%  { transform: scale(1.25) translateY(-4px); opacity: 1; }
+  40%  { transform: scale(1) translateY(-2px); opacity: 1; }
+  80%  { transform: scale(1) translateY(-6px); opacity: 1; }
+  100% { transform: scale(0.85) translateY(-16px); opacity: 0; }
+}
+.level-up-text {
+  display: inline-block;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: #f97316;
+  background: rgba(20, 83, 45, 0.92);
+  border-radius: 9999px;
+  padding: 0.2rem 0.7rem;
+  white-space: nowrap;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  animation: levelUpBurst 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .level-up-shake { animation: none; }
+  .level-up-text { animation: none; opacity: 1; }
+}
+
+/* ── 팀 합계 점수 — 은은한 그라데이션의 담백한 패널 ─────────────────────────── */
+.score-total {
+  position: relative;
+  border-radius: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+}
+.score-total-mine {
+  background: linear-gradient(155deg, #bef264 0%, #65a30d 100%);
+  border: 2px solid #4d7c0f;
+}
+.score-total-enemy {
+  background: linear-gradient(155deg, #fda4af 0%, #e11d48 100%);
+  border: 2px solid #9f1239;
+}
+.score-total-value {
+  font-size: 2.75rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+/* ── 헤더 진행 단계 도식(장소 선택 → 행동 선택) — 그림자로 입체감을 준다 ────────── */
+.step-flow {
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.step-pill-active {
+  background: linear-gradient(180deg, #fde68a 0%, #f59e0b 100%);
+  color: #451a03;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.step-pill-inactive {
+  background: rgba(5, 46, 22, 0.55);
+  color: #6b8f7a;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 두 단계 사이 화살표 — 계속 색이 바뀌며 순서대로 밝아졌다 어두워지길 반복한다 */
+@keyframes stepChevronFlow {
+  0%, 100% { opacity: 0.3; color: #4ade80; transform: translateX(0); }
+  50%      { opacity: 1;   color: #fbbf24; transform: translateX(2px); }
+}
+.step-chevron {
+  display: inline-block;
+  font-weight: 900;
+  font-size: 0.8rem;
+  line-height: 1;
+  animation: stepChevronFlow 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-chevron { animation: none; opacity: 0.9; color: #fbbf24; }
+}
+
 /* ── 점수 팝 ─────────────────────────────────────────────────────────────── */
 @keyframes scorePop {
   0%   { transform: scale(1); color: inherit; }
@@ -955,9 +1047,34 @@ body {
 .skill-choice-disabled:focus-visible {
   filter: brightness(0.18) grayscale(70%);
 }
+
+/* ── "아무것도 하지 않음" 패널 — 배경 이미지가 없어 기본 dim(0.55)이 과하게
+   어두워 보였다. 더 밝은 시작값 + 은은한 그라데이션으로 다른 패널과 어울리게. ── */
+.skill-choice-pass {
+  filter: brightness(0.85);
+}
+.skill-choice-pass:hover,
+.skill-choice-pass:focus-visible {
+  filter: brightness(1.08);
+}
+.pass-panel-bg {
+  background: linear-gradient(165deg, #1f7a45 0%, #0f3d24 100%);
+}
 .skill-choice-dim {
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.1) 100%);
   pointer-events: none;
+}
+
+/* ── 쓸 수 있는 스킬이 하나도 없을 때 — "아무것도 하지 않음" 강조 ────────────── */
+@keyframes skillChoiceGlow {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(163, 230, 53, 0); filter: brightness(0.85); }
+  50%       { box-shadow: inset 0 0 24px 6px rgba(163, 230, 53, 0.85); filter: brightness(1.15); }
+}
+.skill-choice-glow {
+  animation: skillChoiceGlow 1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skill-choice-glow { animation: none; box-shadow: inset 0 0 0 3px rgba(163, 230, 53, 0.9); }
 }
 .skill-outline-text {
   text-shadow:
@@ -971,8 +1088,8 @@ body {
 /* ── 중앙 동물 스택 — 카드 한 장 ──────────────────────────────────────────── */
 .stack-card {
   position: relative;
-  width: 94px;
-  height: 122px;
+  width: 88px;
+  height: 116px;
   border-radius: 14px;
   background: #fff;
   border: 2px solid #d1d5db;
@@ -991,15 +1108,17 @@ body {
 .stack-card-new {
   animation: stackCardPop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+/* 장소 타일 절반쯤을 지나는 지점까지만 이동한 뒤, 자연스럽게 페이드아웃되며 사라진다
+   (합계 점수판이 화면 아래쪽으로 옮겨졌으므로 아래쪽으로 더 크게 이동한다). */
 @keyframes stackCardFlingLeft {
   0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
-  70%  { opacity: 1; }
-  100% { transform: translate(-115vw, 20vh) scale(0.35) rotate(-35deg); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translate(-42vw, 38vh) scale(0.4) rotate(-22deg); opacity: 0; }
 }
 @keyframes stackCardFlingRight {
   0%   { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
-  70%  { opacity: 1; }
-  100% { transform: translate(115vw, 20vh) scale(0.35) rotate(35deg); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translate(42vw, 38vh) scale(0.4) rotate(22deg); opacity: 0; }
 }
 .stack-card-fling-left { animation: stackCardFlingLeft 750ms ease-in forwards; z-index: 20 !important; }
 .stack-card-fling-right { animation: stackCardFlingRight 750ms ease-in forwards; z-index: 20 !important; }

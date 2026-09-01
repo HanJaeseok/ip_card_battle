@@ -10,7 +10,26 @@ import { SLOT_SPIN_DUR, SLOT_TOTAL_DUR, WOOL_BALL_DUR, SHEEP_DRAW_STEP } from '@
 
 type DeltaKey = `${Team}:${Animal}`;
 const deltaKeyOf = (t: Team, a: Animal): DeltaKey => `${t}:${a}`;
-const teamLabel = (t: Team) => (t === 'A' ? '[A팀]' : '[B팀]');
+
+// 해설판/자막에 쓰는 "OOO권의 위력!" 같은 문구용 동물별 권리명.
+const RIGHT_NAME: Record<Animal, string> = {
+  sheep: '실용신안권',
+  rabbit: '상표권',
+  mermaid: '디자인권',
+  tiger: '특허권',
+};
+
+// "상표토끼 스킬 발동!" 같은 딱딱한 문구 대신, 매번 무작위로 하나를 골라 보여준다.
+// "스킬"이라는 단어는 쓰지 않는다(사용자 요청 — "행동"으로 대체).
+function randomActionPhrase(animal: Animal): string {
+  const phrases = [
+    `${RIGHT_NAME[animal]}의 위력!`,
+    '지식재산의 힘!',
+    `${RIGHT_NAME[animal]}, 발동!`,
+    `${ANIMAL_INFO[animal].name}의 행동 개시!`,
+  ];
+  return phrases[Math.floor(Math.random() * phrases.length)];
+}
 
 export interface FloatingTextItem {
   id: number;
@@ -421,6 +440,9 @@ export function useAnimationQueue(
 
     // ── Pass 0: 해설판 커멘터리 생성 (즉시 반영, 통합 로그) ─────────────────
     if (gameState) {
+      // A팀/B팀이 아니라 방 생성 시 입력한 실제 팀 이름으로 표기한다.
+      const teamLabel = (t: Team) => `[${gameState.teamNames[t]}]`;
+
       type Slot = { id: string; key: DeltaKey; delta: number };
       const slots: Slot[] = [];
 
@@ -455,10 +477,12 @@ export function useAnimationQueue(
       const newLines: { team: Team | null; text: string }[] = [];
       lastEvents.forEach((ev, i) => {
         if (ev.type === 'collect') {
-          const r = range.get(`${i}:main`)!;
+          // 괄호로 (before → after) 구간을 함께 보여주던 부분은 일단 화면에 노출하지
+          // 않는다(요청). before/after 계산 로직 자체는 나중에 다시 켤 수 있도록 유지.
+          void range.get(`${i}:main`);
           newLines.push({
             team: ev.team,
-            text: `${teamLabel(ev.team)} ${ANIMAL_INFO[ev.animal].emoji} ${ANIMAL_INFO[ev.animal].name} +${ev.score}! (${r.before} → ${r.after})`,
+            text: `${teamLabel(ev.team)} ${ANIMAL_INFO[ev.animal].emoji} ${ANIMAL_INFO[ev.animal].name} +${ev.score}!`,
           });
         } else if (ev.type === 'bonusDraws') {
           newLines.push({
@@ -466,24 +490,26 @@ export function useAnimationQueue(
             text: `${teamLabel(ev.team)} 예약된 카드 ${ev.count}장 뽑기!`,
           });
         } else if (ev.type === 'skillApplied') {
-          const parts: string[] = [`${teamLabel(ev.team)} ${ANIMAL_INFO[ev.animal].emoji} ${ANIMAL_INFO[ev.animal].name} 스킬 발동!`];
+          const parts: string[] = [
+            `${teamLabel(ev.team)} ${ANIMAL_INFO[ev.animal].emoji} ${ANIMAL_INFO[ev.animal].name} ${randomActionPhrase(ev.animal)}`,
+          ];
           if (ev.myScoreDelta > 0) {
-            const r = range.get(`${i}:main`)!;
-            parts.push(`내 점수 +${ev.myScoreDelta} (${r.before} → ${r.after})`);
+            void range.get(`${i}:main`); // before/after 로직 유지, 표시만 생략
+            parts.push(`내 점수 +${ev.myScoreDelta}`);
           }
           if (ev.oppScoreDelta > 0) parts.push(`상대 점수 -${ev.oppScoreDelta}`);
           if (ev.extraDrawsQueued > 0) parts.push(`다음 턴 추가 뽑기 ${ev.extraDrawsQueued}회 예약`);
           newLines.push({ team: ev.team, text: parts.join(' ') });
         } else if (ev.type === 'skillPassed' && !ev.auto) {
-          newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 다음 기회를 노리기로 했습니다 (레벨을 더 모으는 중).` });
+          newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 다음 기회를 노리기로 했습니다.` });
         } else if (ev.type === 'expand') {
           newLines.push({ team: null, text: '더 신나게!! 도토리 폭탄이 등장합니다.' });
         } else if (ev.type === 'timeoutChoice') {
           newLines.push({
             team: null,
             text: ev.animal
-              ? `시간 초과로 서버가 대신 ${ANIMAL_INFO[ev.animal].name} 스킬을 선택했습니다.`
-              : '시간 초과로 아무 스킬도 선택되지 않아 턴이 넘어갔습니다.',
+              ? `시간 초과로 서버가 대신 ${ANIMAL_INFO[ev.animal].name} 행동을 선택했습니다.`
+              : '시간 초과로 아무 행동도 선택되지 않아 턴이 넘어갔습니다.',
           });
         }
       });
@@ -775,7 +801,7 @@ export function useAnimationQueue(
         const opp: Team = team === 'A' ? 'B' : 'A';
         const at = cursor;
 
-        addCaption(`${ANIMAL_INFO[animal].short} 스킬 발동!`, 'effect', at, { team });
+        addCaption(`${ANIMAL_INFO[animal].short} ${randomActionPhrase(animal)}`, 'effect', at, { team });
 
         sched(() => {
           const gs = gameStateRef.current;

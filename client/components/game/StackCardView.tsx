@@ -1,7 +1,6 @@
 'use client';
 
 import type { StackedCard } from 'shared';
-import { ANIMAL_INFO } from '@/lib/animals';
 
 export function StackCardView({
   card,
@@ -29,7 +28,7 @@ export function StackCardView({
       className={`stack-card card-shadow ${flingClass} ${bombClass} ${shakeClass} ${isNew ? 'stack-card-new' : ''}`}
       style={{ zIndex: index, marginLeft: index === 0 ? 0 : -46 }}
     >
-      <span className="text-4xl leading-none">{ANIMAL_INFO[card.animal].emoji}</span>
+      <img src={`/emoticon/${card.animal}_focus.png`} alt={card.animal} className="w-12 h-12 object-contain" />
       <span className="text-2xl font-black text-jungle-900 tabular-nums">{card.num}</span>
     </div>
   );

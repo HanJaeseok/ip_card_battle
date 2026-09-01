@@ -162,7 +162,7 @@ export function GameEndScreen({
         className="bg-white rounded-2xl shadow-lg border border-jungle-200 p-6 w-full max-w-md"
         style={{ animation: 'bounceIn 0.7s cubic-bezier(0.36,0.07,0.19,0.97) 300ms both' }}
       >
-        <p className="text-center text-sm font-bold text-jungle-500 mb-4">스킬 사용 통계</p>
+        <p className="text-center text-sm font-bold text-jungle-500 mb-4">행동 사용 통계</p>
         <div className="grid grid-cols-2 gap-4">
           {(['A', 'B'] as const).map(t => (
             <div key={t}>

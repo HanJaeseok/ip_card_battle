@@ -50,7 +50,11 @@ export function useWebSocket(): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(null);
+  // 재접속(로비 → 게임 화면 이동 등)은 서버가 playerId를 다시 보내주지 않고
+  // 클라이언트가 sessionStorage에 저장해둔 값을 그대로 재사용한다. 훅이 새로
+  // 마운트될 때(페이지 이동으로 새 useWebSocket 인스턴스가 생길 때)도 이 값을
+  // 그대로 물려받아야 "지금 활성 플레이어가 나인지" 같은 판별이 끊기지 않는다.
+  const [playerId, setPlayerId] = useState<string | null>(() => sessionStore.get(STORAGE_PLAYER_ID));
   const [lobbyPlayers, setLobbyPlayers] = useState<LobbyPlayer[]>([]);
   const [lobbyTeamNames, setLobbyTeamNames] = useState<LobbyTeamNames>({ A: null, B: null });
   const [gameState, setGameState] = useState<ClientGameState | null>(null);
@@ -122,6 +126,10 @@ export function useWebSocket(): UseWebSocketReturn {
             sessionStore.remove(STORAGE_ROOM_ID);
             sessionStore.remove(STORAGE_PLAYER_ID);
           }
+          // "지금은 행동을 선택할 차례입니다" 류는 화면 전환 타이밍에 늦게 도착한
+          // 클릭이 원인인 무해한 안내라, 화면 위에 빨간 배너로 띄울 필요가 없다
+          // (버튼 자체가 이미 막혀 있어 사용자가 조치할 일도 없다).
+          if (msg.code === 'NO_PENDING_CHOICE') break;
           setError(msg.message);
           break;
       }

@@ -64,7 +64,7 @@ function AnimalStackRow({
   return (
     <div
       data-stack-area={animal}
-      className="relative flex-1 min-h-0 bg-white/70 rounded-xl border border-jungle-200 flex items-center gap-3 px-4 overflow-hidden"
+      className="relative flex-1 min-h-0 bg-white/70 rounded-xl border border-jungle-200 flex items-center gap-3 px-4 overflow-visible"
     >
       <div
         className="absolute inset-0 bg-no-repeat bg-center opacity-15 pointer-events-none"
@@ -78,7 +78,7 @@ function AnimalStackRow({
           <span className="stack-total-badge text-4xl font-black text-jungle-900 tabular-nums">{total}</span>
         )}
       </div>
-      <div className="relative flex items-center flex-1 min-w-0 h-full overflow-hidden">
+      <div className="relative flex items-center flex-1 min-w-0 h-full overflow-visible">
         {cards.length === 0 ? (
           <span className="text-xs text-jungle-300">비어 있음</span>
         ) : (
