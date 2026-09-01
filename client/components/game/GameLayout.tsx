@@ -10,6 +10,7 @@ import { MainComboBanner } from '@/components/effects/MainComboBanner';
 import { SheepLoadedBanner } from '@/components/effects/SheepLoadedBanner';
 import { PlayerEmoticonLayer } from '@/components/effects/PlayerEmoticonLayer';
 import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
+import { DecisiveHitBanner } from '@/components/effects/DecisiveHitBanner';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { GameBoard } from './GameBoard';
@@ -116,15 +117,15 @@ export function GameLayout({
             placeFocusBursts={animState.placeFocusBursts}
             drawSlots={animState.drawSlots}
             woolBalls={animState.woolBalls}
-            bombBursts={animState.bombBursts}
+            pairDoubleBursts={animState.pairDoubleBursts}
             collectingCardIds={animState.collectingCardIds}
-            bombFallingIds={animState.bombFallingIds}
             shakingPile={animState.shakingPile}
             newCardId={animState.newCardId}
             stackCards={animState.stackCards}
             displayedActiveTeam={animState.displayedActiveTeam}
             isSettling={animState.isSettling}
-            expandFlash={animState.expandFlash}
+            festivalFlash={animState.festivalFlash}
+            festivalBurst={animState.festivalBurst}
             mermaidPopup={animState.mermaidPopup}
           />
         </div>
@@ -153,9 +154,14 @@ export function GameLayout({
           />
         </div>
 
-        {/* 합계(연두=우리팀/붉은=상대팀) — 사이에 턴 종료 행동 선택 영역 */}
+        {/* 체력 구슬(연두=우리팀/붉은=상대팀) — 사이에 턴 종료 행동 선택 영역 */}
         <div style={{ gridColumn: 1, gridRow: 3 }} className="min-h-0">
-          <TeamTotalPanel team="A" gameState={gameState} isMine={myTeam !== null ? myTeam === 'A' : true} />
+          <TeamTotalPanel
+            team="A"
+            gameState={gameState}
+            isMine={myTeam !== null ? myTeam === 'A' : true}
+            pulse={animState.hpPulse.get('A') ?? null}
+          />
         </div>
         <div style={{ gridColumn: 2, gridRow: 3 }} className="min-h-0">
           <SkillChoiceBar
@@ -167,7 +173,12 @@ export function GameLayout({
           />
         </div>
         <div style={{ gridColumn: 3, gridRow: 3 }} className="min-h-0">
-          <TeamTotalPanel team="B" gameState={gameState} isMine={myTeam !== null ? myTeam === 'B' : false} />
+          <TeamTotalPanel
+            team="B"
+            gameState={gameState}
+            isMine={myTeam !== null ? myTeam === 'B' : false}
+            pulse={animState.hpPulse.get('B') ?? null}
+          />
         </div>
       </main>
 
@@ -197,6 +208,9 @@ export function GameLayout({
 
       {/* 특허랑이 행동 발동 — 화면 전체가 크게 흔들리는 타격 비네트 */}
       {animState.tigerImpact && <div className="tiger-vignette" />}
+
+      {/* 체력 즉시 승패 — 결정타! 강조 */}
+      <DecisiveHitBanner hit={animState.decisiveHit} />
     </div>
   );
 }

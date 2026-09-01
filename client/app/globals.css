@@ -363,28 +363,172 @@ body {
   .level-up-text { animation: none; opacity: 1; }
 }
 
-/* ── 팀 합계 점수 — 은은한 그라데이션의 담백한 패널 ─────────────────────────── */
-.score-total {
+/* ── 팀 체력 오브 — 아래 0, 위 WIN_HP까지 차오르는 유리구슬 ────────────────────── */
+.hp-orb {
   position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 1.5rem;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18), inset 0 2px 3px rgba(255, 255, 255, 0.4);
 }
-.score-total-mine {
-  background: linear-gradient(155deg, #bef264 0%, #65a30d 100%);
+.hp-orb-mine {
+  background: linear-gradient(155deg, #f7fee7 0%, #ecfccb 100%);
   border: 2px solid #4d7c0f;
 }
-.score-total-enemy {
-  background: linear-gradient(155deg, #fda4af 0%, #e11d48 100%);
+.hp-orb-enemy {
+  background: linear-gradient(155deg, #fff1f2 0%, #ffe4e6 100%);
   border: 2px solid #9f1239;
 }
-.score-total-value {
+.hp-orb-liquid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: height 600ms cubic-bezier(0.34, 1.2, 0.4, 1);
+}
+.hp-orb-mine .hp-orb-liquid { background: linear-gradient(180deg, #a3e635 0%, #4d7c0f 100%); }
+.hp-orb-enemy .hp-orb-liquid { background: linear-gradient(180deg, #fb7185 0%, #9f1239 100%); }
+@keyframes hpOrbWave {
+  0%, 100% { transform: translateX(-4%) scaleY(1); }
+  50%      { transform: translateX(4%) scaleY(1.4); }
+}
+.hp-orb-wave {
+  position: absolute;
+  top: -5px;
+  left: -25%;
+  width: 150%;
+  height: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  animation: hpOrbWave 2.4s ease-in-out infinite;
+}
+.hp-orb-value {
+  position: relative;
+  z-index: 2;
   font-size: 2.75rem;
   font-weight: 900;
+  color: #14532d;
+  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.7);
+}
+.hp-orb-enemy .hp-orb-value { color: #7f1d1d; }
+.hp-orb-sheen {
+  position: absolute;
+  top: 8%;
+  left: 14%;
+  width: 26%;
+  height: 16%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+  border-radius: 50%;
+  filter: blur(1px);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* 체력 상승 — 연두색 기운이 샤라락 아래에서 위로 훑고 지나간다 */
+@keyframes hpSurge {
+  0%   { opacity: 0; transform: translateY(35%); }
+  30%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-90%); }
+}
+.hp-orb-surge {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(0deg, rgba(163, 230, 53, 0.75) 0%, rgba(163, 230, 53, 0) 70%);
+  animation: hpSurge 700ms ease-out forwards;
+  pointer-events: none;
+}
+
+/* 체력 감소 — 빨갛게 빠직! 금 가는 느낌 + 흔들림 */
+@keyframes hpCrackShake {
+  0%, 100% { transform: translate(0, 0); }
+  15%       { transform: translate(-4px, 2px); }
+  30%       { transform: translate(4px, -2px); }
+  45%       { transform: translate(-3px, 2px); }
+  60%       { transform: translate(3px, -1px); }
+  75%       { transform: translate(-2px, 1px); }
+}
+.hp-orb-crack {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(circle at 50% 40%, rgba(220, 38, 38, 0.6), transparent 70%);
+  animation: hpCrackShake 500ms ease-in-out;
+  pointer-events: none;
+}
+/* 체력 감소 — 붉은 파편이 사방으로 튄다 */
+@keyframes hpShardFly {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--shard-dx)), calc(-50% + var(--shard-dy))) scale(0.3); opacity: 0; }
+}
+.hp-orb-shard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: #dc2626;
+  border-radius: 2px;
+  z-index: 4;
+  animation: hpShardFly 550ms ease-out forwards;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hp-orb-wave, .hp-orb-surge, .hp-orb-crack, .hp-orb-shard { animation: none; }
+}
+
+/* ── 체력 즉시 승패 — 결정타! 강조 배너 ──────────────────────────────────────── */
+@keyframes decisiveHitPop {
+  0%   { transform: translate(-50%, -50%) scale(0.3) rotate(-8deg); opacity: 0; }
+  25%  { transform: translate(-50%, -50%) scale(1.25) rotate(4deg); opacity: 1; }
+  40%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0; }
+}
+.decisive-hit-banner {
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  animation: decisiveHitPop 1.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.decisive-hit-title {
+  font-size: 4rem;
+  font-weight: 900;
+  color: #fbbf24;
+  -webkit-text-stroke: 3px #7c2d12;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.decisive-hit-sub {
+  font-size: 1.5rem;
+  font-weight: 800;
   color: #fff;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.6);
+  margin-top: 0.3rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .decisive-hit-banner { animation: none; opacity: 0; }
+}
+
+/* ── 디자인어 대기 배율 배지 ─────────────────────────────────────────────── */
+.mermaid-multiplier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(155deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 /* ── 헤더 진행 단계 도식(장소 선택 → 행동 선택) — 그림자로 입체감을 준다 ────────── */
@@ -1157,22 +1301,7 @@ body {
   .draw-slot-spin { animation: none; }
 }
 
-/* ── 도토리 폭탄 — 스택의 실제 카드가 직접 흔들리다 떨어지며 사라진다 ──────────── */
-@keyframes bombCardShakeFall {
-  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
-  10%  { transform: translateY(0) rotate(-7deg); opacity: 1; }
-  20%  { transform: translateY(1px) rotate(7deg); opacity: 1; }
-  30%  { transform: translateY(0) rotate(-6deg); opacity: 1; }
-  40%  { transform: translateY(1px) rotate(6deg); opacity: 1; }
-  50%  { transform: translateY(0) rotate(-3deg); opacity: 1; }
-  60%  { transform: translateY(2px) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(70px) rotate(14deg); opacity: 0; }
-}
-.stack-card-bomb-fall {
-  animation: bombCardShakeFall 800ms ease-in both;
-  z-index: 30 !important;
-}
-/* 중심에서 사방으로 튀어나갔다 사라지는 도토리 폭죽 */
+/* 중심에서 사방으로 튀어나갔다 사라지는 도토리 폭죽 — 축제 중 페어가 2배로 붙을 때 재생 */
 @keyframes acornBurst {
   0%   { transform: translate(-50%, -50%) scale(0.4) rotate(0deg); opacity: 1; }
   55%  { opacity: 1; }
@@ -1185,6 +1314,33 @@ body {
   font-size: 1.7rem;
   animation: acornBurst 700ms ease-out both;
   pointer-events: none;
+}
+.pair-double-label {
+  position: absolute;
+  left: 0;
+  top: -1.6rem;
+  transform: translateX(-50%);
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #ca8a04;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  animation: floatUp 800ms ease-out forwards;
+}
+
+/* 축제 시작 — 보드 여기저기서 도토리가 폭죽처럼 터진다 */
+@keyframes festivalAcornPop {
+  0%   { transform: translate(-50%, -50%) scale(0.3) rotate(-20deg); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.3) rotate(10deg); opacity: 1; }
+  40%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -60%) scale(0.8) rotate(0deg); opacity: 0; }
+}
+.festival-acorn-burst {
+  font-size: 2.2rem;
+  animation: festivalAcornPop 900ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .festival-acorn-burst, .pair-double-label { animation: none; opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .stack-card-bomb-fall, .bomb-acorn { animation: none; opacity: 0; }

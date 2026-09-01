@@ -25,12 +25,13 @@ export function SkillChoiceBar({
   onPass: () => void;
 }) {
   const previews = ANIMAL_ORDER.map(animal => previewSkill(gameState, team, animal));
+  const multiplier = gameState.teams[team].pendingMultiplier;
 
   return (
     <div className="h-full min-h-0 bg-jungle-950 rounded-2xl overflow-hidden grid grid-cols-5 divide-x-2 divide-jungle-700">
       {ANIMAL_ORDER.map((animal, i) => {
         const preview = previews[i];
-        const hasEffect = preview.myScoreDelta > 0 || preview.oppScoreDelta > 0 || preview.extraDraws > 0;
+        const hasEffect = preview.myHpDelta > 0 || preview.oppHpDelta < 0 || preview.extraDraws > 0;
         const eligible = preview.level > 0;
         const clickable = interactive && eligible;
 
@@ -45,11 +46,12 @@ export function SkillChoiceBar({
             style={{ backgroundImage: `url(/skills/${animal}_skill.png)` }}
           >
             <div className="skill-choice-dim absolute inset-0" />
-            {hasEffect && (
+            {(hasEffect || (animal === 'mermaid' && eligible)) && (
               <span className="skill-outline-text absolute top-2 left-3 z-10 text-base font-bold text-amber-300">
                 {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
-                {preview.myScoreDelta > 0 && `내 점수 +${preview.myScoreDelta}점`}
-                {preview.oppScoreDelta > 0 && `상대 점수 -${preview.oppScoreDelta}점`}
+                {preview.myHpDelta > 0 && animal !== 'tiger' && `체력 +${preview.myHpDelta}`}
+                {preview.oppHpDelta < 0 && `상대 체력 ${preview.oppHpDelta}`}
+                {animal === 'mermaid' && `다음 행동 ×${preview.multiplierAfter}`}
               </span>
             )}
             <span className="skill-outline-text absolute top-2 right-3 z-10 text-base font-bold text-white">
@@ -63,7 +65,7 @@ export function SkillChoiceBar({
                 &lt;{SKILL_TITLE[animal]}&gt;
               </h3>
               <p className="skill-outline-text text-base text-white leading-snug line-clamp-5">
-                {describeSkill(animal, preview.level)}
+                {describeSkill(animal, preview.level, multiplier)}
               </p>
             </div>
           </button>

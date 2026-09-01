@@ -2,9 +2,16 @@ import type { WebSocket } from 'ws';
 import type { Animal, Place, Team } from 'shared';
 import type { ServerMessage } from 'shared';
 import { processPlayerAction, processSkillChoice, processPass, processTimeout, initGame } from './engine/gameEngine';
-import { randomEligibleSkill, eligibleAnimals } from './engine/skills';
+import { eligibleAnimals, levelOf } from './engine/skills';
 import type { GameState } from 'shared';
-import { TURN_TIME_SEC, SHEEP_EXTRA_TIME_PER_DRAW_SEC, PLACES, TEAM_NAME_POOL } from 'shared';
+import {
+  TURN_TIME_SEC,
+  SHEEP_EXTRA_TIME_PER_DRAW_SEC,
+  SHEEP_TIMER_EXTRA_DRAW_CAP,
+  WIN_HP,
+  PLACES,
+  TEAM_NAME_POOL,
+} from 'shared';
 import { serializeEvents, serializeState } from './serializer';
 
 // 싱글 모드 컴퓨터 플레이어는 실제 WebSocket 연결이 없으므로 고정 ID로 취급한다.
@@ -28,6 +35,29 @@ const NO_ELIGIBLE_CHOICE_TIMEOUT_MS = 5000;
 // 검증된 값이다). 유예 시간은 turnDeadline에 그대로 녹아들어 화면에 별도로 드러나지
 // 않는다 — 클라이언트는 정산이 끝나야 비로소 이 타이머를 보여주기 시작하기 때문이다.
 const NO_ELIGIBLE_SETTLE_GRACE_MS = CPU_THINK_MIN_MS;
+
+/**
+ * 싱글 모드 컴퓨터의 행동 선택 — 기본은 무작위지만, 지금 당장 이길 수 있는 수(상표토끼로
+ * 체력이 WIN_HP에 닿거나 특허랑이로 상대를 0으로 만드는 경우)가 있으면 그걸 최우선으로
+ * 고른다. 그 외에는 완전히 무작위라 사람 상대처럼 실수도 한다.
+ */
+function pickComputerSkill(state: GameState, team: Team): Animal | null {
+  const options = eligibleAnimals(state, team);
+  if (options.length === 0) return null;
+
+  const opponent: Team = team === 'A' ? 'B' : 'A';
+  const me = state.teams[team];
+  const foe = state.teams[opponent];
+
+  for (const animal of options) {
+    if (animal === 'sheep' || animal === 'mermaid') continue;
+    const amount = levelOf(state, team, animal) * me.pendingMultiplier;
+    if (animal === 'rabbit' && me.hp + amount >= WIN_HP) return animal;
+    if (animal === 'tiger' && amount >= foe.hp) return animal;
+  }
+
+  return options[Math.floor(Math.random() * options.length)];
+}
 
 interface PlayerConnection {
   ws: WebSocket;
@@ -160,11 +190,11 @@ export class Room {
 
     const { state, events } = processPlayerAction(this.state, place);
     this.state = state;
-    this.resetTimer();
+    if (this.state.phase === 'ended') this.clearTimer();
+    else this.resetTimer();
     this.broadcastResult(events);
 
-    if (this.state.phase === 'ended') this.clearTimer();
-    else this.scheduleComputerActionIfNeeded();
+    if (this.state.phase === 'playing') this.scheduleComputerActionIfNeeded();
   }
 
   handleChooseSkill(playerId: string, animal: Animal): void {
@@ -181,11 +211,11 @@ export class Room {
 
     const { state, events } = processSkillChoice(this.state, animal);
     this.state = state;
-    this.resetTimer();
+    if (this.state.phase === 'ended') this.clearTimer();
+    else this.resetTimer();
     this.broadcastResult(events);
 
-    if (this.state.phase === 'ended') this.clearTimer();
-    else this.scheduleComputerActionIfNeeded();
+    if (this.state.phase === 'playing') this.scheduleComputerActionIfNeeded();
   }
 
   handlePassSkill(playerId: string): void {
@@ -202,11 +232,11 @@ export class Room {
 
     const { state, events } = processPass(this.state);
     this.state = state;
-    this.resetTimer();
+    if (this.state.phase === 'ended') this.clearTimer();
+    else this.resetTimer();
     this.broadcastResult(events);
 
-    if (this.state.phase === 'ended') this.clearTimer();
-    else this.scheduleComputerActionIfNeeded();
+    if (this.state.phase === 'playing') this.scheduleComputerActionIfNeeded();
   }
 
   /** 싱글 모드 — 컴퓨터(B팀) 차례(장소 클릭 또는 스킬 선택)가 되면 잠시 "생각하는" 척한 뒤 무작위로 진행한다. */
@@ -228,7 +258,7 @@ export class Room {
 
     let result: { state: GameState; events: ReturnType<typeof processPlayerAction>['events'] };
     if (this.state.pendingChoice === 'B') {
-      const animal = randomEligibleSkill(this.state, 'B');
+      const animal = pickComputerSkill(this.state, 'B');
       result = animal === null ? processPass(this.state) : processSkillChoice(this.state, animal);
     } else if (this.state.activeTeam === 'B' && this.state.pendingChoice === null) {
       const place = PLACES[Math.floor(Math.random() * PLACES.length)];
@@ -238,11 +268,11 @@ export class Room {
     }
 
     this.state = result.state;
-    this.resetTimer();
+    if (this.state.phase === 'ended') this.clearTimer();
+    else this.resetTimer();
     this.broadcastResult(result.events);
 
-    if (this.state.phase === 'ended') this.clearTimer();
-    else this.scheduleComputerActionIfNeeded();
+    if (this.state.phase === 'playing') this.scheduleComputerActionIfNeeded();
   }
 
   handleTimeout(): void {
@@ -251,9 +281,8 @@ export class Room {
     const { state, events } = processTimeout(this.state);
     this.state = state;
 
-    const firstEv = events.find(e => e.type === 'draw' || e.type === 'bomb');
-    const timeoutPlace =
-      firstEv?.type === 'draw' || firstEv?.type === 'bomb' ? firstEv.place : null;
+    const firstEv = events.find(e => e.type === 'draw');
+    const timeoutPlace = firstEv?.type === 'draw' ? firstEv.place : null;
 
     const clientEvents = serializeEvents(events);
     if (timeoutPlace) {
@@ -292,6 +321,9 @@ export class Room {
     this.clearTimer();
     const waitingTeam = this.state?.pendingChoice ?? this.state?.activeTeam;
     const pendingDraws = waitingTeam && this.state ? this.state.teams[waitingTeam].pendingExtraDraws : 0;
+    // 배율이 실린 예약 뽑기가 턴 제한시간을 무한정 늘리지 않도록, 시간 연장 계산에는
+    // 상한을 둔다(실제 뽑기 횟수 자체는 이 상한과 무관하게 그대로 진행된다).
+    const timerDraws = Math.min(pendingDraws, SHEEP_TIMER_EXTRA_DRAW_CAP);
 
     const noEligibleChoice =
       this.state?.pendingChoice != null &&
@@ -299,7 +331,7 @@ export class Room {
 
     const durationMs = noEligibleChoice
       ? NO_ELIGIBLE_CHOICE_TIMEOUT_MS + NO_ELIGIBLE_SETTLE_GRACE_MS
-      : (TURN_TIME_SEC + SHEEP_EXTRA_TIME_PER_DRAW_SEC * pendingDraws) * 1000;
+      : (TURN_TIME_SEC + SHEEP_EXTRA_TIME_PER_DRAW_SEC * timerDraws) * 1000;
     this.turnDeadline = Date.now() + durationMs;
     this.timerHandle = setTimeout(() => this.handleTimeout(), durationMs);
   }
@@ -313,6 +345,8 @@ export class Room {
       clearTimeout(this.computerTimer);
       this.computerTimer = null;
     }
+    // 종료된 게임의 스냅샷·재접속에 유령 카운트다운이 실리지 않도록 초기화한다.
+    this.turnDeadline = 0;
   }
 
   // ─── 재접속/이탈 ─────────────────────────────────────────────────────────

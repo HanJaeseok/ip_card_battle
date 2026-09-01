@@ -6,28 +6,29 @@ import { ANIMALS, THRESHOLDS } from 'shared';
 import { previewSkill } from '@/lib/skills';
 import { SKILL_TITLE, describeSkill } from '@/lib/skillInfo';
 
-// ── 동물별 표 — 아이콘 | 점수, 그 아래 경험치 바 + 레벨 ─────────────────────
-// 마우스를 올리면 해당 동물 스킬의 설명과, 지금 고른다면 얻을 기댓값을 미리 보여준다.
+// ── 동물별 표 — 아이콘 | 경험치, 그 아래 경험치 바 + 레벨 ─────────────────────
+// 마우스를 올리면 해당 동물 행동의 설명과, 지금 고른다면 얻을 기댓값을 미리 보여준다.
 function AnimalTable({
   animal,
-  score,
+  exp,
   isFlashing,
   isPopping,
   gameState,
   team,
 }: {
   animal: Animal;
-  score: number;
+  exp: number;
   isFlashing: boolean;
   isPopping: boolean;
   gameState: ClientGameState;
   team: Team;
 }) {
   const threshold = THRESHOLDS[animal];
-  const level = Math.floor(score / threshold);
-  const progressPct = ((score % threshold) / threshold) * 100;
+  const level = Math.floor(exp / threshold);
+  const progressPct = ((exp % threshold) / threshold) * 100;
   const preview = previewSkill(gameState, team, animal);
-  const hasEffect = preview.myScoreDelta > 0 || preview.oppScoreDelta > 0 || preview.extraDraws > 0;
+  const hasEffect = preview.myHpDelta > 0 || preview.oppHpDelta < 0 || preview.extraDraws > 0;
+  const multiplier = gameState.teams[team].pendingMultiplier;
 
   // 팀 패널이 overflow-y-auto라 absolute 툴팁은 스크롤 영역에 잘려 보이지 않는다.
   // 마우스를 올린 카드의 위치를 직접 측정해 position:fixed로 화면 위에 그린다.
@@ -72,7 +73,7 @@ function AnimalTable({
             className={`font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
             style={isFlashing ? { color: '#22c55e' } : undefined}
           >
-            <span className="text-2xl">{score}</span>
+            <span className="text-2xl">{exp}</span>
             <span className="text-[0.65rem] font-semibold text-jungle-400 ml-0.5">/{threshold}</span>
           </p>
         </div>
@@ -94,10 +95,10 @@ function AnimalTable({
         </div>
       )}
 
-      {/* 호버 툴팁 — 스킬 설명 + 지금 고르면 얻을 기댓값 */}
+      {/* 호버 툴팁 — 행동 설명 + 지금 고르면 얻을 기댓값 */}
       {tooltipPos && (
         <div
-          className="w-52 pointer-events-none"
+          className="w-56 pointer-events-none"
           style={{
             position: 'fixed',
             left: tooltipPos.x,
@@ -108,12 +109,13 @@ function AnimalTable({
         >
           <div className="bg-jungle-950 text-white text-xs rounded-lg px-3 py-2 shadow-xl text-center">
             <p className="font-bold mb-1">{SKILL_TITLE[animal]} (Lv. {level})</p>
-            <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level)}</p>
+            <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level, multiplier)}</p>
             <p className={`mt-1 font-bold ${hasEffect ? 'text-amber-300' : 'text-gray-400'}`}>
               {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
-              {preview.myScoreDelta > 0 && `내 점수 +${preview.myScoreDelta}점`}
-              {preview.oppScoreDelta > 0 && `상대 점수 -${preview.oppScoreDelta}점`}
-              {!hasEffect && '아직 레벨 0 (효과 없음)'}
+              {preview.myHpDelta > 0 && animal !== 'tiger' && `체력 +${preview.myHpDelta}`}
+              {preview.oppHpDelta < 0 && `상대 체력 ${preview.oppHpDelta}`}
+              {animal === 'mermaid' && preview.level > 0 && `다음 행동 ×${preview.multiplierAfter}`}
+              {!hasEffect && animal !== 'mermaid' && '아직 레벨 0 (효과 없음)'}
             </p>
           </div>
         </div>
@@ -131,9 +133,9 @@ export function ScorePanel({
   gameState: ClientGameState;
   scoreFlash: ReadonlyMap<string, number>;
 }) {
-  const scores = gameState.teams[team].scores;
+  const exp = gameState.teams[team].exp;
 
-  // 점수 팝 — flashKey 변경 시 re-trigger
+  // 경험치 팝 — flashKey 변경 시 re-trigger
   const [popKeys, setPopKeys] = useState<Set<Animal>>(new Set());
   const prevFlashRef = useRef<ReadonlyMap<string, number>>(new Map());
 
@@ -164,7 +166,7 @@ export function ScorePanel({
         <AnimalTable
           key={a}
           animal={a}
-          score={scores[a]}
+          exp={exp[a]}
           isFlashing={scoreFlash.has(`${team}:${a}`)}
           isPopping={popKeys.has(a)}
           gameState={gameState}

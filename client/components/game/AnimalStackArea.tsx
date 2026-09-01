@@ -8,17 +8,17 @@ import type { ShakingPile } from '@/hooks/useAnimationQueue';
 export function AnimalStackArea({
   stackCards,
   collectingIds,
-  bombFallingIds,
   shakingPile,
   newCardId,
   isMyTurn,
+  festival,
 }: {
   stackCards: Record<Animal, StackedCard[]>;
   collectingIds: ReadonlySet<number>;
-  bombFallingIds: ReadonlySet<number>;
   shakingPile: ShakingPile | null;
   newCardId: number | null;
   isMyTurn: boolean;
+  festival: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 w-full h-full">
@@ -28,10 +28,10 @@ export function AnimalStackArea({
           animal={animal}
           cards={stackCards[animal]}
           collectingIds={collectingIds}
-          bombFallingIds={bombFallingIds}
           isShaking={shakingPile?.animal === animal}
           newCardId={newCardId}
           isMyTurn={isMyTurn}
+          festival={festival}
         />
       ))}
     </div>
@@ -42,23 +42,23 @@ function AnimalStackRow({
   animal,
   cards,
   collectingIds,
-  bombFallingIds,
   isShaking,
   newCardId,
   isMyTurn,
+  festival,
 }: {
   animal: Animal;
   cards: StackedCard[];
   collectingIds: ReadonlySet<number>;
-  bombFallingIds: ReadonlySet<number>;
   isShaking: boolean;
   newCardId: number | null;
   isMyTurn: boolean;
+  festival: boolean;
 }) {
   // cards는 이미 "지금 화면에 그려야 하는" 카드만 들어있다(useAnimationQueue의 stackCards).
-  // 총합 배지는 실제로 아직 미획득이고 폭탄으로 떨어지는 중도 아닌 카드만 센다.
+  // 총합 배지는 실제로 아직 미획득인 카드만 센다 — 이 숫자는 경험치로 들어갈 값이다(점수 아님).
   const total = cards
-    .filter(c => c.collectedBy === null && !bombFallingIds.has(c.id))
+    .filter(c => c.collectedBy === null)
     .reduce((s, c) => s + c.num, 0);
 
   return (
@@ -73,10 +73,11 @@ function AnimalStackRow({
           backgroundSize: '33%',
         }}
       />
-      <div className="relative flex items-center justify-center shrink-0 w-16">
+      <div className="relative flex flex-col items-center justify-center shrink-0 w-16">
         {total > 0 && (
           <span className="stack-total-badge text-4xl font-black text-jungle-900 tabular-nums">{total}</span>
         )}
+        {festival && total > 0 && <span className="text-[0.6rem] font-bold text-amber-600">×2 축제</span>}
       </div>
       <div className="relative flex items-center flex-1 min-w-0 h-full overflow-visible">
         {cards.length === 0 ? (
@@ -91,7 +92,6 @@ function AnimalStackRow({
               flingDirection={
                 collectingIds.has(c.id) ? (c.collectedBy === 'A' ? 'left' : 'right') : null
               }
-              isBombFalling={bombFallingIds.has(c.id)}
               shakeVariant={isShaking ? (i % 2 === 0 ? 'a' : 'b') : null}
             />
           ))

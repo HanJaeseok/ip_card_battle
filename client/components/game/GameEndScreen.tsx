@@ -2,30 +2,26 @@
 
 import { useMemo } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
-import { ANIMALS } from 'shared';
+import { ANIMALS, WIN_HP, LOSE_HP } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
 
 const FLAVOR_TEXT: Record<Animal, string> = {
-  sheep: '실용신안의 실리주의에 당하셨군요!',
-  rabbit: '상표의 가치는 날로 강해지죠!',
-  mermaid: '디자인과 벤치마킹, 그 경계는 어디일까요?',
-  tiger: '가장 강력한 독점권을 행사하셨군요!',
+  sheep: '실용신안의 실리주의로 판을 키우셨군요!',
+  rabbit: '상표의 가치를 꾸준히 쌓아 체력을 채우셨군요!',
+  mermaid: '디자인권의 배율로 판을 뒤집으셨군요!',
+  tiger: '가장 강력한 독점권으로 상대를 밀어붙이셨군요!',
 };
 
-/** 승리팀이 가장 크게 앞선 동물을 정규화 격차비율로 판정 (패배팀이 앞선 동물은 제외) */
+/** 승리팀이 체력을 가장 많이 벌어들인 동물(행동)을 판정한다. */
 function pickFlavorAnimal(gameState: ClientGameState, winner: Team | 'draw' | null): Animal | null {
   if (winner !== 'A' && winner !== 'B') return null;
-  const loser: Team = winner === 'A' ? 'B' : 'A';
 
   let best: Animal | null = null;
-  let bestGap = 0;
+  let bestGain = 0;
   for (const a of ANIMALS) {
-    const w = gameState.teams[winner].scores[a];
-    const l = gameState.teams[loser].scores[a];
-    if (w < l) continue;
-    const gap = (w - l) / (w + l || 1);
-    if (gap > bestGap) {
-      bestGap = gap;
+    const gain = gameState.teams[winner].skillStats[a].totalHpGained;
+    if (gain > bestGain) {
+      bestGain = gain;
       best = a;
     }
   }
@@ -67,8 +63,10 @@ export function GameEndScreen({
   onBack: () => void;
 }) {
   const { winner } = gameState;
-  const scoreA = ANIMALS.reduce((s, a) => s + gameState.teams.A.scores[a], 0);
-  const scoreB = ANIMALS.reduce((s, a) => s + gameState.teams.B.scores[a], 0);
+  const hpA = gameState.teams.A.hp;
+  const hpB = gameState.teams.B.hp;
+  const isKnockout = hpA >= WIN_HP || hpB >= WIN_HP || hpA <= LOSE_HP || hpB <= LOSE_HP;
+  const reasonText = isKnockout ? '체력 즉시 승부 — 결정타!' : '제한 턴 종료 — 체력 비교';
 
   const confetti = useMemo(
     () => (winner && winner !== 'draw' ? generateConfetti(45, winner) : []),
@@ -102,29 +100,32 @@ export function GameEndScreen({
       <div className="winner-bounce-in flex flex-col items-center gap-3">
         <div style={{ fontSize: '5rem' }}>{winnerEmoji}</div>
         <h2 className="text-3xl font-bold text-jungle-900">{winnerText}</h2>
+        <p className="text-xs font-semibold text-jungle-400 -mt-1">{reasonText}</p>
         {flavorAnimal && (
           <p className="text-sm text-jungle-500 -mt-1">{FLAVOR_TEXT[flavorAnimal]}</p>
         )}
       </div>
 
-      {/* 점수표 */}
+      {/* 체력표 */}
       <div
         className="bg-white rounded-2xl shadow-lg border border-jungle-200 p-6 w-full max-w-md"
         style={{ animation: 'bounceIn 0.7s cubic-bezier(0.36,0.07,0.19,0.97) 200ms both' }}
       >
-        <div className="flex justify-between text-lg font-bold mb-5">
+        <div className="flex justify-between text-lg font-bold mb-1">
           <span
             className={`text-team-a ${winner === 'A' ? 'underline decoration-2' : 'opacity-60'}`}
           >
-            🟢 {gameState.teamNames.A}: {scoreA}점
+            🟢 {gameState.teamNames.A}: 체력 {hpA}
           </span>
           <span
             className={`text-team-b ${winner === 'B' ? 'underline decoration-2' : 'opacity-60'}`}
           >
-            🔵 {gameState.teamNames.B}: {scoreB}점
+            🔵 {gameState.teamNames.B}: 체력 {hpB}
           </span>
         </div>
+        <p className="text-center text-xs text-jungle-400 mb-4">체력은 5에서 시작해 행동으로만 오르내립니다.</p>
 
+        <p className="text-xs font-bold text-jungle-500 mb-2">동물별 경험치</p>
         <div className="flex flex-col gap-2.5">
           {ANIMALS.map(a => (
             <div key={a} className="flex items-center justify-between text-sm">
@@ -134,22 +135,22 @@ export function GameEndScreen({
               <div className="flex gap-4 tabular-nums font-mono">
                 <span
                   className={`font-bold w-8 text-right ${
-                    gameState.teams.A.scores[a] >= gameState.teams.B.scores[a]
+                    gameState.teams.A.exp[a] >= gameState.teams.B.exp[a]
                       ? 'text-team-a'
                       : 'text-jungle-400'
                   }`}
                 >
-                  {gameState.teams.A.scores[a]}
+                  {gameState.teams.A.exp[a]}
                 </span>
                 <span className="text-jungle-400">vs</span>
                 <span
                   className={`font-bold w-8 ${
-                    gameState.teams.B.scores[a] >= gameState.teams.A.scores[a]
+                    gameState.teams.B.exp[a] >= gameState.teams.A.exp[a]
                       ? 'text-team-b'
                       : 'text-jungle-400'
                   }`}
                 >
-                  {gameState.teams.B.scores[a]}
+                  {gameState.teams.B.exp[a]}
                 </span>
               </div>
             </div>
@@ -157,7 +158,7 @@ export function GameEndScreen({
         </div>
       </div>
 
-      {/* 스킬 사용 통계 — 동물별로 몇 번, 총 몇 레벨어치를 발동했는지 */}
+      {/* 행동 사용 통계 — 동물별로 몇 번, 총 몇 레벨어치를 발동했는지 */}
       <div
         className="bg-white rounded-2xl shadow-lg border border-jungle-200 p-6 w-full max-w-md"
         style={{ animation: 'bounceIn 0.7s cubic-bezier(0.36,0.07,0.19,0.97) 300ms both' }}

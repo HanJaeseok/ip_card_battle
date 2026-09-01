@@ -9,12 +9,12 @@ export function PlaceTile({
   place,
   disabled,
   onClick,
-  showBombWarning,
+  festival,
 }: {
   place: Place;
   disabled: boolean;
   onClick: (place: Place) => void;
-  showBombWarning: boolean;
+  festival: boolean;
 }) {
   const [pressed, setPressed] = useState(false);
 
@@ -42,9 +42,9 @@ export function PlaceTile({
         className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
       />
 
-      {showBombWarning && (
-        <span className="absolute top-1.5 right-1.5 text-lg drop-shadow" title="도토리 폭탄이 등장할 수 있습니다">
-          🌰
+      {festival && (
+        <span className="absolute top-1.5 right-1.5 text-lg drop-shadow" title="축제 중 — 페어 경험치 2배">
+          🌰×2
         </span>
       )}
     </button>

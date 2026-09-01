@@ -1,6 +1,6 @@
 import type { Animal, GameEvent, GameState, Place } from 'shared';
 import { drawCard } from './drawCard';
-import { advanceTurn, initGame } from './turnManager';
+import { finishTurn, initGame } from './turnManager';
 import { applySkillChoice, applyPass, randomEligibleSkill, levelOf } from './skills';
 import { randomPlace } from './places';
 import type { RNG } from './places';
@@ -46,7 +46,7 @@ export function processSkillChoice(
   const events: GameEvent[] = [];
   events.push(applySkillChoice(state, team, animal));
   state.pendingChoice = null;
-  events.push(...advanceTurn(state));
+  events.push(...finishTurn(state));
 
   return { state, events };
 }
@@ -63,7 +63,7 @@ export function processPass(state: GameState, auto = false): { state: GameState;
   const team = state.pendingChoice;
   const events: GameEvent[] = [applyPass(team, auto)];
   state.pendingChoice = null;
-  events.push(...advanceTurn(state));
+  events.push(...finishTurn(state));
 
   return { state, events };
 }

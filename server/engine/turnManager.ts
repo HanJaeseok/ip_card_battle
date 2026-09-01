@@ -1,28 +1,62 @@
-import { EXPAND_TURN, MAX_TURN, ANIMALS } from 'shared';
+import { FESTIVAL_TURN, MAX_TURN, INITIAL_HP, WIN_HP, LOSE_HP } from 'shared';
 import type { GameEvent, GameState, Team } from 'shared';
 import { initStacks } from './places';
 import type { RNG } from './places';
 
-function determineWinner(state: GameState): Team | 'draw' {
-  const scoreOf = (team: Team) =>
-    ANIMALS.reduce((sum, a) => sum + state.teams[team].scores[a], 0);
-  const a = scoreOf('A');
-  const b = scoreOf('B');
+function determineWinnerByHp(state: GameState): Team | 'draw' {
+  const a = state.teams.A.hp;
+  const b = state.teams.B.hp;
   if (a > b) return 'A';
   if (b > a) return 'B';
   return 'draw';
 }
 
+/** 게임 종료를 한 곳에서 처리한다 — phase/winner/pendingChoice를 모두 정리하고 gameEnd를 낸다. */
+function endGame(state: GameState, winner: Team | 'draw', reason: 'knockout' | 'turnLimit'): GameEvent[] {
+  state.phase = 'ended';
+  state.winner = winner;
+  state.pendingChoice = null;
+  return [{ type: 'gameEnd', winner, reason }];
+}
+
 /**
- * 턴 종료 처리 — 스킬 선택까지 모두 끝난 뒤에만 호출된다.
+ * 체력 즉시 승패 판정 — 행동을 적용한 직후(=턴을 넘기기 전)에 호출된다.
+ * 체력은 오직 상표토끼(자신)·특허랑이(상대에게서 강탈)로만 움직이므로, 이론상 두 팀이
+ * 동시에 승리 조건을 만족할 수 없다. 그래도 방어적으로 무승부 분기를 남겨둔다.
+ */
+export function checkKnockout(state: GameState): GameEvent[] {
+  if (state.phase !== 'playing') return [];
+
+  const aWins = state.teams.A.hp >= WIN_HP || state.teams.B.hp <= LOSE_HP;
+  const bWins = state.teams.B.hp >= WIN_HP || state.teams.A.hp <= LOSE_HP;
+  if (!aWins && !bWins) return [];
+  if (aWins && bWins) return endGame(state, 'draw', 'knockout');
+  return endGame(state, aWins ? 'A' : 'B', 'knockout');
+}
+
+/**
+ * 턴 종료 공통 경로 — 행동 선택(또는 패스) 직후 반드시 이걸 거친다.
+ * 즉시 승패가 났으면 턴을 넘기지 않고 그대로 게임을 끝낸다.
+ */
+export function finishTurn(state: GameState): GameEvent[] {
+  const ko = checkKnockout(state);
+  if (ko.length > 0) return ko;
+  return advanceTurn(state);
+}
+
+/**
+ * 턴 종료 처리 — 행동 선택까지 모두 끝난 뒤에만(또는 checkKnockout이 통과한 뒤에만) 호출된다.
  *
  * 순서:
- * 1. 팀 교대 (A→B, B→A)
- * 2. B→A 교대 시 턴 카운터 증가
- * 3. EXPAND_TURN 도달 시 "더 신나지는" 시점 진입 (1회) — 이때부터 폭탄 등장
- * 4. MAX_TURN 초과 시 게임 종료
+ * 1. 이미 끝난 게임은 절대 되살리지 않는다.
+ * 2. 팀 교대 (A→B, B→A)
+ * 3. B→A 교대 시 턴 카운터 증가
+ * 4. FESTIVAL_TURN 도달 시 축제 진입 (1회) — 이때부터 페어 경험치 2배
+ * 5. MAX_TURN 초과 시 체력 비교로 게임 종료
  */
 export function advanceTurn(state: GameState): GameEvent[] {
+  if (state.phase !== 'playing') return [];
+
   const events: GameEvent[] = [];
 
   const currentTeam = state.activeTeam;
@@ -32,19 +66,16 @@ export function advanceTurn(state: GameState): GameEvent[] {
   if (currentTeam === 'B') {
     state.turn++;
 
-    // EXPAND_TURN 종료 시점부터 폭탄이 등장한다
-    if (state.turn === EXPAND_TURN + 1 && !state.expanded) {
-      state.expanded = true;
-      events.push({ type: 'expand' });
+    // FESTIVAL_TURN 도달 시점부터 축제가 시작된다
+    if (!state.festival && state.turn >= FESTIVAL_TURN) {
+      state.festival = true;
+      events.push({ type: 'festival' });
     }
   }
 
-  // 종료 판정
+  // 종료 판정 — 턴 상한 초과 시 체력 비교
   if (state.turn > MAX_TURN) {
-    state.phase = 'ended';
-    state.winner = determineWinner(state);
-    events.push({ type: 'gameEnd', winner: state.winner });
-    return events;
+    return [...events, ...endGame(state, determineWinnerByHp(state), 'turnLimit')];
   }
 
   // 방금 플레이한 팀의 playerIndex를 다음 번을 위해 증가 (N:N 로테이션)
@@ -67,14 +98,16 @@ export function initGame(
 ): GameState {
   const makeTeam = (members: string[]) => ({
     members,
-    scores: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
+    exp: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
+    hp: INITIAL_HP,
+    pendingMultiplier: 1,
     pendingExtraDraws: 0,
     playerIndex: 0,
     skillStats: {
-      sheep: { count: 0, totalLevel: 0 },
-      rabbit: { count: 0, totalLevel: 0 },
-      mermaid: { count: 0, totalLevel: 0 },
-      tiger: { count: 0, totalLevel: 0 },
+      sheep: { count: 0, totalLevel: 0, totalHpGained: 0, totalExtraDraws: 0 },
+      rabbit: { count: 0, totalLevel: 0, totalHpGained: 0, totalExtraDraws: 0 },
+      mermaid: { count: 0, totalLevel: 0, totalHpGained: 0, totalExtraDraws: 0 },
+      tiger: { count: 0, totalLevel: 0, totalHpGained: 0, totalExtraDraws: 0 },
     },
   });
 
@@ -84,7 +117,7 @@ export function initGame(
     activeTeam: 'A',
     activePlayerIndex: 0,
     stacks: initStacks(),
-    expanded: false,
+    festival: false,
     pendingChoice: null,
     teams: {
       A: makeTeam(teamAMembers),

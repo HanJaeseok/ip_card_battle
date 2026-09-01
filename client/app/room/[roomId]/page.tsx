@@ -24,17 +24,17 @@ export default function GamePage() {
     if (saved === 'A' || saved === 'B') setMyTeam(saved);
   }, []);
 
-  // 게임 진행 상황에 따른 BGM 전환: 진행 중(game1) → 보드 확장(game2) → 종료(opening)
+  // 게임 진행 상황에 따른 BGM 전환: 진행 중(game1) → 축제(game2) → 종료(opening)
   useEffect(() => {
     if (!gameState) return;
     if (gameState.phase === 'ended') {
       playBgm('/sounds/bgm_opening.mp3', 0.6);
-    } else if (gameState.expanded) {
+    } else if (gameState.festival) {
       playBgm('/sounds/bgm_game2.mp3', GAME_BGM_VOLUME);
     } else {
       playBgm('/sounds/bgm_game1.mp3', GAME_BGM_VOLUME);
     }
-  }, [gameState?.phase, gameState?.expanded]);
+  }, [gameState?.phase, gameState?.festival]);
 
   const handlePlaceClick = useCallback(
     (place: Place) => {
@@ -71,7 +71,10 @@ export default function GamePage() {
     );
   }
 
-  if (gameState.phase === 'ended') {
+  // 체력이 즉시 10/0에 닿아 게임이 끝난 경우, 그 결정타 연출(체력 구슬 반응 +
+  // "결정타!" 강조)이 끝까지 재생된 뒤에야 종료 화면으로 넘어간다 — 승리를 만든
+  // 그 행동의 손맛을 화면 전환이 잘라먹지 않도록.
+  if (gameState.phase === 'ended' && !animState.isSettling) {
     return <GameEndScreen gameState={gameState} myTeam={myTeam} onBack={() => router.push('/')} />;
   }
 

@@ -27,13 +27,17 @@ export interface StackedCard {
 export interface SkillUsageStat {
   count: number;
   totalLevel: number;
+  totalHpGained: number;   // 이 동물로 얻은 체력 총합 (토끼=회복분, 호랑이=강탈분, 양/인어=0)
+  totalExtraDraws: number; // 양으로 예약한 추가 뽑기 총합 (양 외 0)
 }
 
 export interface TeamState {
   members: string[];
-  scores: Record<Animal, number>;      // 동물별 누적 점수 = 경험치 (레벨 = floor(score/threshold))
-  pendingExtraDraws: number;           // 실용신양 스킬로 예약된, 다음 내 턴에 추가로 뽑을 카드 수
-  playerIndex: number;                 // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
+  exp: Record<Animal, number>;    // 동물별 누적 경험치 = 카드 숫자 합. 레벨 = floor(exp/threshold)
+  hp: number;                      // 체력(=점수) — INITIAL_HP에서 시작, WIN_HP 이상이면 승리, LOSE_HP 이하면 패배
+  pendingMultiplier: number;       // 디자인어가 키우는 대기 배율. 초기값 1, 인어 외 스킬을 쓰면 1로 초기화
+  pendingExtraDraws: number;       // 실용신양 스킬로 예약된, 다음 내 턴에 추가로 뽑을 카드 수
+  playerIndex: number;             // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
   skillStats: Record<Animal, SkillUsageStat>; // 결과 화면에 표시할 스킬 사용 통계
 }
 
@@ -43,8 +47,8 @@ export interface GameState {
   activeTeam: Team;
   activePlayerIndex: number;
   stacks: Record<Animal, StackedCard[]>;      // 동물별 중앙 카드 스택 (수집된 카드도 기록으로 남음)
-  expanded: boolean;                          // EXPAND_TURN 이후 여부 — 이때부터 폭탄이 등장한다
-  pendingChoice: Team | null;                 // 턴을 마친 팀이 5가지 선택지(스킬 4종 + 패스) 중 하나를 고르길 기다리는 중
+  festival: boolean;                          // FESTIVAL_TURN 이후 여부 — 이때부터 페어 경험치가 2배
+  pendingChoice: Team | null;                 // 턴을 마친 팀이 5가지 선택지(행동 4종 + 패스) 중 하나를 고르길 기다리는 중
   teams: Record<Team, TeamState>;
   winner: Team | 'draw' | null;
 }
@@ -52,20 +56,31 @@ export interface GameState {
 // 게임 이벤트 (클라이언트 연출 및 시뮬레이션 로그용)
 export type GameEvent =
   | { type: 'draw'; place: Place; card: StackedCard }
-  | { type: 'bomb'; place: Place; animal: Animal; clearedCards: StackedCard[] } // 해당 동물 미획득 스택을 전부 날려버림(도토리 폭탄)
-  | { type: 'collect'; animal: Animal; team: Team; score: number; cardIds: number[] }
+  | {
+      type: 'collect';
+      animal: Animal;
+      team: Team;
+      exp: number;      // 실제로 더해진 경험치 (축제 중이면 이미 2배 적용된 값)
+      baseExp: number;  // 축제 배수 적용 전 카드 숫자 합
+      doubled: boolean; // 축제로 2배가 적용됐는지
+      cardIds: number[];
+    }
   | { type: 'bonusDraws'; team: Team; count: number } // 실용신양 스킬로 예약해둔 추가 뽑기를 이번 턴에 소모
   | {
       type: 'skillApplied';
       team: Team;
       animal: Animal;
-      level: number;           // 발동에 사용된(초기화 직전) 레벨
-      myScoreDelta: number;    // 내 점수(해당 동물 버킷, 초기화 후 다시 채워짐)에 더해진 값
-      oppScoreDelta: number;   // 상대 총점에서 깎인 값(양수로 표기, 실제로는 감소)
-      extraDrawsQueued: number; // 실용신양을 골랐을 때, 다음 내 턴에 예약된 추가 뽑기 수
+      level: number;            // 발동에 사용된(초기화 직전) 레벨. 0이면 아무 일도 없었다는 뜻
+      expSpent: number;         // level × threshold — 소모된 경험치
+      multiplierUsed: number;   // 이번 발동에 실제로 곱해진 배율(인어일 때는 항상 1)
+      multiplierAfter: number;  // 발동 후 그 팀의 pendingMultiplier(인어면 커진 값, 나머지는 1)
+      myHpDelta: number;        // 내 체력 증감 — 항상 0 이상
+      oppHpDelta: number;       // 상대 체력 증감 — 항상 0 이하(음수 그대로, 양수로 뒤집지 않는다)
+      extraDrawsQueued: number; // 양을 골랐을 때, 다음 내 턴에 예약된 추가 뽑기 수(배율 반영 후 최종값)
+      hpAfter: Record<Team, number>; // 적용 직후 양 팀 체력
     }
-  | { type: 'skillPassed'; team: Team; auto: boolean } // "아무것도 하지 않음"을 선택(auto=true면 고를 수 있는 스킬이 없어 화면에 알리지 않고 자동 처리)
-  | { type: 'expand' }
-  | { type: 'gameEnd'; winner: Team | 'draw' }
+  | { type: 'skillPassed'; team: Team; auto: boolean } // "아무것도 하지 않음"을 선택(auto=true면 고를 수 있는 행동이 없어 화면에 알리지 않고 자동 처리)
+  | { type: 'festival' } // FESTIVAL_TURN 도달 — 이때부터 페어 경험치 2배
+  | { type: 'gameEnd'; winner: Team | 'draw'; reason: 'knockout' | 'turnLimit' }
   | { type: 'timeout'; place: Place }
-  | { type: 'timeoutChoice'; animal: Animal | null }; // 스킬 선택 제한시간 초과 — null이면 고를 스킬이 없어 자동 패스
+  | { type: 'timeoutChoice'; animal: Animal | null }; // 행동 선택 제한시간 초과 — null이면 고를 행동이 없어 자동 패스

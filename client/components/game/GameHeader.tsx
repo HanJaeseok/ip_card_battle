@@ -1,5 +1,5 @@
 import type { ClientGameState, Team } from 'shared';
-import { MAX_TURN, bombChanceForTurn } from 'shared';
+import { MAX_TURN } from 'shared';
 
 function StepPill({ label, active }: { label: string; active: boolean }) {
   return (
@@ -42,7 +42,6 @@ export function GameHeader({
 }) {
   const teamLabel = `${displayedActiveTeam === 'A' ? '🟢' : '🔵'} ${gameState.teamNames[displayedActiveTeam]}`;
   const nickname = gameState.teams[displayedActiveTeam].members[displayedActivePlayerIndex] ?? '';
-  const bombPct = gameState.expanded ? Math.round(bombChanceForTurn(gameState.turn) * 100) : null;
 
   // "지금 이 차례가 나(우리팀)인지 상대인지" + "장소 선택 → 행동 선택" 중 어느 단계인지를
   // 도식으로 보여준다. 실제 타이머는 해설판 가운데 오버레이(ActionPrompt)가 담당하므로
@@ -69,9 +68,9 @@ export function GameHeader({
             <StepPill label="행동 선택" active={!isDrawPhase} />
           </div>
         </div>
-        {bombPct !== null && (
+        {gameState.festival && (
           <span className="text-xs font-semibold text-amber-300 whitespace-nowrap">
-            🌰 폭탄 {bombPct}% 확률로 폭파!
+            🌰 축제! 페어 경험치 2배
           </span>
         )}
       </div>

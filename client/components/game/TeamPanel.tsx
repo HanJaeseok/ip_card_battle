@@ -45,9 +45,13 @@ export function TeamPanel({
       data-rabbit-target={team}
       className={`w-56 h-full min-h-0 shrink-0 ${bgClass} rounded-2xl border border-jungle-200 p-4 flex flex-col gap-3 overflow-y-auto ${teamRing} ${recoilClass} ${hitShakeClass} ${rabbitPressureClass} transition-colors transition-shadow`}
     >
-      <div className={`text-base font-bold ${teamColor} flex items-center gap-1.5`}>
+      <div className={`text-base font-bold ${teamColor} flex items-center gap-1.5 flex-wrap`}>
         {label}
         {isMine && <span className="text-rose-500">우리팀♥</span>}
+        {/* 디자인어로 쌓아둔 대기 배율 — 상대도 볼 수 있어야 견제 판단이 가능하다 */}
+        {teamState.pendingMultiplier > 1 && (
+          <span className="mermaid-multiplier-badge">다음 행동 ×{teamState.pendingMultiplier}</span>
+        )}
       </div>
 
       <PlayerList

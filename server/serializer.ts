@@ -30,12 +30,14 @@ export function serializeState(
       mermaid: [...state.stacks.mermaid],
       tiger: [...state.stacks.tiger],
     },
-    expanded: state.expanded,
+    festival: state.festival,
     pendingChoice: state.pendingChoice,
     teams: {
       A: {
         members: state.teams.A.members,
-        scores: { ...state.teams.A.scores },
+        exp: { ...state.teams.A.exp },
+        hp: state.teams.A.hp,
+        pendingMultiplier: state.teams.A.pendingMultiplier,
         pendingExtraDraws: state.teams.A.pendingExtraDraws,
         playerIndex: state.teams.A.playerIndex,
         skillStats: {
@@ -47,7 +49,9 @@ export function serializeState(
       },
       B: {
         members: state.teams.B.members,
-        scores: { ...state.teams.B.scores },
+        exp: { ...state.teams.B.exp },
+        hp: state.teams.B.hp,
+        pendingMultiplier: state.teams.B.pendingMultiplier,
         pendingExtraDraws: state.teams.B.pendingExtraDraws,
         playerIndex: state.teams.B.playerIndex,
         skillStats: {
