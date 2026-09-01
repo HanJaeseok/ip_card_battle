@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import type { ClientGameState, Team } from 'shared';
-import { INITIAL_HP } from 'shared';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
 
 // 팀 체력(=점수) — 아래가 0, 위가 WIN_HP인 유리구슬. 중간(시작값)부터 차오르거나
@@ -20,7 +19,7 @@ export function TeamTotalPanel({
   pulse?: { id: number; direction: 'gain' | 'loss' } | null;
 }) {
   const hp = gameState.teams[team].hp;
-  const winHp = INITIAL_HP + gameState.settings.targetScore;
+  const winHp = gameState.settings.targetScore * 2;
   const toneClass = isMine ? 'hp-orb-mine' : 'hp-orb-enemy';
   const fillPct = Math.max(0, Math.min(100, (hp / winHp) * 100));
 
@@ -46,8 +45,8 @@ export function TeamTotalPanel({
     return () => clearTimeout(t);
   }, [pulse]);
 
-  // 체력 1점 = 눈금 한 칸 — 목표 체력(winHp)만큼 칸을 나눠, 지금 몇 칸째인지 한눈에
-  // 보이도록 반투명한 눈금선을 긋는다(예: 목표 5점 → INITIAL_HP 5 + 5 = 10칸).
+  // 체력 1점 = 눈금 한 칸 — 목표 체력(winHp = targetScore × 2)만큼 칸을 나눠, 지금
+  // 몇 칸째인지 한눈에 보이도록 반투명한 눈금선을 긋는다(예: 목표 5점 → 10칸).
   const segmentLines = Array.from({ length: winHp - 1 }, (_, i) => ((i + 1) / winHp) * 100);
 
   return (

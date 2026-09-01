@@ -7,7 +7,6 @@ import type { GameSettings, GameState } from 'shared';
 import {
   SHEEP_EXTRA_TIME_PER_DRAW_SEC,
   SHEEP_TIMER_EXTRA_DRAW_CAP,
-  INITIAL_HP,
   PLACES,
   TEAM_NAME_POOL,
   DEFAULT_SETTINGS,
@@ -49,7 +48,7 @@ function pickComputerSkill(state: GameState, team: Team): Animal | null {
   const opponent: Team = team === 'A' ? 'B' : 'A';
   const me = state.teams[team];
   const foe = state.teams[opponent];
-  const winHp = INITIAL_HP + state.settings.targetScore;
+  const winHp = state.settings.targetScore * 2;
 
   for (const animal of options) {
     if (animal === 'sheep' || animal === 'mermaid') continue;

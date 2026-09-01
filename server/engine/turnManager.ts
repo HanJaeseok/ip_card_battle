@@ -1,11 +1,14 @@
-import { MAX_TURN, INITIAL_HP, LOSE_HP, clampSettings } from 'shared';
+import { MAX_TURN, LOSE_HP, clampSettings } from 'shared';
 import type { GameEvent, GameSettings, GameState, Team } from 'shared';
 import { initStacks } from './places';
 import type { RNG } from './places';
 
-/** 목표 점수(방장이 정한 settings.targetScore)로부터 실제 승리 체력 문턱을 구한다. */
+/**
+ * 시작 체력 = 목표 점수 그 자체다 — 목표 점수만큼 "더 벌거나 잃어야" 끝나는 게임이므로,
+ * 목표 점수가 6이면 6에서 시작해 12에 닿으면 승리, 0에 닿으면 패배다.
+ */
 function winHpOf(state: GameState): number {
-  return INITIAL_HP + state.settings.targetScore;
+  return state.settings.targetScore * 2;
 }
 
 function determineWinnerByHp(state: GameState): Team | 'draw' {
@@ -103,10 +106,12 @@ export function initGame(
   rng: RNG = Math.random,
   settings?: Partial<GameSettings>,
 ): GameState {
+  const resolvedSettings = clampSettings(settings);
+
   const makeTeam = (members: string[]) => ({
     members,
     exp: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
-    hp: INITIAL_HP,
+    hp: resolvedSettings.targetScore,
     pendingMultiplier: 1,
     pendingExtraDraws: 0,
     playerIndex: 0,
@@ -131,6 +136,6 @@ export function initGame(
       B: makeTeam(teamBMembers),
     },
     winner: null,
-    settings: clampSettings(settings),
+    settings: resolvedSettings,
   };
 }

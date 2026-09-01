@@ -1,7 +1,11 @@
 // 동물별 레벨 임계값 — level = floor(exp / threshold)
 export const THRESHOLDS = { sheep: 10, rabbit: 10, mermaid: 20, tiger: 20 } as const;
 
-// 체력(=점수) 규칙 — 5에서 시작해 10 이상이면 즉시 승리, 0 이하면 즉시 패배.
+// 체력(=점수) 규칙 — 시작 체력은 목표 점수(GameSettings.targetScore) 그 자체이고,
+// 그 두 배(=시작 체력 + 목표 점수)에 닿으면 즉시 승리, 0 이하면 즉시 패배다.
+// 아래 INITIAL_HP/WIN_HP는 "기본 규칙(targetScore=5)일 때의 값"을 나타내는
+// 참고용 상수일 뿐, 실제 게임 로직은 항상 state.settings.targetScore로 계산한다
+// (server/engine/turnManager.ts의 winHpOf, initGame 참조).
 export const INITIAL_HP = 5;
 export const WIN_HP = 10;
 export const LOSE_HP = 0;
@@ -14,7 +18,7 @@ export const FESTIVAL_EXP_MULTIPLIER = 2;
 
 // 방장이 방 생성 시 정할 수 있는 게임 규칙의 기본값 — GameSettings 참조.
 // targetScore(목표 점수)의 기본값 5는 "체력 5에서 시작해 10 이상이면 즉시 승리"라는
-// 기존 규칙과 정확히 일치한다(winHp = INITIAL_HP + targetScore).
+// 기존 규칙과 정확히 일치한다(시작 체력 = targetScore, winHp = targetScore × 2).
 export const DEFAULT_TARGET_SCORE = 5;
 export const DEFAULT_FESTIVAL_TURN = FESTIVAL_TURN;
 export const DEFAULT_DRAW_TIME_SEC = 30;

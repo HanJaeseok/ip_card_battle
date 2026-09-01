@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
-import { ANIMALS, INITIAL_HP, LOSE_HP } from 'shared';
+import { ANIMALS, LOSE_HP } from 'shared';
 import { ANIMAL_INFO } from '@/lib/animals';
 
 const FLAVOR_TEXT: Record<Animal, string> = {
@@ -65,7 +65,7 @@ export function GameEndScreen({
   const { winner } = gameState;
   const hpA = gameState.teams.A.hp;
   const hpB = gameState.teams.B.hp;
-  const winHp = INITIAL_HP + gameState.settings.targetScore;
+  const winHp = gameState.settings.targetScore * 2;
   const isKnockout = hpA >= winHp || hpB >= winHp || hpA <= LOSE_HP || hpB <= LOSE_HP;
   const reasonText = isKnockout ? '체력 즉시 승부 — 결정타!' : '제한 턴 종료 — 체력 비교';
 
@@ -124,7 +124,9 @@ export function GameEndScreen({
             🔵 {gameState.teamNames.B}: 체력 {hpB}
           </span>
         </div>
-        <p className="text-center text-xs text-jungle-400 mb-4">체력은 5에서 시작해 행동으로만 오르내립니다.</p>
+        <p className="text-center text-xs text-jungle-400 mb-4">
+          체력은 목표 점수({gameState.settings.targetScore})에서 시작해 행동으로만 오르내립니다.
+        </p>
 
         <p className="text-xs font-bold text-jungle-500 mb-2">동물별 경험치</p>
         <div className="flex flex-col gap-2.5">

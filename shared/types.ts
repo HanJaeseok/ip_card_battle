@@ -34,7 +34,7 @@ export interface SkillUsageStat {
 export interface TeamState {
   members: string[];
   exp: Record<Animal, number>;    // 동물별 누적 경험치 = 카드 숫자 합. 레벨 = floor(exp/threshold)
-  hp: number;                      // 체력(=점수) — INITIAL_HP에서 시작, WIN_HP 이상이면 승리, LOSE_HP 이하면 패배
+  hp: number;                      // 체력(=점수) — settings.targetScore에서 시작, 그 두 배 이상이면 승리, 0 이하면 패배
   pendingMultiplier: number;       // 디자인어가 키우는 대기 배율. 초기값 1, 인어 외 스킬을 쓰면 1로 초기화
   pendingExtraDraws: number;       // 실용신양 스킬로 예약된, 다음 내 턴에 추가로 뽑을 카드 수
   playerIndex: number;             // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
@@ -43,7 +43,7 @@ export interface TeamState {
 
 // 방장이 방 생성 시 정하는 게임 규칙 — 기본값은 shared/constants.ts의 DEFAULT_* 참조.
 export interface GameSettings {
-  targetScore: number;    // 목표 점수 — 승리에 필요한 체력 격차(winHp = INITIAL_HP + targetScore)
+  targetScore: number;    // 목표 점수 — 시작 체력이자 승리에 필요한 격차(시작 hp = targetScore, winHp = targetScore × 2)
   festivalTurn: number;   // 도토리 축제 시작 턴
   drawTimeSec: number;    // 동물 뽑기(장소 클릭) 제한시간
   actionTimeSec: number;  // 행동 선택 제한시간 — 고를 수 있는 행동이 있을 때

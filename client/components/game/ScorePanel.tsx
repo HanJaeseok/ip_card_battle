@@ -25,7 +25,11 @@ function AnimalTable({
 }) {
   const threshold = THRESHOLDS[animal];
   const level = Math.floor(exp / threshold);
-  const progressPct = ((exp % threshold) / threshold) * 100;
+  // 분자는 "이번 레벨 안에서 쌓은 만큼"만 보여준다 — 누적 총량을 그대로 쓰면 레벨이
+  // 오른 뒤에도 분모를 넘는 값(예: 18/10)이 찍혀 레벨이 오히려 먼저 오른 것처럼
+  // 헷갈렸다. 레벨업 직후에는 항상 0으로 시작한다.
+  const expInLevel = exp % threshold;
+  const progressPct = (expInLevel / threshold) * 100;
   const preview = previewSkill(gameState, team, animal);
   const hasEffect = preview.myHpDelta > 0 || preview.oppHpDelta < 0 || preview.extraDraws > 0;
   const multiplier = gameState.teams[team].pendingMultiplier;
@@ -74,14 +78,16 @@ function AnimalTable({
             className="w-16 h-16 object-contain"
           />
         </div>
-        <div className="border-l border-gray-200 px-3 py-1 flex items-center justify-center min-w-[4.75rem]">
+        <div className="border-l border-gray-200 px-3 py-1 flex flex-col items-center justify-center gap-1 min-w-[4.75rem]">
           <p
             className={`font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
             style={isFlashing ? { color: '#22c55e' } : undefined}
           >
-            <span className="text-2xl">{exp}</span>
-            <span className="text-[0.65rem] font-semibold text-jungle-400 ml-0.5">/{threshold}</span>
+            <span className="text-2xl">{expInLevel}</span>
+            <span className="text-xs font-semibold text-jungle-400 ml-0.5">/{threshold}</span>
           </p>
+          {/* 분수 아래 남는 공간을 활용 — 레벨을 여기로 올려 훨씬 크고 눈에 띄게 한다 */}
+          <p className="text-xl font-black text-jungle-600 leading-none">Lv.{level}</p>
         </div>
       </div>
       <div className="px-2 pb-1.5 pt-1 shrink-0">
@@ -91,7 +97,6 @@ function AnimalTable({
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <p className="text-[0.65rem] text-jungle-500 text-right mt-0.5 font-bold">Lv. {level}</p>
       </div>
 
       {/* 레벨업 강조 — 불꽃 + 위 화살표가 짧고 강렬하게 튀어오른다 */}
