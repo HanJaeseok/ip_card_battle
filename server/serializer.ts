@@ -66,6 +66,8 @@ export function serializeState(
     },
     winner: state.winner,
     settings: state.settings,
+    startingTeam: state.startingTeam,
+    startingTeamReason: state.startingTeamReason,
   };
 }
 

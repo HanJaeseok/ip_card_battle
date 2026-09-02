@@ -270,8 +270,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const FIRST_TEAM_OPTIONS: { value: GameSettings['firstTeam']; label: string }[] = [
+  { value: 'A', label: '🟢 팀 1 먼저' },
+  { value: 'B', label: '🔵 팀 2 먼저' },
+  { value: 'random', label: '🎲 무작위' },
+];
+
 const RULE_FIELDS: {
-  key: keyof GameSettings;
+  key: keyof Omit<GameSettings, 'firstTeam'>;
   label: string;
   suffix: string;
   hint?: string;
@@ -307,6 +313,25 @@ function GameRulesFields({
       </button>
       {open && (
         <div className="px-3 pb-3 flex flex-col gap-2 border-t border-gray-100 pt-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-gray-500">선 플레이어(먼저 시작하는 팀)</label>
+            <div className="flex gap-1">
+              {FIRST_TEAM_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => onChange({ ...settings, firstTeam: value })}
+                  className={`flex-1 py-1.5 rounded-lg font-semibold transition text-xs ${
+                    settings.firstTeam === value
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {RULE_FIELDS.map(({ key, label, suffix, hint }) => {
             const { min, max } = SETTINGS_LIMITS[key];
             return (
@@ -370,6 +395,14 @@ function WaitingRoom({
       </div>
 
       <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1 justify-center">
+        <span>
+          🚩 선공{' '}
+          {settings.firstTeam === 'random'
+            ? '무작위 추첨'
+            : settings.firstTeam === 'A'
+              ? (teamNames.A ?? '팀 1')
+              : (teamNames.B ?? '팀 2')}
+        </span>
         <span>🎯 목표 {settings.targetScore}점</span>
         <span>🌰 축제 {settings.festivalTurn}턴부터 (뽑기 {settings.festivalDrawCount}회)</span>
         <span>⏳ 뽑기 {settings.drawTimeSec}초</span>

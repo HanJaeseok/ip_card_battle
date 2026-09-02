@@ -17,14 +17,17 @@ import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { GameBoard } from './GameBoard';
 import { SheepProgressBar } from './SheepProgressBar';
+import { FestivalProgressBar } from './FestivalProgressBar';
 import { CommentaryBoard } from './CommentaryBoard';
 import { SkillChoiceBar } from './SkillChoiceBar';
 import { TeamTotalPanel } from './TeamTotalPanel';
 import { ActionPrompt } from './ActionPrompt';
 
-// 실용신양 콤보 번호 → 진동 강도 스케일. 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다.
-function shakeScale(combo: number): number {
-  return Math.min(0.6 + (combo - 1) * 0.35, 3.2);
+// screenShakeLevel(임의의 정수) → 진동 강도 스케일. 숫자가 클수록 세게 흔들린다 —
+// 카드가 쌓일 때/예약 뽑기 롤 진입 시(약하게=1, 강하게=4), 특허랑이·결정타 등 다른
+// 효과(레벨 2, 3)까지 이 하나의 스케일 함수를 공유해서 쓴다.
+function shakeScale(level: number): number {
+  return Math.min(0.6 + (level - 1) * 0.35, 3.2);
 }
 
 export function GameLayout({
@@ -156,6 +159,10 @@ export function GameLayout({
                 noEligible={noEligible}
                 turnDeadline={gameState.turnDeadline}
                 settings={gameState.settings}
+                turn={gameState.turn}
+                startingTeam={gameState.startingTeam}
+                startingTeamReason={gameState.startingTeamReason}
+                teamNames={gameState.teamNames}
               />
             }
           />
@@ -212,6 +219,9 @@ export function GameLayout({
 
       {/* 실용신양 추가 뽑기 진행도 */}
       <SheepProgressBar progress={animState.sheepProgress} />
+
+      {/* 도토리 축제 추가 뽑기 진행도 */}
+      <FestivalProgressBar progress={animState.festivalProgress} />
 
       {/* 상표토끼 행동 발동 — 토끼 스택에서 팀 점수판으로 날아가는 토끼들 */}
       <RabbitFlightLayer flights={animState.rabbitFlights} />

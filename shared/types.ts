@@ -44,6 +44,7 @@ export interface TeamState {
 
 // 방장이 방 생성 시 정하는 게임 규칙 — 기본값은 shared/constants.ts의 DEFAULT_* 참조.
 export interface GameSettings {
+  firstTeam: 'A' | 'B' | 'random'; // 선 플레이어(먼저 시작하는 팀) — 'random'이면 게임 시작 시 서버가 무작위로 정한다
   targetScore: number;    // 목표 점수 — 시작 체력이자 승리에 필요한 격차(시작 hp = targetScore, winHp = targetScore × 2)
   festivalTurn: number;   // 도토리 축제 시작 턴
   festivalDrawCount: number;           // 도토리 축제 랜덤 뽑기 발동 횟수(n) — festivalTurn에 n×1회 발동
@@ -64,6 +65,8 @@ export interface GameState {
   teams: Record<Team, TeamState>;
   winner: Team | 'draw' | null;
   settings: GameSettings;                     // 방장이 정한(또는 기본값) 게임 규칙 — 방 생성 시 확정되어 게임 중 불변
+  startingTeam: Team;                         // 이 게임에서 실제로 먼저 시작한 팀 — settings.firstTeam이 'random'이어도 이미 추첨이 끝난 확정값
+  startingTeamReason: 'setting' | 'random';   // startingTeam이 방장 설정으로 정해졌는지 무작위 추첨으로 정해졌는지
 }
 
 // 게임 이벤트 (클라이언트 연출 및 시뮬레이션 로그용)

@@ -62,12 +62,6 @@ export interface SheepProgress {
   total: number;   // 이번에 소모해야 할 전체 예약 뽑기 수
 }
 
-export interface FestivalProgress {
-  team: Team;
-  current: number; // 지금까지 소모한 도토리 축제 예약 뽑기 수
-  total: number;   // 이번에 소모해야 할 전체 도토리 축제 예약 뽑기 수
-}
-
 export interface RabbitFlight {
   id: number;
   team: Team; // 이 팀 체력 쪽으로 토끼떼(RabbitFlightLayer가 고정 개수로 그린다)가 달려간다
@@ -147,7 +141,6 @@ export interface AnimationState {
   mainCombo: MainCombo | null;
   sheepLoaded: SheepLoaded | null;
   sheepProgress: SheepProgress | null; // 예약된 추가 뽑기가 지금 몇 번째까지 소모됐는지
-  festivalProgress: FestivalProgress | null; // 도토리 축제 예약 뽑기가 지금 몇 번째까지 소모됐는지
   rabbitFlights: RabbitFlight[];
   rabbitPressure: RabbitPressure | null;
   tigerSlash: { onTeam: Team } | null;
@@ -191,16 +184,9 @@ const EFFECT_DUR = 1200;
 const COMMENTARY_MAX = 40;
 const SHEEP_COMBO_DUR = 1400;
 const SHAKE_PULSE_DUR = 300;
-// 화면 흔들림 레벨(GameLayout의 shakeScale이 이 숫자로 진폭을 계산한다) — 두 가지 용도로 쓴다:
-// 1) 실용신양/도토리 축제 예약 뽑기 롤에 "처음 진입"하는 순간 한 번(약하게).
-// 2) 동물 스택이 쌓일 때마다(뽑기 종류 무관) 그 크기 기준으로(4장↑ 약하게, 6장↑ 강하게).
-const SCREEN_SHAKE_WEAK = 1;
-const SCREEN_SHAKE_STRONG = 4;
-const STACK_SHAKE_WEAK_AT = 4;
-const STACK_SHAKE_STRONG_AT = 6;
 const MAIN_COMBO_DUR = 1300;
 const REACTION_DUR = 700;
-const COLLECT_FLING_DUR = 450; // .stack-card-fling-* CSS 지속시간과 일치해야 함 — 원래 750ms의 60%(페어 카드가 팀 쪽으로 날아가는 연출만 단축)
+const COLLECT_FLING_DUR = 750; // .stack-card-fling-* CSS 지속시간과 일치해야 함
 const SHAKE_CHECK_DUR = 550; // .stack-card-shake-* CSS 지속시간과 일치해야 함
 const SHEEP_LOADED_DUR = 1100;
 const EMOTICON_DUR = 2000;
@@ -225,7 +211,6 @@ export function useAnimationQueue(
   const [mainCombo, setMainCombo] = useState<MainCombo | null>(null);
   const [sheepLoaded, setSheepLoaded] = useState<SheepLoaded | null>(null);
   const [sheepProgress, setSheepProgress] = useState<SheepProgress | null>(null);
-  const [festivalProgress, setFestivalProgress] = useState<FestivalProgress | null>(null);
   const [rabbitFlights, setRabbitFlights] = useState<RabbitFlight[]>([]);
   const [rabbitPressure, setRabbitPressure] = useState<RabbitPressure | null>(null);
   const [tigerSlash, setTigerSlash] = useState<{ onTeam: Team } | null>(null);
@@ -445,7 +430,6 @@ export function useAnimationQueue(
     setSheepCombos([]);
     setMainCombo(null);
     setSheepProgress(null);
-    setFestivalProgress(null);
     setRabbitFlights([]);
     setRabbitPressure(null);
     setTigerSlash(null);
@@ -593,8 +577,8 @@ export function useAnimationQueue(
 
     // ── Pass 1: 뽑기(draw) + 예약된 추가 뽑기(bonusDraws=실용신양, festivalDraws=도토리 축제) 애니메이션 ────────
     // 도토리 축제 랜덤 뽑기는 실용신양과 완전히 동일한 방식(장소 클릭 시 예약분을 먼저
-    // 소모)으로 동작한다(server/engine/drawCard.ts) — 한 액션 안에서 bonusDraws(실용신양)가
-    // 먼저, 그 다음 festivalDraws(도토리 축제)가 소모되므로 두 롤이 동시에 진행 중일 수는 없다.
+    // 소모)으로 동작한다(server/engine/drawCard.ts) — 한 액션 안에서 festivalDraws가
+    // 먼저, 그 다음 bonusDraws가 소모되므로 두 롤이 동시에 진행 중일 수는 없다.
     let cursor = 0;
     let bonusRollTeam: Team | null = null;
     let bonusRollRemaining = 0;
@@ -603,32 +587,8 @@ export function useAnimationQueue(
     let festivalRollTeam: Team | null = null;
     let festivalRollRemaining = 0;
     let festivalRollIdx = 0;
-    let festivalRollTotal = 0;
     let comboCounter = 0;
     let lastDrawEndCursor = 0;
-
-    // ── 카드가 쌓일 때마다(뽑기 종류·롤 여부와 무관하게) 화면을 흔들기 위한 준비 ──
-    // 이번 액션에서 각 동물 스택이 몇 장째가 되는지 실시간으로 추적한다. 시작값(baseline)은
-    // "이번 액션이 끝난 뒤의 최종 상태"에서 이번 액션에 새로 뽑힌 장수만큼을 거꾸로 빼서
-    // 구한다 — 정산(collect)이 있었다면 그 페어에 포함된 카드 수(cardIds.length, 정산
-    // 직후 0장으로 리셋되기 전의 총량)를, 없었다면 지금 gameState에 남아있는 미획득
-    // 장수를 최종값으로 삼는다.
-    const drawCountByAnimal: Record<Animal, number> = { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 };
-    const collectedCountByAnimal: Partial<Record<Animal, number>> = {};
-    lastEvents.forEach(e => {
-      if (e.type === 'draw') drawCountByAnimal[e.card.animal]++;
-      else if (e.type === 'collect') collectedCountByAnimal[e.animal] = e.cardIds.length;
-    });
-    const stackRunningCount: Record<Animal, number> = { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 };
-    ANIMALS.forEach(a => {
-      const finalUncollected = gameState ? gameState.stacks[a].filter(c => c.collectedBy === null).length : 0;
-      const totalAtEnd = collectedCountByAnimal[a] ?? finalUncollected;
-      stackRunningCount[a] = totalAtEnd - drawCountByAnimal[a];
-    });
-    // 같은 액션 안에서 카드가 여러 장 연달아 쌓여도(롤 중 등), 흔들림은 각 단계(약함/
-    // 강함)에 "새로 진입하는 그 순간"에만 한 번씩 재생한다 — 임계값을 넘은 채로 계속
-    // 쌓일 때마다 매번 흔들면 다시 "애매하게 잦은 흔들림"이 되어버리기 때문이다.
-    const shookTierByAnimal: Partial<Record<Animal, 'weak' | 'strong'>> = {};
 
     for (const ev of lastEvents) {
       if (ev.type === 'draw') {
@@ -668,24 +628,6 @@ export function useAnimationQueue(
         const card = ev.card;
         const place = ev.place;
 
-        // 카드가 쌓일수록(뽑기 종류 무관) 화면을 흔든다 — 4장 이상 약하게, 6장 이상
-        // 강하게. 단, 매 장마다가 아니라 그 단계에 "새로 진입하는" 순간에만 한 번
-        // 재생한다(예: 5장→6장으로 강한 단계에 올라설 때만 다시 흔들리고, 6장→7장은
-        // 이미 강한 단계라 흔들지 않는다). 카드가 실제로 등장하는(revealAt) 순간에
-        // 맞춰 재생한다.
-        stackRunningCount[card.animal]++;
-        const pileSize = stackRunningCount[card.animal];
-        const pileTier: 'weak' | 'strong' | null =
-          pileSize >= STACK_SHAKE_STRONG_AT ? 'strong' : pileSize >= STACK_SHAKE_WEAK_AT ? 'weak' : null;
-        if (pileTier !== null && pileTier !== shookTierByAnimal[card.animal]) {
-          shookTierByAnimal[card.animal] = pileTier;
-          const pileShakeLevel = pileTier === 'strong' ? SCREEN_SHAKE_STRONG : SCREEN_SHAKE_WEAK;
-          sched(() => {
-            setScreenShakeLevel(pileShakeLevel);
-            sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
-          }, revealAt);
-        }
-
         const slotId = ++floatIdCounter;
         sched(() => {
           setDrawSlots(prev => [...prev, { id: slotId, place, animal: card.animal, num: card.num }]);
@@ -707,19 +649,21 @@ export function useAnimationQueue(
         if (inRoll) {
           const combo = ++comboCounter;
           const comboId = ++floatIdCounter;
-          const progressTeam = inFestivalRoll ? festivalRollTeam : bonusRollTeam;
-          const progressCurrent = inFestivalRoll ? festivalRollIdx : bonusRollIdx;
-          const progressTotal = inFestivalRoll ? festivalRollTotal : bonusRollTotal;
+          const progressTeam = bonusRollTeam;
+          const progressCurrent = bonusRollIdx;
+          const progressTotal = bonusRollTotal;
           sched(() => {
             setSheepCombos(prev => [...prev, { id: comboId, place, combo }]);
             sched(() => setSheepCombos(prev => prev.filter(c => c.id !== comboId)), SHEEP_COMBO_DUR);
 
+            // 콤보마다 진동 — 1콤보는 약하게 시작해 콤보가 쌓일수록 점점 강해진다
+            setScreenShakeLevel(combo);
+            sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
+
             // 이번 턴에 예약된 추가 뽑기가 몇 번째까지 진행됐는지 계속 갱신해 보여준다
-            // (실용신양/도토리 축제 각각 자기 진행 배지에만 반영한다).
+            // (실용신양 롤일 때만 — 도토리 축제는 별도의 배너(FestivalLoadedBanner)로 알린다).
             if (inSheepRoll) {
               setSheepProgress({ team: progressTeam!, current: progressCurrent, total: progressTotal });
-            } else if (inFestivalRoll) {
-              setFestivalProgress({ team: progressTeam!, current: progressCurrent, total: progressTotal });
             }
           }, revealAt);
 
@@ -743,14 +687,6 @@ export function useAnimationQueue(
         bonusRollRemaining = ev.count;
         bonusRollIdx = 0;
         bonusRollTotal = ev.count;
-
-        // 예약 뽑기 롤에 처음 진입하는 순간 화면을 약하게 한 번 흔든다 — 뽑을 때마다
-        // 점점 세게 흔들던 이전 방식은 타이밍이 애매하다는 피드백으로 폐지하고,
-        // "진입 시 1회"로 단순화했다(카드가 실제로 쌓일 때의 흔들림은 별도).
-        sched(() => {
-          setScreenShakeLevel(SCREEN_SHAKE_WEAK);
-          sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
-        }, cursor);
 
         if (ev.count >= 5) {
           const level = ev.count;
@@ -779,19 +715,6 @@ export function useAnimationQueue(
         festivalRollTeam = ev.team;
         festivalRollRemaining = ev.count;
         festivalRollIdx = 0;
-        festivalRollTotal = ev.count;
-
-        // 실용신양 롤과 동일하게, 처음 진입하는 순간 화면을 약하게 한 번 흔든다.
-        sched(() => {
-          setScreenShakeLevel(SCREEN_SHAKE_WEAK);
-          sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
-        }, cursor);
-
-        // 한 액션에 실용신양 롤과 도토리 축제 롤이 함께 들어있으면(둘 다 예약돼 있던 경우)
-        // 이 시점엔 실용신양 롤이 이미 끝나 있다(server/engine/drawCard.ts 순서상 항상
-        // 실용신양이 먼저) — 완료된 "N/N" 배지가 도토리 배지와 같은 자리에 겹쳐 남지
-        // 않도록 여기서 지운다.
-        sched(() => setSheepProgress(null), cursor);
 
         if (ev.count >= 5) {
           const level = ev.count;
@@ -1085,7 +1008,6 @@ export function useAnimationQueue(
     mainCombo,
     sheepLoaded,
     sheepProgress,
-    festivalProgress,
     rabbitFlights,
     rabbitPressure,
     tigerSlash,

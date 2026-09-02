@@ -73,9 +73,10 @@ function festivalDrawCountAt(turn: number, settings: GameSettings): number {
  *
  * 순서:
  * 1. 이미 끝난 게임은 절대 되살리지 않는다.
- * 2. 팀 교대 (A→B, B→A)
- * 3. B→A 교대 시 턴 카운터 증가
- * 4. FESTIVAL_TURN 도달 시 축제 진입(안내는 1회) + 그 뒤로 매 턴 다음 팀에게 도토리 축제 랜덤 뽑기 예약
+ * 2. 팀 교대 (선공→후공, 후공→선공)
+ * 3. 후공 팀이 플레이를 마친 시점(=한 라운드가 다 돈 시점)에 턴 카운터 증가
+ * 4. FESTIVAL_TURN 도달 시 축제 진입(안내는 1회) + 그 뒤로 "매 턴(플레이어 교대마다)" 다음
+ *    차례 팀(A/B 구분 없이)에게 도토리 축제 랜덤 뽑기 예약
  * 5. MAX_TURN 초과 시 체력 비교로 게임 종료
  */
 export function advanceTurn(state: GameState): GameEvent[] {
@@ -85,9 +86,13 @@ export function advanceTurn(state: GameState): GameEvent[] {
 
   const currentTeam = state.activeTeam;
   const nextTeam: Team = currentTeam === 'A' ? 'B' : 'A';
+  // 이 게임에서 매 라운드 "두 번째로" 플레이하는 팀 — settings.firstTeam이 A/B/무작위
+  // 무엇이든, 라운드의 두 번째 팀이 플레이를 마쳐야 턴 카운터가 오른다(기존에는
+  // 이 팀을 'B'로 못박아뒀는데, 선 플레이어를 고를 수 있게 되면서 일반화했다).
+  const secondTeamOfRound: Team = state.startingTeam === 'A' ? 'B' : 'A';
 
-  // B팀이 플레이를 마친 경우 → 턴 카운터 증가
-  if (currentTeam === 'B') {
+  // 후공 팀이 플레이를 마친 경우 → 턴 카운터 증가
+  if (currentTeam === secondTeamOfRound) {
     state.turn++;
 
     // settings.festivalTurn 도달 시점부터 축제가 시작된다
@@ -95,10 +100,13 @@ export function advanceTurn(state: GameState): GameEvent[] {
       state.festival = true;
       events.push({ type: 'festival' });
     }
+  }
 
-    // 도토리 축제 랜덤 뽑기 — 실용신양과 완전히 동일하게, 즉시 뽑지 않고 다음 팀(nextTeam)의
-    // pendingFestivalDraws에 예약해둔다. 실제 뽑기는 그 팀이 다음 장소를 클릭할 때
-    // (server/engine/drawCard.ts) 실행된다. festivalTurn 이후로는 매 턴 계속 예약된다.
+  // 도토리 축제 랜덤 뽑기 — 실용신양과 완전히 동일하게, 즉시 뽑지 않고 다음으로 플레이할
+  // 팀(nextTeam)의 pendingFestivalDraws에 예약해둔다. 실제 뽑기는 그 팀이 다음 장소를 클릭할 때
+  // (server/engine/drawCard.ts) 실행된다. 축제 시작 이후로는 A/B 어느 팀 차례든 매 턴 계속
+  // 예약된다 — "라운드당 한 번"이 아니라 "누구든 자기 턴이 오면 무조건" 받는 보너스다.
+  if (state.festival) {
     const drawCount = festivalDrawCountAt(state.turn, state.settings);
     if (drawCount > 0) {
       state.teams[nextTeam].pendingFestivalDraws += drawCount;
@@ -131,6 +139,16 @@ export function initGame(
 ): GameState {
   const resolvedSettings = clampSettings(settings);
 
+  // settings.firstTeam이 'random'이면 여기서 딱 한 번 추첨해 확정한다 — 이후로는
+  // state.startingTeam이 그 결과를 그대로 담고 있으므로, 다시 추첨하거나 매번
+  // 다르게 계산될 일이 없다.
+  const startingTeam: Team =
+    resolvedSettings.firstTeam === 'random'
+      ? (rng() < 0.5 ? 'A' : 'B')
+      : resolvedSettings.firstTeam;
+  const startingTeamReason: 'setting' | 'random' =
+    resolvedSettings.firstTeam === 'random' ? 'random' : 'setting';
+
   const makeTeam = (members: string[]) => ({
     members,
     exp: { sheep: 0, rabbit: 0, mermaid: 0, tiger: 0 },
@@ -150,7 +168,7 @@ export function initGame(
   return {
     phase: 'playing',
     turn: 1,
-    activeTeam: 'A',
+    activeTeam: startingTeam,
     activePlayerIndex: 0,
     stacks: initStacks(),
     festival: false,
@@ -161,5 +179,7 @@ export function initGame(
     },
     winner: null,
     settings: resolvedSettings,
+    startingTeam,
+    startingTeamReason,
   };
 }

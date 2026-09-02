@@ -3,7 +3,14 @@
 import { useLayoutEffect, useState } from 'react';
 import type { SheepCombo } from '@/hooks/useAnimationQueue';
 
+// 비활성화 스위치 — "N combo!" 텍스트만 화면에서 끈다. 콤보 계산/스케줄링 로직
+// 자체(useAnimationQueue.ts의 sheepCombos)는 그대로 두고 여기서 렌더만 막는다 —
+// 다시 켜고 싶으면 이 값만 true로 되돌리면 된다.
+const SHOW_COMBO_TEXT = false;
+
 export function SheepComboLayer({ combos }: { combos: SheepCombo[] }) {
+  if (!SHOW_COMBO_TEXT) return null;
+
   return (
     <>
       {combos.map(c => (

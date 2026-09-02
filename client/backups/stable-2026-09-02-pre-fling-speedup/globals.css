@@ -1147,6 +1147,33 @@ body {
   .sheep-loaded-banner, .festival-loaded-banner { animation: none; opacity: 0; }
 }
 
+/* ── 게임 시작 — "선 플레이어" 안내 배너 (3.4초, FirstTeamBanner.tsx) ─────────── */
+@keyframes firstTeamPop {
+  0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  15%  { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  25%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  85%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.92); opacity: 0; }
+}
+.first-team-banner {
+  position: fixed;
+  left: 50%;
+  top: 10%;
+  z-index: 72;
+  pointer-events: none;
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: #f0fdf4;
+  white-space: nowrap;
+  background: rgba(21, 128, 61, 0.85);
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  animation: firstTeamPop 3400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .first-team-banner { animation: none; opacity: 0; }
+}
 
 /* ── 카드 오픈/페어/효과 자막 (보드 중앙 오버레이) ───────────────────────────── */
 @keyframes captionPop {
@@ -1444,7 +1471,7 @@ body {
   35%  { opacity: 1; }
   100% { transform: translate(var(--fling-dx), var(--fling-dy)) scale(0.4) rotate(var(--fling-rot)); opacity: 0; }
 }
-.stack-card-fling { animation: stackCardFling 450ms ease-in forwards; z-index: 20 !important; } /* 원래 750ms의 60% — useAnimationQueue.ts의 COLLECT_FLING_DUR과 일치해야 함 */
+.stack-card-fling { animation: stackCardFling 750ms ease-in forwards; z-index: 20 !important; }
 .stack-total-badge {
   line-height: 1;
 }

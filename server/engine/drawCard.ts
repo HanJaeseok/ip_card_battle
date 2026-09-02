@@ -5,8 +5,8 @@ import type { RNG } from './places';
 
 /**
  * 장소 클릭 처리.
- * 1) 도토리 축제로 예약해둔 추가 뽑기가 있으면 먼저 전부 소모한다.
- * 2) 실용신양 행동으로 예약해둔 추가 뽑기가 있으면 이어서 전부 소모한다.
+ * 1) 실용신양 행동으로 예약해둔 추가 뽑기가 있으면 먼저 전부 소모한다.
+ * 2) 도토리 축제로 예약해둔 추가 뽑기가 있으면 이어서 전부 소모한다.
  * 3) 클릭한 장소에서 카드 1장을 뽑는다.
  * 4) 이번 액션에서 뽑은 카드가 전부 모인 뒤, 동물별로 미획득 스택이 짝수 개면 한꺼번에 수집한다
  *    (경험치만 오른다 — 체력은 오직 행동으로만 움직인다).
@@ -18,8 +18,8 @@ export function drawCard(
 ): GameEvent[] {
   const events: GameEvent[] = [];
 
-  events.push(...consumePendingFestivalDraws(state, rng));
   events.push(...consumePendingExtraDraws(state, rng));
+  events.push(...consumePendingFestivalDraws(state, rng));
   events.push(..._drawOne(state, place, rng));
   events.push(...settleStacks(state));
 

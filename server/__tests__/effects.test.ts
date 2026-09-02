@@ -299,6 +299,49 @@ describe('턴 진행', () => {
   });
 });
 
+// ─── 선 플레이어(firstTeam) 설정 ──────────────────────────────────────────────
+describe('선 플레이어(firstTeam) 설정', () => {
+  it('firstTeam을 지정하지 않으면 기존과 동일하게 A팀이 먼저 시작한다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    expect(state.activeTeam).toBe('A');
+    expect(state.startingTeam).toBe('A');
+    expect(state.startingTeamReason).toBe('setting');
+  });
+
+  it('firstTeam: "B"를 지정하면 B팀이 먼저 시작한다', () => {
+    const state = initGame(['A1'], ['B1'], rng0, { firstTeam: 'B' });
+    expect(state.activeTeam).toBe('B');
+    expect(state.startingTeam).toBe('B');
+    expect(state.startingTeamReason).toBe('setting');
+  });
+
+  it('firstTeam: "random"이면 rng 결과에 따라 A 또는 B가 정해지고 reason이 random으로 기록된다', () => {
+    const stateA = initGame(['A1'], ['B1'], rng0, { firstTeam: 'random' });
+    expect(stateA.startingTeam).toBe('A');
+    expect(stateA.startingTeamReason).toBe('random');
+
+    const stateB = initGame(['A1'], ['B1'], rngLast, { firstTeam: 'random' });
+    expect(stateB.startingTeam).toBe('B');
+    expect(stateB.startingTeamReason).toBe('random');
+  });
+
+  it('B팀이 먼저 시작해도(firstTeam: "B") 한 라운드(B→A)가 다 돈 뒤에만 턴 카운터가 오른다', () => {
+    const state = initGame(['A1'], ['B1'], rng0, { firstTeam: 'B' });
+    expect(state.activeTeam).toBe('B');
+    expect(state.turn).toBe(1);
+
+    // 선공(B)이 플레이를 마쳐도 아직 라운드가 안 끝났으므로 턴은 그대로다.
+    advanceTurn(state);
+    expect(state.turn).toBe(1);
+    expect(state.activeTeam).toBe('A');
+
+    // 후공(A)까지 플레이를 마쳐야 라운드가 끝나 턴 카운터가 오른다.
+    advanceTurn(state);
+    expect(state.turn).toBe(2);
+    expect(state.activeTeam).toBe('B');
+  });
+});
+
 // ─── 도토리 축제 랜덤 뽑기 (festivalTurn부터 매 턴 계속, k턴마다 단계가 올라 n×1→n×2→n×3...) ──
 describe('도토리 축제 랜덤 뽑기', () => {
   it('festivalTurn부터 매 턴 계속 예약되고, k턴마다 단계가 올라 매 턴 예약 수가 n×1→n×2→n×3으로 늘어난다', () => {
@@ -346,8 +389,24 @@ describe('도토리 축제 랜덤 뽑기', () => {
     expect(drawnThisTurn()).toBe(6);
   });
 
-  it('festivalDrawIncreaseInterval=999(기본값)이면 단계 상승 없이 festivalTurn 이후 매 턴 항상 n×1회만 예약된다', () => {
-    const state = initGame(['A1'], ['B1'], rng0, { festivalTurn: 3, festivalDrawCount: 5 });
+  it('축제 중에는 A/B 어느 팀 차례든(라운드당 한 번이 아니라) 매 턴 다음 팀에게 예약된다', () => {
+    const state = initGame(['A1'], ['B1'], rng0, { festivalTurn: 1, festivalDrawCount: 3 });
+    state.festival = true; // 이미 축제가 시작된 상태에서 검증
+
+    // A팀이 막 플레이를 마침 → 다음 팀(B)에게 예약되어야 한다 (기존 버그: A에게만 쌓였음)
+    state.activeTeam = 'A';
+    advanceTurn(state);
+    expect(state.teams.B.pendingFestivalDraws).toBe(3);
+    expect(state.teams.A.pendingFestivalDraws).toBe(0);
+
+    // B팀이 막 플레이를 마침 → 다음 팀(A)에게 예약되어야 한다
+    state.activeTeam = 'B';
+    advanceTurn(state);
+    expect(state.teams.A.pendingFestivalDraws).toBe(3);
+  });
+
+  it('festivalDrawIncreaseInterval=999(사실상 무제한)이면 단계 상승 없이 festivalTurn 이후 매 턴 항상 n×1회만 예약된다', () => {
+    const state = initGame(['A1'], ['B1'], rng0, { festivalTurn: 3, festivalDrawCount: 5, festivalDrawIncreaseInterval: 999 });
     const advanceAsB = () => {
       state.activeTeam = 'B';
       return advanceTurn(state);
@@ -365,7 +424,7 @@ describe('도토리 축제 랜덤 뽑기', () => {
     expect(state.teams.A.pendingFestivalDraws).toBe(5); // MAX_TURN 근처에서도 여전히 n×1
   });
 
-  it('예약된 도토리 뽑기는 실용신양(pendingExtraDraws)과 별도로 쌓이고, 다음 장소 클릭에서 실용신양보다 먼저 소모된다', () => {
+  it('예약된 도토리 뽑기는 실용신양(pendingExtraDraws)과 별도로 쌓이고, 다음 장소 클릭에서 실용신양보다 나중에 소모된다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.teams.A.pendingFestivalDraws = 2;
     state.teams.A.pendingExtraDraws = 1;
@@ -375,7 +434,7 @@ describe('도토리 축제 랜덤 뽑기', () => {
     const bonusEv = events.find(e => e.type === 'bonusDraws');
     expect(festivalEv).toMatchObject({ type: 'festivalDraws', team: 'A', count: 2 });
     expect(bonusEv).toMatchObject({ type: 'bonusDraws', team: 'A', count: 1 });
-    expect(events.indexOf(festivalEv!)).toBeLessThan(events.indexOf(bonusEv!));
+    expect(events.indexOf(bonusEv!)).toBeLessThan(events.indexOf(festivalEv!));
 
     const drawCount = events.filter(e => e.type === 'draw').length;
     expect(drawCount).toBe(4); // 도토리 2장 + 실용신양 1장 + 이번 클릭 1장
@@ -393,11 +452,13 @@ describe('도토리 축제 랜덤 뽑기', () => {
   });
 });
 
-// ─── 즉시 승패(체력 10 이상 / 0 이하) ───────────────────────────────────────────
+// ─── 즉시 승패(체력 WIN_HP 이상 / 0 이하) ───────────────────────────────────────
 describe('체력 즉시 승패', () => {
   it('상표토끼로 체력이 WIN_HP에 닿으면 즉시 승리하고, 턴은 넘어가지 않는다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.teams['A'].exp.rabbit = 50; // level=5 → +5 → 5+5=10=WIN_HP
+    // level = (WIN_HP - INITIAL_HP) / 1(배율) 이 되도록 경험치를 채운다 — 딱 그 레벨만큼
+    // 체력이 올라 정확히 WIN_HP에 닿는다.
+    state.teams['A'].exp.rabbit = (WIN_HP - INITIAL_HP) * THRESHOLDS.rabbit;
     state.pendingChoice = 'A';
 
     const { state: s2, events } = processSkillChoice(state, 'rabbit');

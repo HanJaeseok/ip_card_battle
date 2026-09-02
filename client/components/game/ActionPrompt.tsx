@@ -10,6 +10,8 @@ import { TurnTimer } from './TurnTimer';
 //  - 우리 팀 차례이지만 팀 내 다른 사람 차례 → "내 차례가 아니에요."
 //  - 내가 카드를 뽑을 차례 → 모래시계 타이머(30초) + 안내 문구
 //  - 내가 행동을 고를 차례 → 모래시계 타이머(고를 게 없으면 5초) + 안내 문구
+// 첫 라운드(turn === 1)에는 이 문구 위에 "선 플레이어" 안내(방 설정/무작위 추첨 결과 어느
+// 팀이 먼저 시작하는지)도 함께 보여준다.
 export function ActionPrompt({
   myTeam,
   playerId,
@@ -21,6 +23,10 @@ export function ActionPrompt({
   noEligible,
   turnDeadline,
   settings,
+  turn,
+  startingTeam,
+  startingTeamReason,
+  teamNames,
 }: {
   myTeam: Team | null;
   playerId: string | null;
@@ -32,6 +38,10 @@ export function ActionPrompt({
   noEligible: boolean;
   turnDeadline: number;
   settings: GameSettings;
+  turn: number; // 1이면 아직 첫 라운드 — 선 플레이어 안내를 함께 보여준다
+  startingTeam: Team;
+  startingTeamReason: 'setting' | 'random';
+  teamNames: Record<Team, string>;
 }) {
   const isMyTeamTurn = myTeam !== null && displayedActiveTeam === myTeam;
   const isMyPlayerTurn =
@@ -56,19 +66,33 @@ export function ActionPrompt({
 
   if (text === null) return null;
 
+  // 아직 첫 라운드(양 팀 모두 한 번씩도 안 둔 시점)면, 어느 팀이 왜 먼저 시작하는지를
+  // 이 상시 노출 안내문 위에 함께 보여준다 — 화면 중앙에 잠깐(3.4초)만 떴다 사라지는
+  // 별도 배너였던 이전 방식은 놓치기 쉽다는 피드백을 받아, 턴이 넘어갈 때까지 계속
+  // 보이는 이 자리로 옮겼다.
+  const firstTeamNote =
+    turn === 1
+      ? `${startingTeamReason === 'random' ? '무작위 추첨 결과' : '방 설정에 의해'} 먼저 시작하는 팀은 ${teamNames[startingTeam]}입니다.`
+      : null;
+
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-      <div className="bg-white rounded-xl px-5 py-2 flex items-center gap-3 shadow-sm">
-        {showTimer && (
-          <div className="w-56 shrink-0">
-            <TurnTimer
-              deadline={turnDeadline}
-              paused={false}
-              maxSeconds={urgent ? settings.noActionTimeSec : interactive ? settings.actionTimeSec : settings.drawTimeSec}
-            />
-          </div>
+      <div className="bg-white rounded-xl px-5 py-2 flex flex-col items-center gap-1 shadow-sm">
+        {firstTeamNote && (
+          <p className="text-xs text-jungle-500 whitespace-nowrap">{firstTeamNote}</p>
         )}
-        <p className={`font-bold whitespace-nowrap ${urgent ? 'text-amber-600' : 'text-jungle-700'}`}>{text}</p>
+        <div className="flex items-center gap-3">
+          {showTimer && (
+            <div className="w-56 shrink-0">
+              <TurnTimer
+                deadline={turnDeadline}
+                paused={false}
+                maxSeconds={urgent ? settings.noActionTimeSec : interactive ? settings.actionTimeSec : settings.drawTimeSec}
+              />
+            </div>
+          )}
+          <p className={`font-bold whitespace-nowrap ${urgent ? 'text-amber-600' : 'text-jungle-700'}`}>{text}</p>
+        </div>
       </div>
     </div>
   );

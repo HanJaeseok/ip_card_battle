@@ -73,7 +73,7 @@ export function GameHeader({
           <StepPill label="행동 선택" active={isChoicePhase} />
         </div>
         {gameState.festival && (
-          <span className="festival-header-badge text-xs font-bold whitespace-nowrap">
+          <span className="festival-header-badge text-sm font-bold whitespace-nowrap">
             🌰 도토리 축제 진행 중
             {pendingFestivalDraws > 0 && ` (랜덤 뽑기 +${pendingFestivalDraws}회 추가!)`}
           </span>
