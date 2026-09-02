@@ -277,6 +277,33 @@ export function useAnimationQueue(
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
 
+  // ⚠️ exp 마스킹은 useLayoutEffect가 아니라 렌더 도중에 동기적으로 적용한다.
+  // useLayoutEffect로 하면(예전 방식) "gameState는 이미 갱신됐지만 pendingExpCredit는
+  // 아직 예전 값"인 첫 번째 렌더가 일단 커밋까지 끝나고, 그 직후 레이아웃 이펙트가
+  // 두 번째(가려진) 렌더로 덮어씌우는 두 번의 커밋이 생긴다. 화면에는 두 번째 커밋만
+  // 페인트되어 눈으로는 문제가 없어 보이지만, 첫 번째(부풀려진) 커밋에도 하위 컴포넌트의
+  // useEffect(예: ScorePanel의 레벨업 감지)가 정상적으로 예약되고, 이 이펙트는 두 번째
+  // 커밋이 이미 화면을 바로잡았다는 사실과 무관하게 자신이 렌더될 때 캡처한 "부풀려진"
+  // level 값을 그대로 들고 나중에(패시브 이펙트라 비동기로) 실행돼버린다 — 그 결과
+  // 카드가 실제로 도착하기도 전에 "Lv UP!" 연출이 클릭 즉시 터지고, prevLevelRef까지
+  // 잘못된 값으로 어긋나 정작 진짜 도착 시점의 레벨업은 감지되지 않는 버그로 이어졌다.
+  // 렌더 "중에" 상태를 보정하면(React가 공식 지원하는 패턴) 그 부풀려진 첫 번째 커밋 자체가
+  // 아예 생기지 않으므로, 어떤 하위 이펙트도 잘못된 값을 관측할 기회가 없다.
+  // (개발 원칙: 애니메이션과 실제 로직의 순서가 항상 일치해야 한다 — 카드 뽑기 → 동물
+  // 영역으로 도착 → 경험치 반영 → 정산해서 레벨업. CLAUDE.md 참고.)
+  const lastEventsForCreditRef = useRef<ClientGameEvent[] | null>(null);
+  if (lastEvents !== lastEventsForCreditRef.current) {
+    lastEventsForCreditRef.current = lastEvents;
+    const newCredits: Record<string, number> = {};
+    lastEvents.forEach(ev => {
+      if (ev.type === 'collect') {
+        const key = deltaKeyOf(ev.team, ev.animal);
+        newCredits[key] = (newCredits[key] ?? 0) + ev.exp;
+      }
+    });
+    setPendingExpCredit(newCredits);
+  }
+
   // lastEvents가 비어있는 gameState 갱신(최초 입장 · 재접속 스냅샷)은 재생할 애니메이션이
   // 없으므로, 이미 존재하는 카드들을 슬롯머신 연출 없이 즉시 스택에 그대로 노출시킨다.
   // (actionResult로 들어오는 갱신은 항상 최소 1개 이상의 이벤트를 동반하므로 여기 걸리지 않는다.)
@@ -366,14 +393,12 @@ export function useAnimationQueue(
     }, atMs);
   };
 
-  // ⚠️ useEffect가 아니라 useLayoutEffect다 — 반드시 그래야 한다. gameState(서버 진실,
-  // 이미 정산된 exp)와 이 이펙트가 그 exp를 가리는 pendingExpCredit는 같은 커밋에서
-  // 함께 반영되지 않으면, 브라우저가 "이미 오른 exp가 그대로 노출된" 프레임을 먼저
-  // 페인트해버린다 — 그 한 프레임 동안 ScorePanel의 레벨업 감지(prevLevelRef 비교)가
-  // 앞서 실행되어, 카드가 실제로 도착하기도 전에 "Lv UP!"이 먼저 터지는 버그가 났었다.
-  // useLayoutEffect는 DOM 변경 직후·페인트 직전에 동기 실행되므로 그 프레임 자체가
-  // 생기지 않는다. (개발 원칙: 애니메이션과 실제 로직의 순서가 항상 일치해야 한다 —
-  // 카드 뽑기 → 동물 영역으로 도착 → 경험치 반영 → 정산해서 레벨업. CLAUDE.md 참고.)
+  // exp 가림(pendingExpCredit)은 이제 이 이펙트보다 먼저(렌더 도중, 위쪽
+  // lastEventsForCreditRef 블록) 동기 반영되므로 이 이펙트 자체는 useEffect로도
+  // 충분하다 — 다만 턴 전환(pendingFlipRef → flushSync) 등 다른 타이밍에도 이미
+  // 문제없이 검증된 useLayoutEffect를 그대로 유지한다(불필요한 위험 회피).
+  // (개발 원칙: 애니메이션과 실제 로직의 순서가 항상 일치해야 한다 — 카드 뽑기 →
+  // 동물 영역으로 도착 → 경험치 반영 → 정산해서 레벨업. CLAUDE.md 참고.)
   useLayoutEffect(() => {
     if (lastEvents.length === 0) return;
 
@@ -422,9 +447,8 @@ export function useAnimationQueue(
     setShakingPile(null);
     setNewCardId(null);
     setDecisiveHit(null);
-    // 이전 액션이 아직 다 못 보여준 "도착 전 가림"이 있었다면 여기서 전부 걷는다 —
-    // 서버 상태는 이미 그 값을 포함해 최신이므로 실제 값보다 낮아지는 일은 없다.
-    setPendingExpCredit({});
+    // pendingExpCredit는 이제 이 이펙트가 아니라 렌더 도중(위쪽 lastEventsForCreditRef
+    // 블록)에 이미 이번 액션의 정답값으로 동기 반영돼 있다 — 여기서 다시 건드리지 않는다.
 
     // 이번 액션의 정산 연출이 끝날 때까지는 화면상 "행동한 팀"의 턴으로 유지한다.
     setIsSettling(true);
@@ -753,9 +777,9 @@ export function useAnimationQueue(
           });
 
           // 서버 exp에는 이 페어의 exp가 이미 반영돼 있다 — 카드가 실제로 도착할 때까지는
-          // 그만큼을 화면에서 가려서 보여준다(진짜 값은 항상 gameState 그대로이므로, 이
-          // 가림이 중간에 취소돼도 표시값이 실제보다 낮아지거나 음수가 되는 일은 없다).
-          setPendingExpCredit(prev => ({ ...prev, [flashKey]: exp }));
+          // 그만큼을 화면에서 가려서 보여준다. 이 가림(exp 크레딧)은 렌더 도중(위쪽
+          // lastEventsForCreditRef 블록)에 이미 동기적으로 걸려 있으므로 여기서는 다시
+          // 걸지 않는다 — 아래에서는 도착 시점에 그 가림을 걷는 것만 담당한다.
 
           // 1) 카드가 스택에 다 모인 뒤, 짝이 맞았는지 "확인하듯" 스택 전체가 흔들린다.
           sched(() => {
