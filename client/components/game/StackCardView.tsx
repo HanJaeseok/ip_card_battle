@@ -71,7 +71,11 @@ export function StackCardView({
       className={`stack-card card-shadow ${flingClass} ${shakeClass} ${isNew ? 'stack-card-new' : ''}`}
       style={{ zIndex: index, marginLeft: index === 0 ? 0 : -46, ...flingVars }}
     >
-      <img src={`/emoticon/${card.animal}_focus.png`} alt={card.animal} className="w-12 h-12 object-contain" />
+      <img
+        src={`/emoticon/${card.animal}_focus.png`}
+        alt={card.animal}
+        className="w-[68%] h-auto object-contain"
+      />
       <span className="text-2xl font-black text-jungle-900 tabular-nums">{card.num}</span>
     </div>
   );

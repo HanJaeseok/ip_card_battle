@@ -57,7 +57,10 @@ export function processSkillChoice(
  * 이미 "시간 초과로..." 해설을 내보내므로, 여기서 또 "다음 기회를 노리기로 했습니다"를
  * 중복으로 보여주지 않기 위해서다(클라이언트는 auto인 skillPassed를 해설판에 표시하지 않는다).
  */
-export function processPass(state: GameState, auto = false): { state: GameState; events: GameEvent[] } {
+export function processPass(
+  state: GameState,
+  auto = false,
+): { state: GameState; events: GameEvent[] } {
   if (state.phase !== 'playing' || state.pendingChoice === null) return { state, events: [] };
 
   const team = state.pendingChoice;

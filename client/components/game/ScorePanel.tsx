@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Animal, ClientGameState, Team } from 'shared';
 import { ANIMALS, THRESHOLDS } from 'shared';
-import { previewSkill } from '@/lib/skills';
-import { SKILL_TITLE, describeSkill } from '@/lib/skillInfo';
+import { SKILL_TITLE, describeSkillShort } from '@/lib/skillInfo';
 
-// ── 동물별 표 — 아이콘 | 경험치, 그 아래 경험치 바 + 레벨 ─────────────────────
-// 마우스를 올리면 해당 동물 행동의 설명과, 지금 고른다면 얻을 기댓값을 미리 보여준다.
+// ── 동물별 표 — 왼쪽팀은 [얼굴|경험치 현황|레벨], 오른쪽팀은 [레벨|경험치 현황|얼굴]로
+// 좌우 대칭 배치한다. 마우스를 올리면 해당 동물 행동의 한 줄 요약을 미리 보여준다.
 function AnimalTable({
   animal,
   exp,
@@ -23,6 +22,7 @@ function AnimalTable({
   gameState: ClientGameState;
   team: Team;
 }) {
+  const isTeamB = team === 'B';
   const threshold = THRESHOLDS[animal];
   const level = Math.floor(exp / threshold);
   // 분자는 "이번 레벨 안에서 쌓은 만큼"만 보여준다 — 누적 총량을 그대로 쓰면 레벨이
@@ -30,9 +30,8 @@ function AnimalTable({
   // 헷갈렸다. 레벨업 직후에는 항상 0으로 시작한다.
   const expInLevel = exp % threshold;
   const progressPct = (expInLevel / threshold) * 100;
-  const preview = previewSkill(gameState, team, animal);
-  const hasEffect = preview.myHpDelta > 0 || preview.oppHpDelta < 0 || preview.extraDraws > 0;
   const multiplier = gameState.teams[team].pendingMultiplier;
+  const extraDraws = gameState.teams[team].pendingExtraDraws;
 
   // 팀 패널이 overflow-y-auto라 absolute 툴팁은 스크롤 영역에 잘려 보이지 않는다.
   // 마우스를 올린 카드의 위치를 직접 측정해 position:fixed로 화면 위에 그린다.
@@ -56,60 +55,86 @@ function AnimalTable({
     prevLevelRef.current = level;
   }, [level]);
 
+  const face = (
+    <div className="w-16 h-16 shrink-0 flex items-center justify-center">
+      <img
+        src={`/emoticon/${animal}_${level > 0 ? 'happy' : 'focus'}.png`}
+        alt={animal}
+        className="w-full h-full object-contain"
+      />
+    </div>
+  );
+
+  // 레벨 영역은 글자 주변만이 아니라 이 칸에 배정된 공간 전체(위아래 끝까지)를
+  // 옅게 다른 색으로 채워, 얼굴/경험치와 시각적으로 확실히 구분되는 하나의 구역처럼 보이게 한다.
+  const levelBadge = (
+    <div className="self-stretch shrink-0 flex flex-col items-center justify-center gap-0 px-2.5 bg-jungle-100 rounded-md">
+      <span className="text-[0.65rem] font-bold text-jungle-500 leading-none">Lv.</span>
+      <span className="text-2xl font-black text-jungle-700 leading-none tabular-nums">{level}</span>
+    </div>
+  );
+
   return (
-    <div
-      data-team-score-row={`${team}:${animal}`}
-      className={`relative flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col ${
-        isLevelUp ? 'level-up-shake' : ''
-      }`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setTooltipPos(null)}
-    >
-      {/* 디자인어(인어)가 쌓아둔 대기 배율 — 스티커처럼 인어 칸 모서리에 크게 붙인다.
-          상대도 볼 수 있어야 견제 판단이 가능해 팀 여부와 무관하게 보인다. */}
+    // 스티커(인어 배율·양 예약 뽑기)는 이 바깥 래퍼에 그린다 — 안쪽 박스는 모서리를
+    // 둥글게 다듬으려고 overflow-hidden을 쓰는데, 스티커는 그 박스 밖으로 일부러
+    // 삐져나오게 디자인돼 있어 안쪽에 두면 튀어나온 부분이 그대로 잘려 보인다.
+    <div data-team-score-row={`${team}:${animal}`} className="relative flex-1 min-h-0">
       {animal === 'mermaid' && multiplier > 1 && (
-        <span className="mermaid-multiplier-sticker">×{multiplier}</span>
+        <span
+          className="mermaid-multiplier-sticker"
+          style={isTeamB ? { left: 'auto', right: '-0.4rem' } : undefined}
+        >
+          ×{multiplier}
+        </span>
       )}
-      <div className="flex items-stretch flex-1 min-h-0">
-        <div className="flex items-center justify-center px-2 py-1 flex-1 min-w-0">
-          <img
-            src={`/emoticon/${animal}_${level > 0 ? 'happy' : 'focus'}.png`}
-            alt={animal}
-            className="w-16 h-16 object-contain"
-          />
-        </div>
-        <div className="border-l border-gray-200 px-3 py-1 flex flex-col items-center justify-center gap-1 min-w-[4.75rem]">
+      {animal === 'sheep' && extraDraws > 0 && (
+        <span
+          className="sheep-extra-draws-sticker"
+          style={isTeamB ? { left: 'auto', right: '-0.4rem' } : undefined}
+          title="다음 내 턴에 예약된 추가 뽑기"
+        >
+          +{extraDraws}
+        </span>
+      )}
+
+      <div
+        className={`h-full border border-gray-200 rounded-lg overflow-hidden bg-white flex items-center gap-2 px-2 ${
+          isLevelUp ? 'level-up-shake' : ''
+        }`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setTooltipPos(null)}
+      >
+        {isTeamB ? levelBadge : face}
+
+        <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
           <p
-            className={`font-extrabold text-jungle-900 tabular-nums leading-tight ${isPopping ? 'score-pop' : ''}`}
+            className={`font-extrabold text-jungle-900 tabular-nums leading-tight text-lg ${isPopping ? 'score-pop' : ''}`}
             style={isFlashing ? { color: '#22c55e' } : undefined}
           >
-            <span className="text-2xl">{expInLevel}</span>
-            <span className="text-xs font-semibold text-jungle-400 ml-0.5">/{threshold}</span>
+            {expInLevel}<span className="text-xs font-semibold text-jungle-400 ml-0.5">/{threshold}</span>
           </p>
-          {/* 분수 아래 남는 공간을 활용 — 레벨을 여기로 올려 훨씬 크고 눈에 띄게 한다 */}
-          <p className="text-xl font-black text-jungle-600 leading-none">Lv.{level}</p>
+          <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-jungle-500 transition-[width] duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
         </div>
-      </div>
-      <div className="px-2 pb-1.5 pt-1 shrink-0">
-        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-jungle-500 transition-[width] duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
+
+        {isTeamB ? face : levelBadge}
+
+        {/* 레벨업 강조 — 불꽃 + 위 화살표가 짧고 강렬하게 튀어오른다 */}
+        {isLevelUp && (
+          <div className="level-up-burst absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+            <span className="level-up-text">🔥⬆️ Lv UP!</span>
+          </div>
+        )}
       </div>
 
-      {/* 레벨업 강조 — 불꽃 + 위 화살표가 짧고 강렬하게 튀어오른다 */}
-      {isLevelUp && (
-        <div className="level-up-burst absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <span className="level-up-text">🔥⬆️ Lv UP!</span>
-        </div>
-      )}
-
-      {/* 호버 툴팁 — 행동 설명 + 지금 고르면 얻을 기댓값 */}
+      {/* 호버 툴팁 — 행동의 한 줄 요약 */}
       {tooltipPos && (
         <div
-          className="w-56 pointer-events-none"
+          className="w-72 pointer-events-none"
           style={{
             position: 'fixed',
             left: tooltipPos.x,
@@ -118,16 +143,9 @@ function AnimalTable({
             zIndex: 100,
           }}
         >
-          <div className="bg-jungle-950 text-white text-xs rounded-lg px-3 py-2 shadow-xl text-center">
-            <p className="font-bold mb-1">{SKILL_TITLE[animal]} (Lv. {level})</p>
-            <p className="leading-relaxed text-jungle-100">{describeSkill(animal, level, multiplier)}</p>
-            <p className={`mt-1 font-bold ${hasEffect ? 'text-amber-300' : 'text-gray-400'}`}>
-              {preview.extraDraws > 0 && `다음 턴 카드 +${preview.extraDraws}회`}
-              {preview.myHpDelta > 0 && `체력 +${preview.myHpDelta}`}
-              {preview.oppHpDelta < 0 && `상대 체력 ${preview.oppHpDelta}`}
-              {animal === 'mermaid' && preview.level > 0 && `다음 행동 ×${preview.multiplierAfter}`}
-              {!hasEffect && animal !== 'mermaid' && '아직 레벨 0 (효과 없음)'}
-            </p>
+          <div className="bg-jungle-950 text-white rounded-lg px-4 py-3 shadow-xl text-center">
+            <p className="font-bold text-lg mb-1.5">{SKILL_TITLE[animal]} (Lv. {level})</p>
+            <p className="leading-relaxed text-base text-jungle-100">{describeSkillShort(animal, level)}</p>
           </div>
         </div>
       )}

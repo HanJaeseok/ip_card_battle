@@ -1,20 +1,22 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { WOOL_BALL_DUR as WOOL_DUR } from '@/lib/drawTiming';
-import type { WoolBallItem } from '@/hooks/useAnimationQueue';
+import { WOOL_BALL_DUR as ACORN_DUR } from '@/lib/drawTiming';
+import type { AcornBallItem } from '@/hooks/useAnimationQueue';
 
-export function WoolBallLayer({ items }: { items: WoolBallItem[] }) {
+// 도토리 축제 랜덤 뽑기 — 실용신양의 예약 뽑기(WoolBallLayer, 🐑)와 완전히 같은 방식으로
+// 발동한 그 팀 프로필에서 장소로 도토리(🌰)가 날아가 찍는다.
+export function AcornBallLayer({ items }: { items: AcornBallItem[] }) {
   return (
     <>
       {items.map(item => (
-        <WoolBall key={item.id} item={item} />
+        <AcornBall key={item.id} item={item} />
       ))}
     </>
   );
 }
 
-function WoolBall({ item }: { item: WoolBallItem }) {
+function AcornBall({ item }: { item: AcornBallItem }) {
   const [pos, setPos] = useState<{ x: number; y: number; tx: number; ty: number } | null>(null);
   const [flying, setFlying] = useState(false);
 
@@ -45,16 +47,16 @@ function WoolBall({ item }: { item: WoolBallItem }) {
         left: pos.tx,
         top: pos.ty,
         opacity: 0,
-        transition: `left ${WOOL_DUR}ms ease-in-out, top ${WOOL_DUR}ms ease-in-out, opacity ${WOOL_DUR}ms ease-in`,
+        transition: `left ${ACORN_DUR}ms ease-in-out, top ${ACORN_DUR}ms ease-in-out, opacity ${ACORN_DUR}ms ease-in`,
       }
     : { left: pos.x, top: pos.y, opacity: 1 };
 
   return (
     <span
-      className="wool-ball"
+      className="acorn-ball"
       style={{ position: 'fixed', transform: 'translate(-50%, -50%)', zIndex: 57, ...style }}
     >
-      🐑
+      🌰
     </span>
   );
 }

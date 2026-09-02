@@ -274,9 +274,12 @@ const RULE_FIELDS: {
   key: keyof GameSettings;
   label: string;
   suffix: string;
+  hint?: string;
 }[] = [
   { key: 'targetScore', label: '목표 점수', suffix: '점' },
   { key: 'festivalTurn', label: '도토리 축제 시작 턴', suffix: '턴' },
+  { key: 'festivalDrawCount', label: '도토리 뽑기 횟수', suffix: '회' },
+  { key: 'festivalDrawIncreaseInterval', label: '뽑기 증가 주기', suffix: '턴', hint: '999 = 재발동 없음' },
   { key: 'drawTimeSec', label: '동물 뽑기 제한시간', suffix: '초' },
   { key: 'actionTimeSec', label: '행동 선택 제한시간', suffix: '초' },
   { key: 'noActionTimeSec', label: '행동할 게 없을 때 제한시간', suffix: '초' },
@@ -304,29 +307,32 @@ function GameRulesFields({
       </button>
       {open && (
         <div className="px-3 pb-3 flex flex-col gap-2 border-t border-gray-100 pt-2">
-          {RULE_FIELDS.map(({ key, label, suffix }) => {
+          {RULE_FIELDS.map(({ key, label, suffix, hint }) => {
             const { min, max } = SETTINGS_LIMITS[key];
             return (
-              <div key={key} className="flex items-center justify-between gap-2 text-sm">
-                <label className="text-gray-500">{label}</label>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min={min}
-                    max={max}
-                    value={settings[key]}
-                    onChange={e => {
-                      const v = Number(e.target.value);
-                      onChange({ ...settings, [key]: Number.isFinite(v) ? v : DEFAULT_SETTINGS[key] });
-                    }}
-                    onBlur={e => {
-                      const v = Math.min(max, Math.max(min, Math.round(Number(e.target.value) || DEFAULT_SETTINGS[key])));
-                      onChange({ ...settings, [key]: v });
-                    }}
-                    className="input-base w-20 text-right"
-                  />
-                  <span className="text-gray-400 w-4">{suffix}</span>
+              <div key={key} className="flex flex-col gap-0.5">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <label className="text-gray-500">{label}</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={min}
+                      max={max}
+                      value={settings[key]}
+                      onChange={e => {
+                        const v = Number(e.target.value);
+                        onChange({ ...settings, [key]: Number.isFinite(v) ? v : DEFAULT_SETTINGS[key] });
+                      }}
+                      onBlur={e => {
+                        const v = Math.min(max, Math.max(min, Math.round(Number(e.target.value) || DEFAULT_SETTINGS[key])));
+                        onChange({ ...settings, [key]: v });
+                      }}
+                      className="input-base w-20 text-right"
+                    />
+                    <span className="text-gray-400 w-4">{suffix}</span>
+                  </div>
                 </div>
+                {hint && <p className="text-[0.65rem] text-gray-400 text-right">{hint}</p>}
               </div>
             );
           })}
@@ -365,7 +371,7 @@ function WaitingRoom({
 
       <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1 justify-center">
         <span>🎯 목표 {settings.targetScore}점</span>
-        <span>🌰 축제 {settings.festivalTurn}턴부터</span>
+        <span>🌰 축제 {settings.festivalTurn}턴부터 (뽑기 {settings.festivalDrawCount}회)</span>
         <span>⏳ 뽑기 {settings.drawTimeSec}초</span>
         <span>⏳ 행동 {settings.actionTimeSec}초</span>
       </div>

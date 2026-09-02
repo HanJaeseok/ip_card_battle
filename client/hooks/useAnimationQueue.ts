@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { Animal, ClientGameEvent, ClientGameState, Place, StackedCard, Team } from 'shared';
 import { ANIMALS } from 'shared';
@@ -64,8 +64,7 @@ export interface SheepProgress {
 
 export interface RabbitFlight {
   id: number;
-  team: Team;
-  count: number; // 날아가는 토끼 아이콘 개수(획득 체력 자릿수)
+  team: Team; // 이 팀 체력 쪽으로 토끼떼(RabbitFlightLayer가 고정 개수로 그린다)가 달려간다
 }
 
 export interface RabbitPressure {
@@ -109,9 +108,15 @@ export interface WoolBallItem {
   place: Place;
 }
 
-export interface DoubleBurstItem {
+export interface AcornBallItem {
   id: number;
-  animal: Animal; // 축제 중 페어 경험치가 2배로 붙을 때, 도토리 폭죽이 터질 위치(그 동물 스택)
+  team: Team;
+  place: Place; // 도토리 축제 랜덤 뽑기 — 실용신양(WoolBallItem)과 동일하게 그 팀 프로필에서 장소로 날아간다
+}
+
+export interface FestivalLoaded {
+  id: number;
+  count: number; // 도토리 축제 랜덤 뽑기가 이번에 몇 회 발동했는지
 }
 
 export interface ShakingPile {
@@ -153,7 +158,8 @@ export interface AnimationState {
   placeFocusBursts: PlaceFocusItem[];
   drawSlots: DrawSlotItem[];
   woolBalls: WoolBallItem[];
-  pairDoubleBursts: DoubleBurstItem[]; // 축제 중 페어 경험치가 2배로 붙을 때의 작은 도토리 축하 폭죽
+  acornBalls: AcornBallItem[]; // 도토리 축제 랜덤 뽑기 — 보드 중앙에서 장소로 날아가는 도토리
+  festivalLoaded: FestivalLoaded | null; // "도토리 축제 효과! 랜덤 뽑기 N회!" 예고 배너
   collectingCardIds: ReadonlySet<number>; // 수집되어 날아가는 중이라 아직 화면에 남겨야 하는 카드
   shakingPile: ShakingPile | null; // 정산 직전 "확인" 흔들림이 재생 중인 동물 스택
   newCardId: number | null; // 방금 스택에 추가된 카드 (팝인 강조용)
@@ -187,9 +193,8 @@ const EMOTICON_DUR = 2000;
 const TIGER_RECOIL_DUR = 500;
 const TIGER_HIT_DUR = 900;
 const MERMAID_POPUP_DUR = 2000;
-const RABBIT_FLIGHT_DUR = 900;
+const RABBIT_FLIGHT_DUR = 1100; // 최대 출발 지연(400ms) + 비행 애니메이션(650ms)보다 여유 있게
 const RABBIT_PRESSURE_DUR = 700;
-const DOUBLE_BURST_DUR = 700; // .bomb-acorn CSS 지속시간(700ms)과 맞춘다
 const FESTIVAL_BURST_DUR = 2000;
 const DECISIVE_HIT_DUR = 1800;
 
@@ -222,7 +227,8 @@ export function useAnimationQueue(
   const [placeFocusBursts, setPlaceFocusBursts] = useState<PlaceFocusItem[]>([]);
   const [drawSlots, setDrawSlots] = useState<DrawSlotItem[]>([]);
   const [woolBalls, setWoolBalls] = useState<WoolBallItem[]>([]);
-  const [pairDoubleBursts, setPairDoubleBursts] = useState<DoubleBurstItem[]>([]);
+  const [acornBalls, setAcornBalls] = useState<AcornBallItem[]>([]);
+  const [festivalLoaded, setFestivalLoaded] = useState<FestivalLoaded | null>(null);
   const [collectingCardIds, setCollectingCardIds] = useState<ReadonlySet<number>>(EMPTY_ID_SET);
   const [shakingPile, setShakingPile] = useState<ShakingPile | null>(null);
   const [newCardId, setNewCardId] = useState<number | null>(null);
@@ -360,7 +366,15 @@ export function useAnimationQueue(
     }, atMs);
   };
 
-  useEffect(() => {
+  // ⚠️ useEffect가 아니라 useLayoutEffect다 — 반드시 그래야 한다. gameState(서버 진실,
+  // 이미 정산된 exp)와 이 이펙트가 그 exp를 가리는 pendingExpCredit는 같은 커밋에서
+  // 함께 반영되지 않으면, 브라우저가 "이미 오른 exp가 그대로 노출된" 프레임을 먼저
+  // 페인트해버린다 — 그 한 프레임 동안 ScorePanel의 레벨업 감지(prevLevelRef 비교)가
+  // 앞서 실행되어, 카드가 실제로 도착하기도 전에 "Lv UP!"이 먼저 터지는 버그가 났었다.
+  // useLayoutEffect는 DOM 변경 직후·페인트 직전에 동기 실행되므로 그 프레임 자체가
+  // 생기지 않는다. (개발 원칙: 애니메이션과 실제 로직의 순서가 항상 일치해야 한다 —
+  // 카드 뽑기 → 동물 영역으로 도착 → 경험치 반영 → 정산해서 레벨업. CLAUDE.md 참고.)
+  useLayoutEffect(() => {
     if (lastEvents.length === 0) return;
 
     // 이전 액션의 턴 전환이 아직 실행되지 못한 채 이번 액션이 도착했다면, 아래에서
@@ -404,7 +418,7 @@ export function useAnimationQueue(
     setCaptions([]);
     setDrawSlots([]);
     setWoolBalls([]);
-    setPairDoubleBursts([]);
+    setAcornBalls([]);
     setShakingPile(null);
     setNewCardId(null);
     setDecisiveHit(null);
@@ -482,12 +496,17 @@ export function useAnimationQueue(
         if (ev.type === 'collect') {
           newLines.push({
             team: ev.team,
-            text: `${teamLabel(ev.team)} ${ANIMAL_INFO[ev.animal].emoji} ${ANIMAL_INFO[ev.animal].name} 경험치 +${ev.exp}!${ev.doubled ? ' (축제 ×2!)' : ''}`,
+            text: `${teamLabel(ev.team)} ${ANIMAL_INFO[ev.animal].emoji} ${ANIMAL_INFO[ev.animal].name} 경험치 +${ev.exp}!`,
           });
         } else if (ev.type === 'bonusDraws') {
           newLines.push({
             team: ev.team,
             text: `${teamLabel(ev.team)} 예약된 카드 ${ev.count}장 뽑기!`,
+          });
+        } else if (ev.type === 'festivalDraws') {
+          newLines.push({
+            team: ev.team,
+            text: `${teamLabel(ev.team)} 🌰 도토리 축제 효과! 랜덤 뽑기 ${ev.count}회!`,
           });
         } else if (ev.type === 'skillApplied' && ev.level > 0) {
           const parts: string[] = [
@@ -504,7 +523,7 @@ export function useAnimationQueue(
         } else if (ev.type === 'skillPassed' && !ev.auto) {
           newLines.push({ team: ev.team, text: `${teamLabel(ev.team)} 다음 기회를 노리기로 했습니다.` });
         } else if (ev.type === 'festival') {
-          newLines.push({ team: null, text: '🌰 축제 시작!! 이제부터 페어 경험치가 2배입니다.' });
+          newLines.push({ team: null, text: '🌰 도토리 축제 시작!!' });
         } else if (ev.type === 'timeoutChoice') {
           newLines.push({
             team: null,
@@ -532,23 +551,44 @@ export function useAnimationQueue(
       }
     }
 
-    // ── Pass 1: 뽑기(draw) + 예약된 추가 뽑기(bonusDraws) 애니메이션 ────────
+    // ── Pass 1: 뽑기(draw) + 예약된 추가 뽑기(bonusDraws=실용신양, festivalDraws=도토리 축제) 애니메이션 ────────
+    // 도토리 축제 랜덤 뽑기는 실용신양과 완전히 동일한 방식(장소 클릭 시 예약분을 먼저
+    // 소모)으로 동작한다(server/engine/drawCard.ts) — 한 액션 안에서 festivalDraws가
+    // 먼저, 그 다음 bonusDraws가 소모되므로 두 롤이 동시에 진행 중일 수는 없다.
     let cursor = 0;
     let bonusRollTeam: Team | null = null;
     let bonusRollRemaining = 0;
     let bonusRollIdx = 0;
     let bonusRollTotal = 0;
+    let festivalRollTeam: Team | null = null;
+    let festivalRollRemaining = 0;
+    let festivalRollIdx = 0;
     let comboCounter = 0;
     let lastDrawEndCursor = 0;
 
     for (const ev of lastEvents) {
       if (ev.type === 'draw') {
-        const inRoll = bonusRollRemaining > 0;
+        const inFestivalRoll = festivalRollRemaining > 0;
+        const inSheepRoll = !inFestivalRoll && bonusRollRemaining > 0;
+        const inRoll = inFestivalRoll || inSheepRoll;
         const triggerAt = cursor;
+        let rollIdx = 0;
 
-        if (inRoll) {
+        if (inFestivalRoll) {
+          festivalRollRemaining--;
+          festivalRollIdx++;
+          rollIdx = festivalRollIdx;
+          const team = festivalRollTeam!;
+          const place = ev.place;
+          const ballId = ++floatIdCounter;
+          sched(() => {
+            setAcornBalls(prev => [...prev, { id: ballId, team, place }]);
+            sched(() => setAcornBalls(prev => prev.filter(b => b.id !== ballId)), WOOL_BALL_DUR);
+          }, triggerAt);
+        } else if (inSheepRoll) {
           bonusRollRemaining--;
           bonusRollIdx++;
+          rollIdx = bonusRollIdx;
           const team = bonusRollTeam!;
           const place = ev.place;
           const ballId = ++floatIdCounter;
@@ -573,7 +613,7 @@ export function useAnimationQueue(
         addPlaceFocus(place, slotAt);
 
         // 슬롯이 뜨고 0.3초 뒤에 card_1/card_2 사운드를 재생한다(스핀 종료까지는 기다리지 않음).
-        const pitch = inRoll ? Math.min(1.35, 1 + (bonusRollIdx - 1) * 0.035) : 1;
+        const pitch = inRoll ? Math.min(1.35, 1 + (rollIdx - 1) * 0.035) : 1;
         sched(() => playRandomSound('card', pitch), slotAt + 300);
 
         sched(() => {
@@ -585,7 +625,7 @@ export function useAnimationQueue(
         if (inRoll) {
           const combo = ++comboCounter;
           const comboId = ++floatIdCounter;
-          const progressTeam = bonusRollTeam!;
+          const progressTeam = bonusRollTeam;
           const progressCurrent = bonusRollIdx;
           const progressTotal = bonusRollTotal;
           sched(() => {
@@ -596,11 +636,15 @@ export function useAnimationQueue(
             setScreenShakeLevel(combo);
             sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
 
-            // 이번 턴에 예약된 추가 뽑기가 몇 번째까지 진행됐는지 계속 갱신해 보여준다.
-            setSheepProgress({ team: progressTeam, current: progressCurrent, total: progressTotal });
+            // 이번 턴에 예약된 추가 뽑기가 몇 번째까지 진행됐는지 계속 갱신해 보여준다
+            // (실용신양 롤일 때만 — 도토리 축제는 별도의 배너(FestivalLoadedBanner)로 알린다).
+            if (inSheepRoll) {
+              setSheepProgress({ team: progressTeam!, current: progressCurrent, total: progressTotal });
+            }
           }, revealAt);
 
-          if (bonusRollRemaining === 0) {
+          const rollFinished = inFestivalRoll ? festivalRollRemaining === 0 : bonusRollRemaining === 0;
+          if (rollFinished) {
             const finalId = ++floatIdCounter;
             sched(() => {
               setMainCombo({ id: finalId, combo });
@@ -642,6 +686,33 @@ export function useAnimationQueue(
         }
         continue;
       }
+
+      if (ev.type === 'festivalDraws') {
+        festivalRollTeam = ev.team;
+        festivalRollRemaining = ev.count;
+        festivalRollIdx = 0;
+
+        if (ev.count >= 5) {
+          const level = ev.count;
+          sched(() => {
+            setLeafParticleCount(level >= 12 ? 8 : 4);
+            sched(() => setLeafParticleCount(0), 3000);
+          }, cursor);
+        }
+
+        // "도토리 축제 효과! 랜덤 뽑기 N회!" — 축제로 예약해둔 뽑기가 지금 소모됨을 예고한다.
+        {
+          const loadedId = ++floatIdCounter;
+          const count = ev.count;
+          sched(() => {
+            setFestivalLoaded({ id: loadedId, count });
+            schedPersistent(() => {
+              setFestivalLoaded(prev => (prev?.id === loadedId ? null : prev));
+            }, SHEEP_LOADED_DUR);
+          }, cursor);
+        }
+        continue;
+      }
     }
 
     // ── Pass 1.5: 짝이 맞아 정산되는 동물들을 순서대로 재생 ─────────────────
@@ -670,7 +741,7 @@ export function useAnimationQueue(
         hasPlayedGroup = true;
 
         for (const ev of group.events) {
-          const { team, animal, exp, cardIds, doubled } = ev;
+          const { team, animal, exp, cardIds } = ev;
           const flashKey = `${team}:${animal}`;
           const flashId = ++floatIdCounter;
           const at = cursor;
@@ -690,14 +761,6 @@ export function useAnimationQueue(
           sched(() => {
             setShakingPile({ id: shakeId, animal });
             sched(() => setShakingPile(prev => (prev?.id === shakeId ? null : prev)), SHAKE_CHECK_DUR);
-
-            // 축제 중이라 경험치가 2배로 붙는 페어라면, 작은 도토리 폭죽으로 축하한다.
-            if (doubled) {
-              const burstId = ++floatIdCounter;
-              setPairDoubleBursts(prev => [...prev, { id: burstId, animal }]);
-              playRandomSound('bomb', 1, 1, 'tiger'); // 전용 효과음이 없으면 특허랑이 사운드로 대체
-              sched(() => setPairDoubleBursts(prev => prev.filter(b => b.id !== burstId)), DOUBLE_BURST_DUR);
-            }
           }, at);
 
           // 2) 흔들기가 끝난 뒤에야 팀 쪽으로 날아가기 시작한다.
@@ -761,13 +824,12 @@ export function useAnimationQueue(
           }
 
           if (animal === 'rabbit') {
-            // 상표토끼 — 카드에서 체력 구슬로 날아가는 토끼 연출
+            // 상표토끼 — 보드 여기저기서 토끼떼가 우르르 체력 구슬로 달려가는 연출
             playRandomSound('rabbit');
             if (myHpDelta > 0) {
               pulseHp(team, 'gain');
-              const digits = String(myHpDelta).length;
               const flightId = ++floatIdCounter;
-              setRabbitFlights(prev => [...prev, { id: flightId, team, count: digits }]);
+              setRabbitFlights(prev => [...prev, { id: flightId, team }]);
               sched(() => setRabbitFlights(prev => prev.filter(f => f.id !== flightId)), RABBIT_FLIGHT_DUR);
               addFloat(`+${myHpDelta}`, team, 'bonus');
 
@@ -787,9 +849,11 @@ export function useAnimationQueue(
             sched(() => {
               setTigerSlash({ onTeam: opp });
               setTigerImpact(true);
+              setScreenShakeLevel(2); // 발톱자국이 슉 그어지는 순간 화면이 짧게 흔들린다
               playRandomSound('tiger');
               sched(() => setTigerSlash(null), TIGER_HIT_DUR);
               sched(() => setTigerImpact(false), 600);
+              sched(() => setScreenShakeLevel(0), SHAKE_PULSE_DUR);
               if (oppHpDelta < 0) {
                 pulseHp(opp, 'loss');
                 if (myHpDelta > 0) pulseHp(team, 'gain');
@@ -797,8 +861,9 @@ export function useAnimationQueue(
               }
             }, TIGER_RECOIL_DUR);
           } else {
-            // 실용신양 — 즉시 체력 변화는 없으므로 담백하게 카드 사운드만
-            playRandomSound('card');
+            // 실용신양 — 즉시 체력 변화는 없지만, "메~"를 한 번만 틀면 임팩트가 약해서
+            // 2~3번 랜덤으로 이어 틀어 존재감을 키운다.
+            playRandomSoundSequence('sheep', 2 + Math.floor(Math.random() * 2), 180, 'card');
           }
         }, at);
 
@@ -826,9 +891,6 @@ export function useAnimationQueue(
         sched(() => setFestivalBurst(false), FESTIVAL_BURST_DUR);
       }, at);
       cursor = at + 700;
-
-      addCaption('이제부터 페어 경험치가 2배!', 'effect', cursor);
-      cursor += 950;
     }
 
     // ── 체력 즉시 승패(gameEnd, reason=knockout)는 마지막에 "결정타!" 강조와 함께 재생한다. ──
@@ -857,6 +919,14 @@ export function useAnimationQueue(
         setDisplayedActivePlayerIndex(latest.activePlayerIndex);
       }
       pendingFlipRef.current = null;
+      // 턴이 실제로 넘어가는 이 시점에는 "방금 맞았다/공격했다" 류의 일회성 타격
+      // 연출이 전부 걷혀 있어야 한다 — 각자 자기 타이머로도 지워지지만, 혹시라도
+      // 늦게 남아있는 게 있다면 여기서 확실하게 마무리한다.
+      setTigerSlash(null);
+      setTigerRecoil(null);
+      setTigerImpact(false);
+      setRabbitPressure(null);
+      setHpPulse(EMPTY_HP_PULSE_MAP);
     }, cursor);
 
     return () => {
@@ -931,7 +1001,8 @@ export function useAnimationQueue(
     placeFocusBursts,
     drawSlots,
     woolBalls,
-    pairDoubleBursts,
+    acornBalls,
+    festivalLoaded,
     collectingCardIds,
     shakingPile,
     newCardId,

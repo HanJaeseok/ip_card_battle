@@ -11,14 +11,12 @@ export function AnimalStackArea({
   shakingPile,
   newCardId,
   isMyTurn,
-  festival,
 }: {
   stackCards: Record<Animal, StackedCard[]>;
   collectingIds: ReadonlySet<number>;
   shakingPile: ShakingPile | null;
   newCardId: number | null;
   isMyTurn: boolean;
-  festival: boolean;
 }) {
   return (
     <div className="flex flex-col gap-2 w-full h-full">
@@ -31,7 +29,6 @@ export function AnimalStackArea({
           isShaking={shakingPile?.animal === animal}
           newCardId={newCardId}
           isMyTurn={isMyTurn}
-          festival={festival}
         />
       ))}
     </div>
@@ -45,7 +42,6 @@ function AnimalStackRow({
   isShaking,
   newCardId,
   isMyTurn,
-  festival,
 }: {
   animal: Animal;
   cards: StackedCard[];
@@ -53,7 +49,6 @@ function AnimalStackRow({
   isShaking: boolean;
   newCardId: number | null;
   isMyTurn: boolean;
-  festival: boolean;
 }) {
   // cards는 이미 "지금 화면에 그려야 하는" 카드만 들어있다(useAnimationQueue의 stackCards).
   // 총합 배지는 실제로 아직 미획득인 카드만 센다 — 이 숫자는 경험치로 들어갈 값이다(점수 아님).
@@ -77,12 +72,9 @@ function AnimalStackRow({
         {total > 0 && (
           <span className="stack-total-badge text-4xl font-black text-jungle-900 tabular-nums">{total}</span>
         )}
-        {festival && total > 0 && <span className="text-[0.6rem] font-bold text-amber-600">×2 축제</span>}
       </div>
       <div className="relative flex items-center flex-1 min-w-0 h-full overflow-visible">
-        {cards.length === 0 ? (
-          <span className="text-xs text-jungle-300">비어 있음</span>
-        ) : (
+        {cards.length > 0 && (
           cards.map((c, i) => (
             <StackCardView
               key={c.id}

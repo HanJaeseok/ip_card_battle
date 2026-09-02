@@ -10,11 +10,16 @@ export const INITIAL_HP = 5;
 export const WIN_HP = 10;
 export const LOSE_HP = 0;
 
-// 축제 시작 턴(기본값) — 이후 모든 페어 수집 경험치가 이 배수만큼 커진다.
-// 방장이 방 생성 시 바꿀 수 있다(GameSettings.festivalTurn) — "축제가 시작되는 첫 턴"이라
-// turn >= festivalTurn으로 판정한다.
+// 축제 시작 턴(기본값) — 방장이 방 생성 시 바꿀 수 있다(GameSettings.festivalTurn) —
+// "축제가 시작되는 첫 턴"이라 turn >= festivalTurn으로 판정한다.
 export const FESTIVAL_TURN = 10;
-export const FESTIVAL_EXP_MULTIPLIER = 2;
+
+// 축제가 열리면 실용신양과 동일한 방식(무작위 장소에서 카드 뽑기)의 "도토리 뽑기"가
+// festivalDrawCount(n)회 발동한다. 이후 festivalDrawIncreaseInterval(k)턴마다
+// 발동 횟수가 n×1 → n×2 → n×3 ... 처럼 등차수열로 늘어난다(server/engine/turnManager.ts
+// 참조). k의 기본값 999는 사실상 "추가 발동 없음"(MAX_TURN을 넘어가므로 재발동하지 않음)을 뜻한다.
+export const DEFAULT_FESTIVAL_DRAW_COUNT = 1;
+export const DEFAULT_FESTIVAL_DRAW_INCREASE_INTERVAL = 999;
 
 // 방장이 방 생성 시 정할 수 있는 게임 규칙의 기본값 — GameSettings 참조.
 // targetScore(목표 점수)의 기본값 5는 "체력 5에서 시작해 10 이상이면 즉시 승리"라는
@@ -29,6 +34,8 @@ export const DEFAULT_NO_ACTION_TIME_SEC = 5;
 export const SETTINGS_LIMITS = {
   targetScore: { min: 1, max: 30 },
   festivalTurn: { min: 1, max: 20 }, // MAX_TURN(20)을 넘기면 축제가 아예 시작되지 않는다
+  festivalDrawCount: { min: 1, max: 20 },
+  festivalDrawIncreaseInterval: { min: 1, max: 999 },
   drawTimeSec: { min: 5, max: 120 },
   actionTimeSec: { min: 5, max: 60 },
   noActionTimeSec: { min: 2, max: 30 },
@@ -37,6 +44,8 @@ export const SETTINGS_LIMITS = {
 export const DEFAULT_SETTINGS = {
   targetScore: DEFAULT_TARGET_SCORE,
   festivalTurn: DEFAULT_FESTIVAL_TURN,
+  festivalDrawCount: DEFAULT_FESTIVAL_DRAW_COUNT,
+  festivalDrawIncreaseInterval: DEFAULT_FESTIVAL_DRAW_INCREASE_INTERVAL,
   drawTimeSec: DEFAULT_DRAW_TIME_SEC,
   actionTimeSec: DEFAULT_ACTION_TIME_SEC,
   noActionTimeSec: DEFAULT_NO_ACTION_TIME_SEC,
@@ -53,6 +62,8 @@ export function clampSettings(input: Partial<typeof DEFAULT_SETTINGS> | undefine
   return {
     targetScore: clamp('targetScore'),
     festivalTurn: clamp('festivalTurn'),
+    festivalDrawCount: clamp('festivalDrawCount'),
+    festivalDrawIncreaseInterval: clamp('festivalDrawIncreaseInterval'),
     drawTimeSec: clamp('drawTimeSec'),
     actionTimeSec: clamp('actionTimeSec'),
     noActionTimeSec: clamp('noActionTimeSec'),

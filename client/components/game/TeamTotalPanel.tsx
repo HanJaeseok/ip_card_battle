@@ -27,7 +27,14 @@ export function TeamTotalPanel({
   const [shards, setShards] = useState<{ dx: number; dy: number }[]>([]);
 
   useEffect(() => {
-    if (!pulse) return;
+    if (!pulse) {
+      // 부모(useAnimationQueue)가 이 팀의 pulse를 먼저 정리해버리면(다음 액션이 예상보다
+      // 빨리 도착하는 등) 여기서도 즉시 걷어내야 한다 — 그렇지 않으면 아래 700ms 타이머가
+      // 이미 취소된 채로 activePulse가 영원히 남아 붉은 금(hp-orb-crack)이 계속 보인다.
+      setActivePulse(null);
+      setShards([]);
+      return;
+    }
     setActivePulse(pulse);
     if (pulse.direction === 'loss') {
       setShards(

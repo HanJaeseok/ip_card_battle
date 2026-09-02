@@ -52,8 +52,8 @@ export function playRandomSound(animal: SoundAnimal, rate = 1, volume = 1, fallb
   playSrc(src, rate, volume);
 }
 
-export function playRandomSoundSequence(animal: SoundAnimal, count: number, intervalMs = 150) {
+export function playRandomSoundSequence(animal: SoundAnimal, count: number, intervalMs = 150, fallback?: SoundAnimal) {
   for (let i = 0; i < count; i++) {
-    setTimeout(() => playRandomSound(animal), i * intervalMs);
+    setTimeout(() => playRandomSound(animal, 1, 1, fallback), i * intervalMs);
   }
 }

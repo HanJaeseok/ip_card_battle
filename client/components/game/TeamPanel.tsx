@@ -1,5 +1,6 @@
 import type { ClientGameState, Team } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
+import { withDisplayedExp } from '@/lib/skills';
 import { PlayerList } from './PlayerList';
 import { ScorePanel } from './ScorePanel';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
@@ -69,7 +70,7 @@ export function TeamPanel({
 
         <ScorePanel
           team={team}
-          gameState={gameState}
+          gameState={withDisplayedExp(gameState, team, animState.displayedExp[team])}
           scoreFlash={animState.scoreFlash}
           displayedExp={animState.displayedExp[team]}
         />

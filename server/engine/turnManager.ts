@@ -54,13 +54,28 @@ export function finishTurn(state: GameState): GameEvent[] {
 }
 
 /**
+ * 도토리 축제 랜덤 뽑기 — settings.festivalTurn에 도달한 턴부터는 "그 턴부터 매 턴 계속"
+ * n회씩 발동한다(한 번 터지고 끝나는 일회성 보너스가 아니다). 그리고 매 턴 같은 n회가
+ * 아니라, settings.festivalDrawIncreaseInterval(k)턴이 지날 때마다 n×1 → n×2 → n×3 ...
+ * 으로 단계가 한 번씩 올라가고, 그 단계의 n×stage가 이후 매 턴 유지된다(디폴트
+ * k=999는 사실상 MAX_TURN 안에서 절대 2단계로 못 올라간다는 뜻일 뿐, n×1회가 festivalTurn
+ * 이후 매 턴 계속 발동하는 것 자체는 기본 설정에서도 그대로 적용된다).
+ */
+function festivalDrawCountAt(turn: number, settings: GameSettings): number {
+  const { festivalTurn, festivalDrawCount, festivalDrawIncreaseInterval } = settings;
+  if (turn < festivalTurn) return 0;
+  const stage = Math.floor((turn - festivalTurn) / festivalDrawIncreaseInterval) + 1;
+  return festivalDrawCount * stage;
+}
+
+/**
  * 턴 종료 처리 — 행동 선택까지 모두 끝난 뒤에만(또는 checkKnockout이 통과한 뒤에만) 호출된다.
  *
  * 순서:
  * 1. 이미 끝난 게임은 절대 되살리지 않는다.
  * 2. 팀 교대 (A→B, B→A)
  * 3. B→A 교대 시 턴 카운터 증가
- * 4. FESTIVAL_TURN 도달 시 축제 진입 (1회) — 이때부터 페어 경험치 2배
+ * 4. FESTIVAL_TURN 도달 시 축제 진입(안내는 1회) + 그 뒤로 매 턴 다음 팀에게 도토리 축제 랜덤 뽑기 예약
  * 5. MAX_TURN 초과 시 체력 비교로 게임 종료
  */
 export function advanceTurn(state: GameState): GameEvent[] {
@@ -79,6 +94,14 @@ export function advanceTurn(state: GameState): GameEvent[] {
     if (!state.festival && state.turn >= state.settings.festivalTurn) {
       state.festival = true;
       events.push({ type: 'festival' });
+    }
+
+    // 도토리 축제 랜덤 뽑기 — 실용신양과 완전히 동일하게, 즉시 뽑지 않고 다음 팀(nextTeam)의
+    // pendingFestivalDraws에 예약해둔다. 실제 뽑기는 그 팀이 다음 장소를 클릭할 때
+    // (server/engine/drawCard.ts) 실행된다. festivalTurn 이후로는 매 턴 계속 예약된다.
+    const drawCount = festivalDrawCountAt(state.turn, state.settings);
+    if (drawCount > 0) {
+      state.teams[nextTeam].pendingFestivalDraws += drawCount;
     }
   }
 
@@ -114,6 +137,7 @@ export function initGame(
     hp: resolvedSettings.targetScore,
     pendingMultiplier: 1,
     pendingExtraDraws: 0,
+    pendingFestivalDraws: 0,
     playerIndex: 0,
     skillStats: {
       sheep: { count: 0, totalLevel: 0, totalHpGained: 0, totalExtraDraws: 0 },

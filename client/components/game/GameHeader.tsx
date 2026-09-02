@@ -47,7 +47,13 @@ export function GameHeader({
   // 도식으로 보여준다. 실제 타이머는 해설판 가운데 오버레이(ActionPrompt)가 담당하므로
   // 여기서는 중복 표시하지 않는다.
   const relativeLabel = myTeam === null ? gameState.teamNames[displayedActiveTeam] : displayedActiveTeam === myTeam ? '우리팀' : '상대팀';
-  const isDrawPhase = !isSettling && gameState.pendingChoice === null;
+  // 서버가 이미 pendingChoice를 세워도(=장소 뽑기 자체는 끝났어도), 카드가 날아가고
+  // 경험치·레벨이 반영되는 정산 연출이 다 끝나기 전까지는 아직 "행동 선택" 단계가
+  // 아니다 — 그 앞 단계(장소 선택)가 마무리되는 그림을 계속 보여준다.
+  const isDrawPhase = gameState.pendingChoice === null;
+  const isChoicePhase = !isDrawPhase && !isSettling;
+  // 지금 장소를 클릭할 팀에게 예약된 도토리 축제 뽑기 수 — "이번에 클릭하면 몇 장이 더 뽑히는지"를 보여준다.
+  const pendingFestivalDraws = gameState.teams[gameState.activeTeam].pendingFestivalDraws;
 
   return (
     <header className="relative bg-jungle-800 text-white px-5 py-2.5 flex items-center shadow-md shrink-0 min-h-[3.25rem]">
@@ -56,21 +62,20 @@ export function GameHeader({
       </div>
 
       {/* 나뭇잎 장식이 화면 좌우 모서리를 가리므로, 턴/단계 표시는 항상 잘 보이도록 중앙에 고정 */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-bold tabular-nums whitespace-nowrap">
-            {gameState.turn} / {MAX_TURN}턴
-          </span>
-          <div className="step-flow flex items-center gap-1.5 px-2 py-1 rounded-full">
-            <span className="text-xs font-bold text-jungle-200 whitespace-nowrap">[{relativeLabel}]</span>
-            <StepPill label="장소 선택" active={isDrawPhase} />
-            <FlowArrow />
-            <StepPill label="행동 선택" active={!isDrawPhase} />
-          </div>
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3">
+        <span className="text-sm font-bold tabular-nums whitespace-nowrap">
+          {gameState.turn} / {MAX_TURN}턴
+        </span>
+        <div className="step-flow flex items-center gap-1.5 px-2 py-1 rounded-full">
+          <span className="text-xs font-bold text-jungle-200 whitespace-nowrap">[{relativeLabel}]</span>
+          <StepPill label="장소 선택" active={isDrawPhase} />
+          <FlowArrow />
+          <StepPill label="행동 선택" active={isChoicePhase} />
         </div>
         {gameState.festival && (
-          <span className="text-xs font-semibold text-amber-300 whitespace-nowrap">
-            🌰 축제! 페어 경험치 2배
+          <span className="festival-header-badge text-xs font-bold whitespace-nowrap">
+            🌰 도토리 축제 진행 중
+            {pendingFestivalDraws > 0 && ` (랜덤 뽑기 +${pendingFestivalDraws}회 추가!)`}
           </span>
         )}
       </div>

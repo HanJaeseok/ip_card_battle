@@ -2,15 +2,17 @@ import { useEffect } from 'react';
 import type { Animal, ClientGameState, Place, Team } from 'shared';
 import { ANIMALS } from 'shared';
 import type { AnimationState } from '@/hooks/useAnimationQueue';
-import { previewSkill } from '@/lib/skills';
+import { previewSkill, withDisplayedExp } from '@/lib/skills';
 import { LeafDecoration } from '@/components/ui/LeafDecoration';
 import { EffectLayer } from '@/components/effects/EffectLayer';
 import { SheepComboLayer } from '@/components/effects/SheepComboLayer';
 import { MainComboBanner } from '@/components/effects/MainComboBanner';
 import { SheepLoadedBanner } from '@/components/effects/SheepLoadedBanner';
+import { FestivalLoadedBanner } from '@/components/effects/FestivalLoadedBanner';
 import { PlayerEmoticonLayer } from '@/components/effects/PlayerEmoticonLayer';
 import { RabbitFlightLayer } from '@/components/effects/RabbitFlightLayer';
 import { DecisiveHitBanner } from '@/components/effects/DecisiveHitBanner';
+import { TigerClawLayer } from '@/components/effects/TigerClawLayer';
 import { GameHeader } from './GameHeader';
 import { TeamPanel } from './TeamPanel';
 import { GameBoard } from './GameBoard';
@@ -57,6 +59,10 @@ export function GameLayout({
   // 내 팀(없으면 A팀) 기준으로 미리보기한다.
   const skillPreviewTeam = myTeam ?? 'A';
   const noEligible = isMyChoiceTurn && ANIMALS.every(a => previewSkill(gameState, skillPreviewTeam, a).level === 0);
+  // 스킬 선택 패널에는 서버가 이미 반영한 진짜 경험치가 아니라, 카드가 팀 영역에 도착하는
+  // 연출이 끝나야 비로소 보여주는 "화면상" 경험치를 기준으로 레벨/기댓값을 계산해 넘긴다 —
+  // 그래야 "카드 도착 → 경험치 반영 → 레벨업"이라는 순서가 화면에서도 지켜진다.
+  const skillPreviewGameState = withDisplayedExp(gameState, skillPreviewTeam, animState.displayedExp[skillPreviewTeam]);
 
   // 게임 템포가 늘어지지 않도록, 고를 수 있는 행동이 하나도 없으면 3초 뒤
   // "아무것도 하지 않음"이 자동으로 눌린 것처럼 처리한다(서버 타이머도 5초로
@@ -117,7 +123,7 @@ export function GameLayout({
             placeFocusBursts={animState.placeFocusBursts}
             drawSlots={animState.drawSlots}
             woolBalls={animState.woolBalls}
-            pairDoubleBursts={animState.pairDoubleBursts}
+            acornBalls={animState.acornBalls}
             collectingCardIds={animState.collectingCardIds}
             shakingPile={animState.shakingPile}
             newCardId={animState.newCardId}
@@ -166,7 +172,7 @@ export function GameLayout({
         </div>
         <div style={{ gridColumn: 2, gridRow: 3 }} className="min-h-0">
           <SkillChoiceBar
-            gameState={gameState}
+            gameState={skillPreviewGameState}
             team={skillPreviewTeam}
             interactive={isMyChoiceTurn}
             onChoose={onChooseSkill}
@@ -192,6 +198,9 @@ export function GameLayout({
       {/* 실용신양 발동 예고 — "예약된 카드 N장 뽑기!" */}
       <SheepLoadedBanner loaded={animState.sheepLoaded} />
 
+      {/* 도토리 축제 랜덤 뽑기 발동 예고 — "도토리 축제 효과! 랜덤 뽑기 N회!" */}
+      <FestivalLoadedBanner loaded={animState.festivalLoaded} />
+
       {/* 예약된 추가 뽑기 콤보 텍스트 (fixed, 화면 전역) */}
       <SheepComboLayer combos={animState.sheepCombos} />
 
@@ -209,6 +218,7 @@ export function GameLayout({
 
       {/* 특허랑이 행동 발동 — 화면 전체가 크게 흔들리는 타격 비네트 */}
       {animState.tigerImpact && <div className="tiger-vignette" />}
+      <TigerClawLayer active={animState.tigerImpact} />
 
       {/* 체력 즉시 승패 — 결정타! 강조 */}
       <DecisiveHitBanner hit={animState.decisiveHit} />

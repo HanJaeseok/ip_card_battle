@@ -1,0 +1,15 @@
+
+> client@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.20.34.171:3000
+✓ Ready in 828ms
+
+○ Compiling / ...
+ GET / 200 in 2.2s (next.js: 2.1s, application-code: 51ms)
+ GET / 200 in 47ms (next.js: 6ms, application-code: 41ms)
+ GET / 200 in 289ms (next.js: 10ms, application-code: 279ms)
+ GET /room/XXQE 200 in 2.8s (next.js: 2.8s, application-code: 44ms)
+ GET /api/sounds 200 in 2.1s (next.js: 2.1s, application-code: 24ms)

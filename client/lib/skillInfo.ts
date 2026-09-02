@@ -15,15 +15,36 @@ export const SKILL_COLOR: Record<Animal, string> = {
   tiger: '#f97316',
 };
 
-export function describeSkill(animal: Animal, level: number, multiplier: number): string {
+export interface SkillDescription {
+  effect: string;      // 2줄: "OO 레벨(N)만큼" + 실제 효과 문장. \n으로 줄바꿈된다.
+  catchphrase: string; // 그 지식재산권을 상징하는 한 줄 — 따옴표는 렌더링하는 쪽에서 씌운다.
+}
+
+// 스킬 선택 패널 본문 — 효과 설명 2줄, 빈 줄, 그 아래 동물 타이틀과 같은 색으로
+// 따옴표를 씌운 캐치프레이즈 순서로 보여준다(렌더링은 SkillChoiceBar 참조).
+export function describeSkill(animal: Animal, level: number): SkillDescription {
   switch (animal) {
     case 'sheep':
-      return `실용신안은 빠르게 등록해 실리를 챙기는 권리! 다음 턴에 카드를 (레벨×배율)회 더 뽑아 기회를 선점합니다. 지금 고르면 ${level}×${multiplier}회.`;
+      return { effect: `양 레벨(${level})만큼\n동물을 더 뽑아 기회를 선점합니다.`, catchphrase: '빠르게 등록해 실리를 챙기는 내 권리!' };
     case 'rabbit':
-      return `상표는 쓸수록 브랜드 가치가 쌓이는 권리! 내 체력이 (레벨×배율)만큼 오릅니다. 지금 고르면 ${level}×${multiplier}.`;
+      return { effect: `토끼 레벨(${level})만큼\n체력이 상승합니다.`, catchphrase: '점점 더 브랜드 가치가 더해진다!' };
     case 'mermaid':
-      return `디자인은 다음 행동을 몇 배로 키워주는 권리! 대기 배율에 2^레벨을 곱합니다(스스로는 소모되지 않고 계속 쌓입니다). 지금 고르면 배율이 ${multiplier}가 됩니다.`;
+      return { effect: `인어 레벨(${level})만큼\n내 다음 효과를 증폭합니다.`, catchphrase: '보기 좋은 떡이 먹기도 좋다!' };
     case 'tiger':
-      return `특허는 독점적 실시를 막는 강력한 권리! 상대 체력을 (레벨×배율)만큼 강탈해 내 체력으로 그대로 가져옵니다 — 상대는 그만큼 잃고, 나는 그만큼 오릅니다(상대가 가진 만큼만). 지금 고르면 ${level}×${multiplier}.`;
+      return { effect: `호랑이 레벨(${level})만큼\n상대 체력을 강탈해옵니다.`, catchphrase: '독점적 실시를 통해 상대를 억제한다!' };
+  }
+}
+
+// 팀 패널 호버 툴팁용 — 한 줄로 압축한 요약(캐치프레이즈 없이 효과만).
+export function describeSkillShort(animal: Animal, level: number): string {
+  switch (animal) {
+    case 'sheep':
+      return `${level}만큼 카드를 더 뽑습니다.`;
+    case 'rabbit':
+      return `${level}만큼 체력을 획득합니다.`;
+    case 'mermaid':
+      return `${level}만큼 다음 효과를 증폭합니다.`;
+    case 'tiger':
+      return `${level}만큼 체력을 강탈해옵니다.`;
   }
 }

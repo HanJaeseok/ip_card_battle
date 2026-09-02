@@ -11,9 +11,8 @@ interface Spot {
   delay: number;
 }
 
-// 축제(8턴) 진입 순간 — 보드 여기저기 15군데에서 도토리가 폭죽처럼 시차를 두고
-// 터지며 "지금부터 페어 경험치가 2배!"라는 축제 시작을 알린다. active가 true로
-// 바뀔 때 한 번만 재생된다.
+// 도토리 축제 시작 순간 — 보드 여기저기 15군데에서 도토리가 폭죽처럼 시차를 두고
+// 터지며 축제 시작을 알린다. active가 true로 바뀔 때 한 번만 재생된다.
 export function FestivalStartBurstLayer({ active }: { active: boolean }) {
   const [spots, setSpots] = useState<Spot[] | null>(null);
 

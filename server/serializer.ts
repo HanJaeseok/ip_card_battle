@@ -39,6 +39,7 @@ export function serializeState(
         hp: state.teams.A.hp,
         pendingMultiplier: state.teams.A.pendingMultiplier,
         pendingExtraDraws: state.teams.A.pendingExtraDraws,
+        pendingFestivalDraws: state.teams.A.pendingFestivalDraws,
         playerIndex: state.teams.A.playerIndex,
         skillStats: {
           sheep: { ...state.teams.A.skillStats.sheep },
@@ -53,6 +54,7 @@ export function serializeState(
         hp: state.teams.B.hp,
         pendingMultiplier: state.teams.B.pendingMultiplier,
         pendingExtraDraws: state.teams.B.pendingExtraDraws,
+        pendingFestivalDraws: state.teams.B.pendingFestivalDraws,
         playerIndex: state.teams.B.playerIndex,
         skillStats: {
           sheep: { ...state.teams.B.skillStats.sheep },

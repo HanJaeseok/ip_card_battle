@@ -19,7 +19,7 @@ function stackedCard(animal: Animal, num: CardNum): StackedCard {
 describe('홀수 잔류', () => {
   it('3장 스택 시 아무것도 수집하지 않음', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.stacks.rabbit.push(stackedCard('rabbit', 3), stackedCard('rabbit', 2));
+    state.stacks.rabbit.push(stackedCard('rabbit', 7), stackedCard('rabbit', 6));
     // house = [rabbit, sheep] — rng0는 항상 0번째(rabbit)를 뽑는다
     drawCard(state, 'house', rng0);
     // 2장 + 1장 = 3장(홀수) → 수집 없음
@@ -29,25 +29,25 @@ describe('홀수 잔류', () => {
 
   it('짝수(2장) 스택 시 즉시 수집 — 경험치만 오르고 체력은 그대로다', () => {
     const state = initGame(['A1'], ['B1'], rng0);
-    state.stacks.tiger.push(stackedCard('tiger', 4));
+    state.stacks.tiger.push(stackedCard('tiger', 6));
     // dock = [mermaid, tiger] — rngLast는 항상 마지막(tiger)을 뽑는다
     drawCard(state, 'dock', rngLast);
-    // dock은 2종 장소라 새로 뽑히는 카드 숫자는 1~5 중 rngLast로 고정된 5 → 기존 4 + 새 5 = 9
-    expect(state.teams['A'].exp.tiger).toBe(9);
+    // dock은 2종 장소라 새로 뽑히는 카드 숫자는 5~10 중 rngLast로 고정된 10 → 기존 6 + 새 10 = 16
+    expect(state.teams['A'].exp.tiger).toBe(16);
     expect(state.stacks.tiger.every(c => c.collectedBy === 'A')).toBe(true);
     // 규칙 1의 핵심: 카드 숫자 합은 절대 체력(=점수)이 되지 않는다.
     expect(state.teams['A'].hp).toBe(INITIAL_HP);
   });
 
-  it('축제 중에는 페어 경험치가 2배로 붙는다', () => {
+  it('축제 중이어도 페어 경험치는 배가되지 않는다(카드 숫자 합 그대로)', () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.festival = true;
-    state.stacks.tiger.push(stackedCard('tiger', 4));
-    const events = drawCard(state, 'dock', rngLast); // base 4+5=9 → 축제로 18
+    state.stacks.tiger.push(stackedCard('tiger', 6));
+    const events = drawCard(state, 'dock', rngLast); // 6 + 10 = 16, 배가 없음
 
-    expect(state.teams['A'].exp.tiger).toBe(18);
+    expect(state.teams['A'].exp.tiger).toBe(16);
     const collectEv = events.find(e => e.type === 'collect');
-    expect(collectEv).toMatchObject({ type: 'collect', animal: 'tiger', exp: 18, baseExp: 9, doubled: true });
+    expect(collectEv).toMatchObject({ type: 'collect', animal: 'tiger', exp: 16 });
   });
 });
 
@@ -278,7 +278,7 @@ describe('턴 진행', () => {
     expect(state.activeTeam).toBe('A');
   });
 
-  it(`${FESTIVAL_TURN}턴 진입 시 축제가 한 번만 시작된다`, () => {
+  it(`${FESTIVAL_TURN}턴 진입 시 축제가 시작되고(안내는 한 번만), 그 뒤로는 매 턴 계속 도토리 뽑기가 예약된다(기본 설정 n=1)`, () => {
     const state = initGame(['A1'], ['B1'], rng0);
     state.turn = FESTIVAL_TURN - 1;
     state.activeTeam = 'B';
@@ -286,11 +286,110 @@ describe('턴 진행', () => {
     expect(state.turn).toBe(FESTIVAL_TURN);
     expect(state.festival).toBe(true);
     expect(events.filter(e => e.type === 'festival')).toHaveLength(1);
+    // 실행 자체는 즉시 일어나지 않는다 — 실용신양과 동일하게, 다음 팀(A)에게 예약만 해둔다.
+    expect(events.some(e => e.type === 'festivalDraws')).toBe(false);
+    expect(events.some(e => e.type === 'draw')).toBe(false);
+    expect(state.teams.A.pendingFestivalDraws).toBe(1);
 
-    // 이후 B팀 턴이 다시 와도 재발동하지 않는다
+    // 축제는 한 번 터지고 끝나는 이벤트가 아니다 — 다음 턴에도 계속 예약된다(안내 자막만 1회).
     state.activeTeam = 'B';
     const events2 = advanceTurn(state);
     expect(events2.some(e => e.type === 'festival')).toBe(false);
+    expect(state.teams.A.pendingFestivalDraws).toBe(2); // 1(이전) + 1(이번) 누적
+  });
+});
+
+// ─── 도토리 축제 랜덤 뽑기 (festivalTurn부터 매 턴 계속, k턴마다 단계가 올라 n×1→n×2→n×3...) ──
+describe('도토리 축제 랜덤 뽑기', () => {
+  it('festivalTurn부터 매 턴 계속 예약되고, k턴마다 단계가 올라 매 턴 예약 수가 n×1→n×2→n×3으로 늘어난다', () => {
+    const state = initGame(['A1'], ['B1'], rng0, {
+      festivalTurn: 3,
+      festivalDrawCount: 2,
+      festivalDrawIncreaseInterval: 2,
+    });
+    // advanceTurn은 매번 activeTeam을 B→A로 뒤집으므로(A의 턴은 턴 카운터를 올리지 않는다),
+    // "B팀이 막 턴을 마쳤다"는 상황을 매번 다시 세팅해줘야 한다.
+    const advanceAsB = () => {
+      state.activeTeam = 'B';
+      return advanceTurn(state);
+    };
+    // 이번 턴에 새로 예약된 만큼만 읽고, 다음 검증을 위해 소모된 것처럼 리셋한다.
+    const drawnThisTurn = () => {
+      const v = state.teams.A.pendingFestivalDraws;
+      state.teams.A.pendingFestivalDraws = 0;
+      return v;
+    };
+
+    state.turn = 1;
+    advanceAsB();
+    expect(state.turn).toBe(2);
+    expect(drawnThisTurn()).toBe(0); // 아직 festivalTurn 전
+
+    advanceAsB();
+    expect(state.turn).toBe(3); // festivalTurn 도달 — 1단계: n×1=2
+    expect(drawnThisTurn()).toBe(2);
+
+    advanceAsB();
+    expect(state.turn).toBe(4); // 같은 k구간(아직 1단계): n×1=2
+    expect(drawnThisTurn()).toBe(2);
+
+    advanceAsB();
+    expect(state.turn).toBe(5); // k(2턴) 경과 — 2단계로 상승: n×2=4
+    expect(drawnThisTurn()).toBe(4);
+
+    advanceAsB();
+    expect(state.turn).toBe(6); // 같은 k구간(아직 2단계): n×2=4
+    expect(drawnThisTurn()).toBe(4);
+
+    advanceAsB();
+    expect(state.turn).toBe(7); // 다시 k턴 경과 — 3단계로 상승: n×3=6
+    expect(drawnThisTurn()).toBe(6);
+  });
+
+  it('festivalDrawIncreaseInterval=999(기본값)이면 단계 상승 없이 festivalTurn 이후 매 턴 항상 n×1회만 예약된다', () => {
+    const state = initGame(['A1'], ['B1'], rng0, { festivalTurn: 3, festivalDrawCount: 5 });
+    const advanceAsB = () => {
+      state.activeTeam = 'B';
+      return advanceTurn(state);
+    };
+
+    state.turn = 2;
+    advanceAsB();
+    expect(state.turn).toBe(3);
+    expect(state.teams.A.pendingFestivalDraws).toBe(5);
+    state.teams.A.pendingFestivalDraws = 0;
+
+    state.turn = MAX_TURN - 1;
+    advanceAsB();
+    expect(state.turn).toBe(MAX_TURN);
+    expect(state.teams.A.pendingFestivalDraws).toBe(5); // MAX_TURN 근처에서도 여전히 n×1
+  });
+
+  it('예약된 도토리 뽑기는 실용신양(pendingExtraDraws)과 별도로 쌓이고, 다음 장소 클릭에서 실용신양보다 먼저 소모된다', () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.teams.A.pendingFestivalDraws = 2;
+    state.teams.A.pendingExtraDraws = 1;
+
+    const events = drawCard(state, 'house', rng0);
+    const festivalEv = events.find(e => e.type === 'festivalDraws');
+    const bonusEv = events.find(e => e.type === 'bonusDraws');
+    expect(festivalEv).toMatchObject({ type: 'festivalDraws', team: 'A', count: 2 });
+    expect(bonusEv).toMatchObject({ type: 'bonusDraws', team: 'A', count: 1 });
+    expect(events.indexOf(festivalEv!)).toBeLessThan(events.indexOf(bonusEv!));
+
+    const drawCount = events.filter(e => e.type === 'draw').length;
+    expect(drawCount).toBe(4); // 도토리 2장 + 실용신양 1장 + 이번 클릭 1장
+    expect(state.teams.A.pendingFestivalDraws).toBe(0);
+    expect(state.teams.A.pendingExtraDraws).toBe(0);
+  });
+
+  it(`SHEEP_SAFETY_CAP(${SHEEP_SAFETY_CAP})을 넘는 예약은 그 값에서 잘린다`, () => {
+    const state = initGame(['A1'], ['B1'], rng0);
+    state.teams.A.pendingFestivalDraws = SHEEP_SAFETY_CAP + 500;
+
+    const events = drawCard(state, 'house', rng0);
+    const festivalEv = events.find(e => e.type === 'festivalDraws');
+    expect(festivalEv).toMatchObject({ type: 'festivalDraws', count: SHEEP_SAFETY_CAP });
   });
 });
 

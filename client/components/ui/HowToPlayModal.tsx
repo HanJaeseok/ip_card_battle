@@ -1,8 +1,19 @@
 'use client';
 
-import { MAX_TURN, FESTIVAL_TURN, INITIAL_HP, WIN_HP, PLACES } from 'shared';
+import { MAX_TURN, FESTIVAL_TURN, DEFAULT_FESTIVAL_DRAW_COUNT, INITIAL_HP, WIN_HP, PLACES, ANIMALS } from 'shared';
 import { PLACE_NAME, placeAnimalLabel } from '@/lib/places';
-import type { Place } from 'shared';
+import { ANIMAL_INFO } from '@/lib/animals';
+import { SKILL_TITLE } from '@/lib/skillInfo';
+import type { Animal, Place } from 'shared';
+
+// 팀 패널 호버 툴팁(describeSkillShort)과 같은 문구지만, 여기는 살아있는 레벨 숫자가
+// 없는 정적 안내 화면이라 "레벨만큼"으로 대신한다.
+const SKILL_ONE_LINER: Record<Animal, string> = {
+  sheep: '레벨만큼 카드를 더 뽑습니다.',
+  rabbit: '레벨만큼 체력을 획득합니다.',
+  mermaid: '레벨만큼 다음 효과를 증폭합니다.',
+  tiger: '레벨만큼 체력을 강탈해옵니다.',
+};
 
 function MiniPlace({ place }: { place: Place }) {
   return (
@@ -103,6 +114,18 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="overflow-y-auto px-5 py-4 flex flex-col gap-3 bg-gray-50">
+          {/* 핵심 3단계 — 게임을 처음 보는 사람이 가장 먼저 읽어야 할 요약 */}
+          <div className="bg-jungle-900 text-white rounded-xl p-4 flex flex-col gap-2">
+            <p className="text-sm font-bold text-jungle-200">핵심은 이 세 가지예요</p>
+            <div className="flex items-center gap-1.5 text-sm font-bold flex-wrap">
+              <span className="bg-jungle-700 rounded-full px-3 py-1.5">🃏 카드 짝을 맞춘다</span>
+              <span className="text-jungle-400">→</span>
+              <span className="bg-jungle-700 rounded-full px-3 py-1.5">⚡ 지식재산 에너지를 모은다</span>
+              <span className="text-jungle-400">→</span>
+              <span className="bg-jungle-700 rounded-full px-3 py-1.5">✨ 행동을 선택한다!</span>
+            </div>
+          </div>
+
           {/* 내 차례 확인하기 */}
           <Section
             emoji="🚦"
@@ -182,31 +205,34 @@ export function HowToPlayModal({ onClose }: { onClose: () => void }) {
 
           {/* 턴 종료 행동 선택 */}
           <Section emoji="✨" title="내 턴이 끝나면, 행동 하나를 고르세요">
-            카드를 뽑고 정산까지 끝나면 화면 아래 행동 선택 영역이 활성화됩니다. 네 동물 중
-            <b> 딱 하나</b>를 골라야 비로소 턴이 상대에게 넘어갑니다. 효과는 그 동물의{' '}
-            <b>레벨 × 대기 배율</b>에 비례합니다.
+            카드를 뽑고 정산까지 끝나면 화면 아래 행동 선택 영역이 활성화됩니다. 네 동물 중{' '}
+            <b>딱 하나</b>를 골라야 비로소 턴이 상대에게 넘어갑니다.
             <br /><br />
-            <b>🐑 실용신양</b> — 다음 턴에 카드를 (레벨×배율)회 더 뽑습니다.<br />
-            <b>🐰 상표토끼</b> — 내 체력이 (레벨×배율)만큼 오릅니다.<br />
-            <b>🧜‍♀️ 디자인어</b> — 즉시 효과는 없지만, 대기 배율에 <b>2<sup>레벨</sup></b>을 곱합니다.
-            스스로는 배율을 쓰지 않고 계속 쌓이므로, 여러 번 연달아 고르면 배율이 눈덩이처럼
-            불어납니다(예: 레벨 2를 두 번 고르면 ×16).<br />
-            <b>🐯 특허랑이</b> — 상대 체력을 (레벨×배율)만큼 강탈합니다(상대 −n, 나 +n).<br /><br />
-            디자인어를 제외한 세 행동은 쓰는 순간 대기 배율이 <b>1로 초기화</b>됩니다
-            ("다음을 노리기"로 패스해도 배율은 사라지지 않아요). 각 선택지에는 실제로
-            계산된 값이 미리 표시됩니다. 레벨이 0인 동물은 골라도 효과가 없고, 고를 수
-            있는 행동이 하나도 없으면 5초 뒤 자동으로 "아무것도 하지 않음"이 선택됩니다.
+            {ANIMALS.map(animal => (
+              <span key={animal} className="block">
+                <b>{ANIMAL_INFO[animal].emoji} {SKILL_TITLE[animal]}</b> — {SKILL_ONE_LINER[animal]}
+              </span>
+            ))}
+            <br />
+            디자인어는 체력 대신 <b>다음 행동의 배율</b>을 키워두는 행동이라, 연달아 고르면
+            배율이 눈덩이처럼 불어납니다(다른 세 행동을 쓰면 배율은 1로 초기화). 레벨이 0인
+            동물은 골라도 효과가 없고, 고를 수 있는 행동이 하나도 없으면 5초 뒤 자동으로
+            "다음을 노리기"가 선택됩니다.
           </Section>
 
           {/* 축제 */}
           <Section
             emoji="🌰"
-            title={`${FESTIVAL_TURN}턴부터는 축제! 페어 경험치가 2배`}
+            title={`${FESTIVAL_TURN}턴부터는 도토리 축제! 랜덤 뽑기 발동`}
             visual={<span className="text-3xl">🌰🎉🌰</span>}
           >
             {FESTIVAL_TURN}턴이 되면 보드 곳곳에서 도토리가 폭죽처럼 터지며 축제가
-            시작됩니다. 이때부터는 <b>모든 페어 정산에서 얻는 경험치가 2배</b>로 붙어
-            레벨이 훨씬 빠르게 오르고, 자연히 행동을 쓸 기회도 늘어납니다.
+            시작되고, 그 뒤로는 <b>매 턴 계속</b> 다음 차례 팀에게 도토리 뽑기가
+            예약됩니다(기본 {DEFAULT_FESTIVAL_DRAW_COUNT}회 — 한 번 터지고 끝나는 보너스가
+            아니라, 게임이 끝날 때까지 매 턴 반복됩니다). 실용신양과 완전히 똑같은
+            방식으로, 그 팀이 다음 장소를 클릭하는 순간 예약된 도토리가 먼저 무작위
+            장소에서 뽑히고 나서 원래 클릭한 카드가 뽑힙니다. 방장이 정한 주기(턴)가
+            지날 때마다 매 턴 예약되는 횟수 자체가 한 단계씩 늘어날 수도 있습니다.
           </Section>
 
           {/* 게임 종료 */}

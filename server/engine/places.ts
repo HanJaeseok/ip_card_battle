@@ -15,14 +15,14 @@ export function randomPlace(rng: RNG = Math.random): Place {
 
 /**
  * 장소에서 카드 한 장을 뽑는다. 동물은 그 장소가 다루는 동물 중 균등 랜덤(재고 개념 없음),
- * 숫자는 그 장소에 동물이 3종이면 5~9, 2종이면 1~5 범위에서 랜덤으로 나온다.
+ * 숫자는 그 장소에 동물이 3종이면 10~15, 2종이면 5~10 범위에서 랜덤으로 나온다.
  */
 export function drawCardAt(place: Place, rng: RNG = Math.random): StackedCard {
   const options = PLACE_ANIMALS[place];
   const animal = options[Math.floor(rng() * options.length)];
 
   const placeAnimalCount = options.length;
-  const num = (placeAnimalCount >= 3 ? Math.floor(rng() * 5) + 5 : Math.floor(rng() * 5) + 1) as CardNum;
+  const num = (placeAnimalCount >= 3 ? Math.floor(rng() * 6) + 10 : Math.floor(rng() * 6) + 5) as CardNum;
 
   return { id: ++cardIdCounter, animal, num, collectedBy: null };
 }

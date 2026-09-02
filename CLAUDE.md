@@ -4,98 +4,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-**한국특허정보원 카드배틀** — 6×6 보드(중반에 10×10으로 확장)에서 4종 아기 동물 카드(실용신양·상표토끼·디자인어·특허랑이)를 팀 대전으로 짝 맞추는 실시간 멀티플레이 웹 게임. 정확한 보드/턴 수치는 `shared/constants.ts` 참조, 상세 규칙·마일스톤은 `ROADMAP.md` 참조.
+**한국특허정보원 카드배틀** — 맵 네 모서리 장소에서 카드를 뽑아 중앙 동물 스택에 쌓고, 짝수 장이 모이는 순간 획득하는 할리갈리/고스톱류 실시간 N:N 팀 대전 웹 게임. 4대 지식재산권(실용신안·상표·디자인·특허)을 의인화한 아기 동물 카드 4종(🐑실용신양·🐰상표토끼·🧜‍♀️디자인어·🐯특허랑이)이 등장한다.
 
-## 기술 스택
+게임 규칙(장소별 확률, 스킬 공식, 턴 흐름)은 `README.md`가 최신 기준이다. `ROADMAP.md`는 초기 설계 문서로 이후 대개편(6×6 보드 → 장소 클릭 방식, 자동발동 효과 → 턴종료 스킬 선택제 등)을 거쳐 실제 코드와 달라진 부분이 많으니 참고만 할 것 — 정확한 수치는 항상 `shared/constants.ts`·`shared/types.ts`와 실제 코드를 확인한다.
 
-- **클라이언트**: Next.js 15 App Router + TypeScript + Tailwind CSS v4 + ShadcnUI (new-york 스타일)
-- **서버**: Node.js + WebSocket (`ws` 라이브러리)
-- **공유**: `/shared` 디렉토리에 상수·타입 정의
+## 기술 스택 & 모노레포 구조
 
-## 디렉토리 구조 (목표)
+npm workspaces (`client`, `server`, `shared`) — 루트 `package.json`에는 실행 스크립트가 없고, 각 워크스페이스 디렉토리에서 직접 명령을 실행한다.
 
-```
-/client     Next.js 앱 (렌더링·UI·WebSocket 클라이언트)
-/server     Node.js 게임 서버 (상태 관리·타이머·특수 효과)
-/shared     상수·타입 (양쪽에서 import)
-```
+- **`shared/`** — 타입(`types.ts`)·상수(`constants.ts`)·WebSocket 프로토콜(`protocol.ts`), `index.ts`에서 재export. 클라이언트·서버 양쪽에서 `shared` 패키지명으로 import(서버는 jest `moduleNameMapper`, 클라이언트는 workspace 심링크로 해석).
+- **`server/`** — Node.js + `ws` WebSocket 서버. TypeScript를 `ts-node`로 직접 실행(별도 컴파일 없이 개발).
+- **`client/`** — Next.js (App Router) + TypeScript + Tailwind CSS v4. `client/AGENTS.md`가 명시하듯 이 Next.js는 표준판과 다른 브레이킹 체인지가 있을 수 있으니, 확신이 없으면 `node_modules/next/dist/docs/`를 먼저 확인할 것.
 
 ## 개발 명령어
 
 ```bash
-# 클라이언트
-npm run dev       # 개발 서버 (Next.js)
-npm run build     # 프로덕션 빌드
-npm run lint      # ESLint
+# 서버 (WebSocket, 기본 포트 8080)
+cd server
+npm run dev             # ts-node index.ts 직접 실행
+npm test                # jest — server/__tests__/**/*.test.ts (규칙 단위 테스트 + 봇 시뮬레이션)
+npm test -- effects     # 단일 파일만 (testMatch 패턴에 걸리는 이름 일부로 필터)
+npm run test:sim        # 봇 500게임 시뮬레이션 (밸런스 검증, testTimeout 60s)
+npx ts-node scripts/balanceAnalysis.ts [게임수]   # 그리디 봇 기준 스킬별 기여도 분석
+npx ts-node scripts/skillBalanceSuite.ts [게임수] # 여러 봇 전략 조합 종합 밸런스 리포트(md 파일로도 저장)
 
-# 서버
-node server/index.js   # 게임 서버 실행
-
-# 테스트 (단위·시뮬레이션)
-npm test               # 전체 테스트
-npm test -- <파일명>   # 단일 파일 테스트
+# 클라이언트 (Next.js, 기본 포트 3000)
+cd client
+npm run dev
+npm run build
 ```
 
-## 핵심 아키텍처 원칙
+두 서버(WS 8080 + Next 3000)를 각각 별도 터미널로 띄워야 브라우저에서 실제 플레이가 가능하다. 클라이언트가 바라보는 WS 주소는 `NEXT_PUBLIC_WS_URL`(기본 `ws://localhost:8080`)로 바꿀 수 있다. lint 스크립트/설정은 아직 없다.
+
+## 핵심 아키텍처
 
 ### 서버가 유일한 진실(Source of Truth)
-- 게임 상태 전체는 서버에만 존재. 카드의 animal/num은 **미오픈 상태에서 절대 클라이언트로 전송하지 않음** (치팅 방지).
-- 모든 랜덤(강제진행 카드 선택, 실용신양 추가 오픈, 보드 확장 배치)은 서버에서 생성.
-- 30초 턴 타이머는 서버가 `turnDeadline` timestamp로 관리; 클라이언트 타이머는 표시 전용.
+카드는 뽑히는 즉시 공개되므로(숨김 정보 없음) `GameState`를 거의 그대로 클라이언트에 보낸다(`server/serializer.ts`가 `activePlayerNickname`/`turnDeadline`/`teamNames`/`memberIds`만 덧붙임). 모든 랜덤(뽑히는 동물/숫자, 실용신양 추가 뽑기 장소, 시간초과 시 대신 고르는 선택)은 서버에서만 생성된다. 30초(설정 가능) 턴 타이머는 서버가 `turnDeadline` 타임스탬프로 관리하고, 클라이언트 타이머는 표시 전용이다.
 
-### 보드 좌표계
-- `Map<"r,c", Card>` (음수 좌표 허용) — 확장 시(EXPAND_TURN) 외곽 링만 추가하면 되므로 재배치 불필요.
-- 초기: 0~(BOARD_INITIAL-1), 확장 후: 외곽 링 추가 (좌표 범위는 `shared/constants.ts` 값에 따라 자동 계산됨, `server/engine/board.ts` 참조).
+### 게임 엔진 3계층 (server/engine/, UI와 완전 분리 — 순수 함수 + 단위 테스트 대상)
+1. **`gameEngine.ts`** — 외부에서 부르는 진입점. `processPlayerAction`(장소 클릭 → 뽑기+정산) → `processSkillChoice`/`processPass`(턴 종료 시 행동 선택) 2단계 흐름. `processTimeout`이 두 대기 상태 모두를 대신 처리(장소 대기 중이면 무작위 장소, 행동 대기 중이면 무작위 유효 행동 또는 자동 패스).
+2. **`drawCard.ts`** — 실용신양으로 예약된 추가 뽑기(`pendingExtraDraws`, `SHEEP_SAFETY_CAP`까지) 소모 → 클릭한 장소에서 1장 뽑기 → 동물별 미획득 스택이 짝수면 한 번에 정산(`settleStacks`). 정산은 경험치만 올리고 체력은 건드리지 않는다.
+3. **`skills.ts`** / **`turnManager.ts`** — `skills.ts`는 레벨(`floor(exp/threshold)`) 기반 4행동 효과 계산과 경험치 소모, `turnManager.ts`는 턴/팀 교대, 축제(`festivalTurn`) 진입, `MAX_TURN` 초과·즉시 승패(체력 knockout) 판정.
 
-### lastLevel 방식 임계값 판정
-```js
-// 동물별 threshold가 다름에 주의
-const THRESHOLDS = { sheep: 10, rabbit: 10, mermaid: 20, tiger: 20 };
-// 매 턴 floor(score/threshold)를 lastLevel과 비교 → 새로 넘은 구간만 발동
-```
+**행동(스킬) 규칙 요약** — 행동을 고르면 그 동물의 경험치는 `레벨 × threshold`만큼만 차감(초과분은 다음 레벨을 위해 유지)되고, 효과로 얻은 값은 절대 경험치로 되돌아가지 않는다(경험치·체력은 완전히 분리된 자원). `pendingMultiplier`는 디자인어(인어)가 `MERMAID_MULTIPLIER_BASE ** 레벨`로 곱연산 누적시키고, 인어 외의 행동을 쓰면 사용 직후 1로 초기화된다.
 
-### 내부 코드 키 매핑
-```
-sheep  = 실용신양 (실용신안)
-rabbit = 상표토끼 (상표)
-mermaid = 디자인어 (디자인)
-tiger  = 특허랑이 (특허)
-```
-
-### 특수 효과 핵심 수치
-
-| 동물 | threshold | 핵심 계수 |
+| 동물 | threshold | 효과 |
 |---|---|---|
-| sheep | 10 | n장 추가 오픈, 연쇄 cap ~300~400 |
-| rabbit | 10 | `n × 현재턴수`점, 턴 종료 훅 + lastLevel 갱신 후 재폭주 방지 |
-| mermaid | 20 | 뒤처짐: 격차×0.5 흡수 / 앞섬: `round(n×턴×0.3)` 보너스 |
-| tiger | 20 | 상대 sheep·rabbit 각 `round(n×턴×1.5)` 감소 (min 0) |
+| sheep(실용신양) | 10 | 다음 내 턴에 `레벨×배율`회 추가 뽑기 예약(`pendingExtraDraws`) |
+| rabbit(상표토끼) | 10 | 내 체력 `+레벨×배율` |
+| mermaid(디자인어) | 20 | `pendingMultiplier`에 `2^레벨` 곱연산(자기 자신은 배율 미소모) |
+| tiger(특허랑이) | 20 | 상대 체력에서 `레벨×배율`만큼 강탈(보존형 — 상대가 가진 만큼만, 오버킬 없음) |
 
-## 개발 우선순위 (마일스톤)
+### 방(Room) 상태 머신 — `server/room.ts`
+방 하나 = `Room` 인스턴스 하나. 로비(플레이어 join/ready) → `initGame`으로 `GameState` 생성 → 이후 모든 WS 메시지(`drawCard`/`chooseSkill`/`passSkill`)를 검증(현재 턴/대기 상태와 일치하는 플레이어인지)한 뒤 `gameEngine` 진입점을 호출하고 결과를 브로드캐스트하는 흐름. 턴 타이머(`resetTimer`)는 대기 상태(장소 선택 vs 행동 선택)에 따라 `settings.drawTimeSec`/`actionTimeSec`을 쓰고, 실용신양 예약 뽑기 수만큼 `SHEEP_EXTRA_TIME_PER_DRAW_SEC`를 더 준다. 싱글 모드(`addSoloPlayer`)는 B팀을 CPU로 채우고 `performComputerAction`이 일정 딜레이 후 무작위(또는 즉시 승리 가능한 수 우선) 행동을 대신 수행한다. 재접속은 `sessionStorage`에 저장된 `playerId`로 `reconnect` 메시지를 보내 `gameSnapshot`을 다시 받는 방식.
 
-1. **M1** — Task 0+1: UI 없이 봇 대전 40턴 완주 + 단위 테스트 통과
-2. **M2** — Task 2: 브라우저 2개로 1:1 실시간 대전 (임시 UI)
-3. **M3** — Task 3: 확정 목업 UI (타이머 바, 글로우 펄스, 공격력 바)
-4. **M4** — Task 4: 카드 플립·숫자별 리액션·실용신양 연쇄 흔들림 등 전 이벤트 연출
-5. **M5** — Task 5+6: QA + 초대 링크 배포
+### 방장이 정하는 게임 규칙 (`GameSettings`, `shared/constants.ts`)
+`targetScore`(시작 체력이자 승리 격차 — winHp = targetScore×2), `festivalTurn`(도토리 축제 시작 턴), `festivalDrawCount`/`festivalDrawIncreaseInterval`, `drawTimeSec`/`actionTimeSec`/`noActionTimeSec`. 방 생성 시 `clampSettings`로 `SETTINGS_LIMITS` 범위로 잘라내며, 게임 중에는 불변이다. 실제 승패 판정·타이머 계산은 항상 `state.settings`를 참조하고, `shared/constants.ts`의 `INITIAL_HP`/`WIN_HP`/`FESTIVAL_TURN` 등은 "기본 규칙일 때의 참고값"일 뿐이다.
 
-> ⚠️ Task 1(게임 엔진)을 UI와 완전히 분리해 먼저 완성할 것. 규칙이 복잡(연쇄 오픈, lastLevel, 턴 종료 훅)하여 UI에 섞으면 디버깅이 매우 어려움.
+**도토리 축제** — `festivalTurn`에 도달하면 그 턴부터 **매 턴 계속(한 번 터지고 끝나는 일회성 보너스가 아니다)** 다음 팀에게 실용신양과 동일한 방식의 "도토리 뽑기"가 예약된다(`pendingFestivalDraws`, `server/engine/turnManager.ts`의 `festivalDrawCountAt`). 매 턴 같은 횟수가 아니라 `festivalDrawIncreaseInterval`(k)턴이 지날 때마다 그 턴부터 매 턴 예약되는 횟수 자체가 `n×1 → n×2 → n×3 ...`로 한 단계씩 올라간다(디폴트 k=999는 "게임이 끝날 때까지 2단계로 못 올라간다"는 뜻일 뿐, festivalTurn 이후 매 턴 n×1회가 계속 예약되는 것 자체는 기본 설정에도 그대로 적용된다). 이 규칙을 다시 바꿀 때는 "한 번만 터지는 이벤트"로 오해해 되돌리기 쉬우니 주의.
 
-## UI 확정 사항 (Task 3 참고)
+### 클라이언트 — 서버 이벤트를 연출 타임라인으로 번역
+서버는 매 액션마다 `GameEvent[]`(draw/collect/bonusDraws/festivalDraws/skillApplied/skillPassed/festival/gameEnd/timeout* 등)와 최신 `GameState`를 함께 보낸다. `client/hooks/useAnimationQueue.ts`가 이 이벤트 배열을 받아 **연출 순서대로 재생 시각을 계산해 `setTimeout` 체인으로 스케줄링**하는 것이 클라이언트에서 가장 복잡하고 중요한 부분이다 — 실제 게임 상태(`gameState`)는 액션이 끝나는 즉시 최종값으로 도착하지만, 화면에는 "슬롯 스핀 → 카드 노출 → (짝 맞으면) 흔들기 → 팀 쪽으로 날아가기 → 팀 패널 숫자 반영 → 레벨업 판정" 순서로 지연 재생되어야 하므로, 카드 목록(`stackCards`)·경험치 표시값(`displayedExp`)·활성 팀 표시(`displayedActiveTeam`) 모두 서버 진실과 별도의 "화면상 상태"로 관리한다. 다음 액션이 이전 애니메이션 도중 도착하면 타이머를 통째로 취소하고 서버 진실 기준으로 강제 정리하는 방어 로직이 곳곳에 있으니(주석에 과거 버그 사례가 남아있다), 이 훅을 건드릴 때는 그 방어 로직의 이유를 먼저 이해할 것. 연출 레이어 컴포넌트는 `client/components/effects/`, 보드/패널 UI는 `client/components/game/`에 있다.
 
-- 정글 색 팔레트 (연두·녹색 바탕, 갈색 나뭇가지)
-- 현재 차례 플레이어 닉네임 칩: 흰색 글로우 펄스 (`box-shadow` + `@keyframes`, `prefers-reduced-motion` 대응 필수)
-- 특허랑이 아래 공격력 표시: `round((lastLevel+1) × 현재턴 × 1.5)` 실시간 계산
-- 턴 바: 모래시계(⏳) 아이콘 + 30초 카운트다운 프로그레스바
-- 카드판: 마우스 휠 확대/축소 + 드래그 패닝 (터치 포함)
-- 카드 플립: CSS `rotateY` 3D (~250ms) 후 숫자별 리액션 트리거 (1=먼지, 2~3=윙크, 4~5=윙크+👍, 6=윙크+👍+금빛)
-- 미확정 항목(디자인어 연출 등)은 별도 확정 전 구현 보류
+**개발 원칙 — 애니메이션과 실제 로직의 순서는 항상 일치해야 한다.** "카드가 팀 동물 영역으로 도착 → 경험치 반영 → 정산해서 레벨업"처럼 사용자가 기대하는 인과 순서를, 화면도 정확히 그 순서로 보여줘야 한다. `gameState.exp`(서버 진실)가 렌더에 반영되는 시점과, 그 값을 가리는 마스킹 상태(`pendingExpCredit` 등)가 반영되는 시점이 어긋나면 — 예: 마스킹을 일반 `useEffect`로 설정하면 React가 "이미 오른 값이 그대로 노출된" 프레임을 먼저 페인트한 뒤에야 가려버려서, 그 한 프레임 동안 레벨업 감지(`prevLevelRef` 비교) 같은 하위 컴포넌트의 로직이 실제보다 먼저 발동해버린다. 서버 진실이 갱신되는 것과 같은 커밋에서 마스킹 상태도 함께 반영되어야 하는 경우 반드시 `useLayoutEffect`(DOM 반영 직후·페인트 직전에 동기 실행)를 써서 그런 "너무 이른 프레임" 자체가 생기지 않게 할 것 — `useEffect`는 페인트 이후에 비동기로 실행되므로 이 용도로는 쓰면 안 된다.
 
-## 에이전트 사용 가이드
-
-| 상황 | 에이전트 |
-|---|---|
-| 구현 완료 후 코드 품질 검토 | `code-reviewer` |
-| App Router 페이지·레이아웃·라우팅 설계 | `nextjs-app-developer` |
-| 스타터킷 초기화·보일러플레이트 정리 | `starter-cleaner` |
-| UI 컴포넌트 마크업·스타일링 (로직 제외) | `ui-markup-specialist` |
+### 테스트 작성 시 참고
+`server/__tests__/effects.test.ts`는 결정론적 RNG(`rng0`=항상 0번째 선택, `rngLast`=항상 마지막 선택)로 `initGame`부터 각 엔진 함수를 직접 호출하는 패턴을 쓴다. `simulation.test.ts`는 봇 대전을 다회 시뮬레이션해 게임이 항상 유한 턴 내에 끝나는지 등 불변조건을 검증한다.

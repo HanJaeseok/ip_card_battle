@@ -322,18 +322,19 @@ export class Room {
 
   /**
    * 카드 선택(장소 클릭) 대기 중이면 settings.drawTimeSec을, 행동 선택 대기 중이면
-   * settings.actionTimeSec을 기본으로 쓴다. 지금 막 시작된 턴에 실용신양 스킬로
-   * 예약해둔 추가 뽑기가 있다면 그만큼(뽑기 1회당 10초) 시간을 더 준다 — "이번에
-   * 결정해야 할 팀"의 예약된 추가 뽑기 수를 기준으로 계산하며, 행동 선택 대기 중에는
-   * 그 팀이 이미 이번 액션에서 예약분을 소모했으므로 자연히 0이 되어 순수
-   * actionTimeSec으로 돌아간다.
+   * settings.actionTimeSec을 기본으로 쓴다. 지금 막 시작된 턴에 실용신양 스킬 또는
+   * 도토리 축제로 예약해둔 추가 뽑기가 있다면 그 합계만큼(뽑기 1회당 10초) 시간을
+   * 더 준다 — "이번에 결정해야 할 팀"의 예약된 추가 뽑기 수를 기준으로 계산하며,
+   * 행동 선택 대기 중에는 그 팀이 이미 이번 액션에서 예약분을 소모했으므로 자연히
+   * 0이 되어 순수 actionTimeSec으로 돌아간다.
    */
   private resetTimer(): void {
     this.clearTimer();
     if (!this.state) return;
     const settings = this.state.settings;
     const waitingTeam = this.state.pendingChoice ?? this.state.activeTeam;
-    const pendingDraws = this.state.teams[waitingTeam].pendingExtraDraws;
+    const pendingDraws =
+      this.state.teams[waitingTeam].pendingExtraDraws + this.state.teams[waitingTeam].pendingFestivalDraws;
     // 배율이 실린 예약 뽑기가 턴 제한시간을 무한정 늘리지 않도록, 시간 연장 계산에는
     // 상한을 둔다(실제 뽑기 횟수 자체는 이 상한과 무관하게 그대로 진행된다).
     const timerDraws = Math.min(pendingDraws, SHEEP_TIMER_EXTRA_DRAW_CAP);

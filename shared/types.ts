@@ -1,6 +1,6 @@
 export type Animal = 'sheep' | 'rabbit' | 'mermaid' | 'tiger';
 export type Team = 'A' | 'B';
-export type CardNum = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type CardNum = 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 export type GamePhase = 'lobby' | 'playing' | 'ended';
 
 // 맵 네 모서리의 장소 — 각 장소를 클릭하면 괄호 안 동물 중 하나가 무작위로 나온다.
@@ -37,6 +37,7 @@ export interface TeamState {
   hp: number;                      // 체력(=점수) — settings.targetScore에서 시작, 그 두 배 이상이면 승리, 0 이하면 패배
   pendingMultiplier: number;       // 디자인어가 키우는 대기 배율. 초기값 1, 인어 외 스킬을 쓰면 1로 초기화
   pendingExtraDraws: number;       // 실용신양 스킬로 예약된, 다음 내 턴에 추가로 뽑을 카드 수
+  pendingFestivalDraws: number;    // 도토리 축제로 예약된, 다음 내 턴에 추가로 뽑을 카드 수(실용신양과 동일한 방식)
   playerIndex: number;             // 팀 내 현재 차례 플레이어 인덱스 (N:N 로테이션)
   skillStats: Record<Animal, SkillUsageStat>; // 결과 화면에 표시할 스킬 사용 통계
 }
@@ -45,6 +46,8 @@ export interface TeamState {
 export interface GameSettings {
   targetScore: number;    // 목표 점수 — 시작 체력이자 승리에 필요한 격차(시작 hp = targetScore, winHp = targetScore × 2)
   festivalTurn: number;   // 도토리 축제 시작 턴
+  festivalDrawCount: number;           // 도토리 축제 랜덤 뽑기 발동 횟수(n) — festivalTurn에 n×1회 발동
+  festivalDrawIncreaseInterval: number; // 이후 이 턴(k)마다 발동 횟수가 n×2, n×3...으로 늘어난다(기본 999=사실상 재발동 없음)
   drawTimeSec: number;    // 동물 뽑기(장소 클릭) 제한시간
   actionTimeSec: number;  // 행동 선택 제한시간 — 고를 수 있는 행동이 있을 때
   noActionTimeSec: number; // 행동 선택 제한시간 — 고를 수 있는 행동이 하나도 없을 때
@@ -56,7 +59,7 @@ export interface GameState {
   activeTeam: Team;
   activePlayerIndex: number;
   stacks: Record<Animal, StackedCard[]>;      // 동물별 중앙 카드 스택 (수집된 카드도 기록으로 남음)
-  festival: boolean;                          // settings.festivalTurn 이후 여부 — 이때부터 페어 경험치가 2배
+  festival: boolean;                          // settings.festivalTurn 이후 여부 — 이때부터 도토리 축제 랜덤 뽑기가 발동한다
   pendingChoice: Team | null;                 // 턴을 마친 팀이 5가지 선택지(행동 4종 + 패스) 중 하나를 고르길 기다리는 중
   teams: Record<Team, TeamState>;
   winner: Team | 'draw' | null;
@@ -70,12 +73,11 @@ export type GameEvent =
       type: 'collect';
       animal: Animal;
       team: Team;
-      exp: number;      // 실제로 더해진 경험치 (축제 중이면 이미 2배 적용된 값)
-      baseExp: number;  // 축제 배수 적용 전 카드 숫자 합
-      doubled: boolean; // 축제로 2배가 적용됐는지
+      exp: number;      // 카드 숫자 합 — 이 페어를 정산해 실제로 더해진 경험치
       cardIds: number[];
     }
   | { type: 'bonusDraws'; team: Team; count: number } // 실용신양 스킬로 예약해둔 추가 뽑기를 이번 턴에 소모
+  | { type: 'festivalDraws'; team: Team; count: number } // 도토리 축제로 예약해둔 추가 뽑기를 이번 턴에 소모(실용신양과 동일한 방식)
   | {
       type: 'skillApplied';
       team: Team;
@@ -90,7 +92,7 @@ export type GameEvent =
       hpAfter: Record<Team, number>; // 적용 직후 양 팀 체력
     }
   | { type: 'skillPassed'; team: Team; auto: boolean } // "아무것도 하지 않음"을 선택(auto=true면 고를 수 있는 행동이 없어 화면에 알리지 않고 자동 처리)
-  | { type: 'festival' } // FESTIVAL_TURN 도달 — 이때부터 페어 경험치 2배
+  | { type: 'festival' } // FESTIVAL_TURN 도달 — 이때부터 도토리 축제 랜덤 뽑기가 발동한다
   | { type: 'gameEnd'; winner: Team | 'draw'; reason: 'knockout' | 'turnLimit' }
   | { type: 'timeout'; place: Place }
   | { type: 'timeoutChoice'; animal: Animal | null }; // 행동 선택 제한시간 초과 — null이면 고를 행동이 없어 자동 패스
